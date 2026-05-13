@@ -755,10 +755,6 @@
       cursor: grabbing;
     }
 
-    .atlas.is-node-dragging {
-      cursor: grabbing;
-    }
-
     .mist {
       position: absolute;
       inset: auto -10% 8% -10%;
@@ -834,22 +830,6 @@
       translate: -50% -50%;
       transition: opacity .16s ease, transform .16s ease, box-shadow .16s ease, border-color .16s ease;
       text-align: left;
-      cursor: grab;
-      touch-action: none;
-      user-select: none;
-    }
-
-    .node:focus-visible,
-    .node:hover {
-      cursor: grab;
-    }
-
-    .node.is-dragging {
-      z-index: 30;
-      cursor: grabbing;
-      transition: none;
-      border-color: rgba(139, 46, 36, .78);
-      box-shadow: 0 20px 34px rgba(36, 31, 26, .18), 0 0 0 4px rgba(139, 46, 36, .1);
     }
 
     .node::before {
@@ -1906,7 +1886,6 @@
         </div>
         <div class="canvas-actions">
           <button class="ghost-button" type="button" id="fit-view">回到全图</button>
-          <button class="ghost-button" type="button" id="reset-layout" disabled aria-disabled="true">恢复布局</button>
           <button class="ghost-button" type="button" id="toggle-dim">弱化未选中</button>
           <div class="state-dock" aria-label="数据状态">
             <button class="state-button" type="button" data-mode="normal" aria-pressed="true">正常</button>

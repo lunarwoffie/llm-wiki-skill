@@ -101,8 +101,7 @@ test_oriental_atlas_runtime_uses_shared_state() {
     js="$tmp_dir/wiki/graph-wash.js"
 
     assert_file_contains "$js" "buildAtlasModel(DATA)"
-    assert_file_contains "$js" "buildAtlasState(DATA"
-    assert_file_contains "$js" "deriveAtlasLayout(model, {"
+    assert_file_contains "$js" "deriveAtlasLayout(atlasModel)"
     assert_file_contains "$js" "resolveAtlasVisibleSnapshot(state.atlasModel, state.atlasLayout, state.ui)"
     assert_file_contains "$js" "renderAtlasView()"
 

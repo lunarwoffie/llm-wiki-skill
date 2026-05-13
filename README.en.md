@@ -10,7 +10,7 @@ Based on [Andrej Karpathy](https://karpathy.ai/)'s [llm-wiki methodology](https:
 
 Turn scattered information into a growing, interconnected knowledge base
 
-[![version](https://img.shields.io/badge/v3.7.0-Digital%20Landscape%20Graph-E8D5B5?style=flat-square&labelColor=3a3026&color=E8D5B5)](https://github.com/sdyckjq-lab/llm-wiki-skill/releases)
+[![version](https://img.shields.io/badge/v3.6.2-Digital%20Landscape%20Graph-E8D5B5?style=flat-square&labelColor=3a3026&color=E8D5B5)](https://github.com/sdyckjq-lab/llm-wiki-skill/releases)
 [![license](https://img.shields.io/badge/MIT-license-5a6e5c?style=flat-square&labelColor=3a3026)](LICENSE)
 [![platforms](https://img.shields.io/badge/Claude·Codex·OpenClaw·Hermes-multi--platform-7a96a6?style=flat-square&labelColor=3a3026)]
 
@@ -24,7 +24,7 @@ Turn scattered information into a growing, interconnected knowledge base
 <img src="docs/assets/graph-demo.gif" width="100%" alt="Knowledge Graph Demo">
 </div>
 
-Oriental editorial × digital landscape interactive knowledge graph — double-click the HTML file to explore in your browser. Search, filters, layered node grammar, manual node dragging, first-open start previews, summaries, full markdown content, community clustering, and minimap navigation all run offline.
+Oriental editorial × digital landscape interactive knowledge graph — double-click the HTML file to explore in your browser. Search, filters, layered node grammar, first-open start previews, summaries, full markdown content, community clustering, and minimap navigation all run offline.
 
 ---
 
@@ -59,7 +59,7 @@ The key difference: knowledge is **compiled once, maintained continuously** — 
 
 | | Feature | Description |
 |---|---|---|
-| 🗺️ | **Digital Landscape Graph** | Self-contained HTML with a three-column oriental editorial layout, draggable and zoomable canvas, manual node adjustment, minimap navigation, and readable side panels |
+| 🗺️ | **Digital Landscape Graph** | Self-contained HTML with a three-column oriental editorial layout, draggable and zoomable canvas, minimap navigation, and readable side panels |
 | ✨ | **Graph Reading Polish** | Nodes now separate map labels, index slips, and cinnabar annotations; first open shows a start preview before entering reading mode |
 | 🎓 | **Local Reading Flow** | Left-side communities, focus filters, scoped search, a local queue, and recommended starts stay connected to the visible graph |
 | 📦 | **Zero-config Init** | One sentence to create a full knowledge base with directory structure and templates |
@@ -109,7 +109,6 @@ Each platform has its own setup guide:
 - **Core-first Install** — Default setup only includes the core pipeline; optional extractors enabled explicitly
 - **Claude Companion Upgrade Command** — `/llm-wiki-upgrade` included after installation
 - **Material Deletion** — Cascade-delete with automatic cleanup of associated pages, broken links, and cache
-- **Manual Graph Node Adjustment** — Drag nodes away from overlap, keep connected lines in sync, preserve positions after reload, and reset to automatic layout when needed
 - **Query Persistence** — Save valuable comprehensive answers back to the knowledge base
 - **Batch Digestion** — Give a folder path, process all files at once
 - **Knowledge Base Health Check** — Scripts detect orphan pages, broken links, index consistency; plus AI-level contradiction and cross-reference checks

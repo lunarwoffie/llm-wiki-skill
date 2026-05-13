@@ -9,18 +9,7 @@ const {
   measureLabelWidth,
   truncateLabel,
   cardDims,
-  createSafeStorage,
-  buildAtlasModel,
-  getAtlasGraphFingerprint,
-  normalizeAtlasManualPositions,
-  createAtlasManualPositionPayload,
-  hasAtlasDragMoved,
-  atlasScreenDeltaToPercent,
-  resolveAtlasDraggedPosition,
-  isAtlasSecondaryPointer,
-  atlasEdgeTouchesNode,
-  resolveAtlasDragCancel,
-  resolveAtlasDragFinish
+  createSafeStorage
 } = require("../../templates/graph-styles/wash/graph-wash-helpers");
 
 const LABEL_CJK_WIDTH = 15;
@@ -253,230 +242,6 @@ describe("browser export", () => {
     assert.equal(typeof sandbox.window.WikiGraphWashHelpers.truncateLabel, "function");
     assert.equal(typeof sandbox.window.WikiGraphWashHelpers.cardDims, "function");
     assert.equal(typeof sandbox.window.WikiGraphWashHelpers.createSafeStorage, "function");
-    assert.equal(typeof sandbox.window.WikiGraphWashHelpers.getAtlasGraphFingerprint, "function");
-    assert.equal(typeof sandbox.window.WikiGraphWashHelpers.normalizeAtlasManualPositions, "function");
-    assert.equal(typeof sandbox.window.WikiGraphWashHelpers.resolveAtlasDraggedPosition, "function");
-  });
-});
-
-// --- manual atlas positions ---
-
-describe("normalizeAtlasManualPositions", () => {
-  const model = buildAtlasModel({
-    nodes: [
-      { id: "a", label: "Alpha" },
-      { id: "b", label: "Beta" }
-    ],
-    edges: [{ from: "a", to: "b", type: "EXTRACTED" }]
-  });
-  const fingerprint = getAtlasGraphFingerprint(model);
-
-  it("accepts existing node ids with finite coordinates and matching fingerprint", () => {
-    const positions = normalizeAtlasManualPositions({
-      version: 1,
-      graph_fingerprint: fingerprint,
-      positions: {
-        a: { x: 42.5, y: 61.25 }
-      }
-    }, model);
-
-    assert.deepEqual(positions, { a: { x: 42.5, y: 61.25 } });
-  });
-
-  it("requires the expected versioned object shape", () => {
-    assert.deepEqual(normalizeAtlasManualPositions({ a: { x: 42.5, y: 61.25 } }, model), {});
-    assert.deepEqual(normalizeAtlasManualPositions({
-      version: 2,
-      graph_fingerprint: fingerprint,
-      positions: { a: { x: 42.5, y: 61.25 } }
-    }, model), {});
-    assert.deepEqual(normalizeAtlasManualPositions({
-      version: 1,
-      graph_fingerprint: fingerprint,
-      positions: [{ id: "a", x: 42.5, y: 61.25 }]
-    }, model), {});
-  });
-
-  it("ignores payloads for a different graph fingerprint", () => {
-    const positions = normalizeAtlasManualPositions({
-      version: 1,
-      graph_fingerprint: "atlas-v1:stale",
-      positions: {
-        a: { x: 42.5, y: 61.25 }
-      }
-    }, model);
-
-    assert.deepEqual(positions, {});
-  });
-
-  it("drops unknown node ids and invalid coordinates", () => {
-    const positions = normalizeAtlasManualPositions({
-      version: 1,
-      graph_fingerprint: fingerprint,
-      positions: {
-        a: { x: "42.5", y: 61.25 },
-        b: { x: 35, y: Infinity },
-        c: { x: 44, y: 55 },
-        d: { x: 44 }
-      }
-    }, model);
-
-    assert.deepEqual(positions, {});
-  });
-
-  it("clamps restored coordinates to atlas-safe bounds", () => {
-    const positions = normalizeAtlasManualPositions({
-      version: 1,
-      graph_fingerprint: fingerprint,
-      positions: {
-        a: { x: -20, y: 200 },
-        b: { x: 120, y: -40 }
-      }
-    }, model);
-
-    assert.deepEqual(positions, {
-      a: { x: 5, y: 92 },
-      b: { x: 95, y: 8 }
-    });
-  });
-
-  it("creates canonical payloads from raw position maps", () => {
-    const payload = createAtlasManualPositionPayload({
-      a: { x: 44, y: 55 },
-      missing: { x: 11, y: 22 }
-    }, model, fingerprint);
-
-    assert.deepEqual(payload, {
-      version: 1,
-      graph_fingerprint: fingerprint,
-      positions: { a: { x: 44, y: 55 } }
-    });
-  });
-});
-
-// --- atlas drag helpers ---
-
-describe("atlas drag helpers", () => {
-  it("distinguishes click movement from drag movement", () => {
-    assert.equal(hasAtlasDragMoved({ x: 10, y: 10 }, { x: 12, y: 12 }, 4), false);
-    assert.equal(hasAtlasDragMoved({ x: 10, y: 10 }, { x: 14, y: 10 }, 4), true);
-  });
-
-  it("converts screen movement through viewport scale and canvas size", () => {
-    assert.deepEqual(
-      atlasScreenDeltaToPercent(
-        { x: 100, y: 100 },
-        { x: 200, y: 168 },
-        { x: 0, y: 0, scale: 2 },
-        { width: 1000, height: 680 }
-      ),
-      { x: 5, y: 5 }
-    );
-  });
-
-  it("resolves dragged positions and clamps outside safe atlas bounds", () => {
-    const result = resolveAtlasDraggedPosition({
-      startPosition: { x: 94, y: 90 },
-      startPointer: { x: 0, y: 0 },
-      currentPointer: { x: 400, y: 400 },
-      viewport: { x: 0, y: 0, scale: 1 },
-      viewportSize: { width: 1000, height: 680 },
-      threshold: 4
-    });
-
-    assert.equal(result.moved, true);
-    assert.deepEqual(result.position, { x: 95, y: 92 });
-  });
-
-  it("keeps below-threshold movement as a click outcome", () => {
-    const result = resolveAtlasDraggedPosition({
-      startPosition: { x: 40, y: 50 },
-      startPointer: { x: 10, y: 10 },
-      currentPointer: { x: 12, y: 12 },
-      viewport: { x: 0, y: 0, scale: 1 },
-      viewportSize: { width: 1000, height: 680 },
-      threshold: 4
-    });
-
-    assert.deepEqual(result, {
-      moved: false,
-      position: { x: 40, y: 50 },
-      delta: { x: 0, y: 0 }
-    });
-  });
-
-  it("rejects secondary or replacement pointers", () => {
-    assert.equal(isAtlasSecondaryPointer({ pointerId: 2, button: 0, isPrimary: true }, 1), true);
-    assert.equal(isAtlasSecondaryPointer({ pointerId: 1, button: 2, isPrimary: true }, 1), true);
-    assert.equal(isAtlasSecondaryPointer({ pointerId: 1, button: 0, isPrimary: false }, 1), true);
-    assert.equal(isAtlasSecondaryPointer({ pointerId: 1, button: 0, isPrimary: true }, 1), false);
-  });
-
-  it("matches connected edge elements and plain edge objects", () => {
-    assert.equal(atlasEdgeTouchesNode({ dataset: { from: "a", to: "b" } }, "a"), true);
-    assert.equal(atlasEdgeTouchesNode({ source: "a", target: "b" }, "b"), true);
-    assert.equal(atlasEdgeTouchesNode({ source: "a", target: "b" }, "c"), false);
-  });
-
-  it("returns cancel outcomes without persistence for interrupted active drags", () => {
-    const active = { pointerId: 7, moved: true };
-    assert.deepEqual(resolveAtlasDragCancel(active, { pointerId: 7, type: "pointercancel" }), {
-      shouldCancel: true,
-      persist: false,
-      reason: "pointercancel"
-    });
-    assert.deepEqual(resolveAtlasDragCancel(active, { pointerId: 8, type: "pointercancel" }), {
-      shouldCancel: false,
-      persist: false,
-      reason: "other-pointer"
-    });
-    assert.deepEqual(resolveAtlasDragCancel(active, { reason: "blur" }), {
-      shouldCancel: true,
-      persist: false,
-      reason: "blur"
-    });
-    assert.deepEqual(resolveAtlasDragCancel(active, { pointerId: 7, type: "lostpointercapture" }), {
-      shouldCancel: true,
-      persist: false,
-      reason: "lostpointercapture"
-    });
-    assert.deepEqual(resolveAtlasDragCancel(active, { reason: "visibility-hidden" }), {
-      shouldCancel: true,
-      persist: false,
-      reason: "visibility-hidden"
-    });
-    assert.deepEqual(resolveAtlasDragCancel(active, { reason: "active-node-removed" }), {
-      shouldCancel: true,
-      persist: false,
-      reason: "active-node-removed"
-    });
-  });
-
-  it("returns finish outcomes that persist only real drags", () => {
-    const clickOutcome = resolveAtlasDragFinish({
-      pointerId: 7,
-      moved: false,
-      startPosition: { x: 40, y: 50 },
-      currentPosition: { x: 44, y: 55 }
-    }, { pointerId: 7 });
-    const dragOutcome = resolveAtlasDragFinish({
-      pointerId: 7,
-      moved: true,
-      startPosition: { x: 40, y: 50 },
-      currentPosition: { x: 120, y: -5 }
-    }, { pointerId: 7 });
-
-    assert.equal(clickOutcome.shouldFinish, true);
-    assert.equal(clickOutcome.persist, false);
-    assert.deepEqual(clickOutcome.position, { x: 44, y: 55 });
-    assert.equal(dragOutcome.shouldFinish, true);
-    assert.equal(dragOutcome.persist, true);
-    assert.deepEqual(dragOutcome.position, { x: 95, y: 8 });
-    assert.deepEqual(resolveAtlasDragFinish({ pointerId: 7, moved: true }, { pointerId: 8 }), {
-      shouldFinish: false,
-      persist: false,
-      reason: "other-pointer"
-    });
   });
 });
 
@@ -487,13 +252,10 @@ describe("createSafeStorage", () => {
     const store = {};
     const storage = createSafeStorage({
       getItem: (k) => store[k],
-      setItem: (k, v) => { store[k] = v; },
-      removeItem: (k) => { delete store[k]; }
+      setItem: (k, v) => { store[k] = v; }
     });
     storage.set("k", "v");
     assert.equal(storage.get("k"), "v");
-    storage.remove("k");
-    assert.equal(storage.get("k"), undefined);
   });
 
   it("returns null when get throws", () => {
@@ -516,17 +278,6 @@ describe("createSafeStorage", () => {
     assert.equal(logs.length, 1);
   });
 
-  it("swallows remove errors", () => {
-    const logs = [];
-    const storage = createSafeStorage({
-      getItem: () => null,
-      setItem: () => {},
-      removeItem: () => { throw new Error("boom"); }
-    }, (...args) => logs.push(args));
-    storage.remove("k");
-    assert.equal(logs.length, 1);
-  });
-
   it("handles null logger", () => {
     const storage = createSafeStorage({
       getItem: () => { throw new Error("boom"); },
@@ -534,13 +285,11 @@ describe("createSafeStorage", () => {
     }, null);
     assert.equal(storage.get("k"), null);
     storage.set("k", "v");
-    storage.remove("k");
   });
 
   it("handles null storage", () => {
     const storage = createSafeStorage(null, null);
     assert.equal(storage.get("k"), null);
     storage.set("k", "v");
-    storage.remove("k");
   });
 });

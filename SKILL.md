@@ -1,6 +1,6 @@
 ---
 name: llm-wiki
-version: 3.7.0
+version: 3.6.2
 author: sdyckjq-lab
 license: MIT
 description: |
@@ -1004,8 +1004,7 @@ bash ${SKILL_DIR}/scripts/adapter-state.sh classify-run <source_id> <exit_code> 
    生成 `wiki/knowledge-graph.html`。脚本把 `graph-data.json`（已做 `</script>` 转义）
    内嵌进 `<script id="graph-data" type="application/json">`，离线双击即可打开。
    页面保持三栏国风布局：左侧文献索引，中间数字山水图谱，右侧常驻节点详情。
-   包含搜索、社区筛选、节点视觉分层、节点手动拖动、首屏推荐预览、摘要、正文、相邻节点、洞察、小地图和关系置信度图例。
-   用户可拖动单个节点避开遮挡；关联线会实时跟随，松手后位置保存在当前图谱页面本地，点击“恢复布局”可回到自动布局。
+   包含搜索、社区筛选、节点视觉分层、首屏推荐预览、摘要、正文、相邻节点、洞察、小地图和关系置信度图例。
 
 3. **读取 insights 并向用户展示结果**（按 `WIKI_LANG` 切换语言）：
 

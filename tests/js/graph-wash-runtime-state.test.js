@@ -4,7 +4,6 @@ const {
   resolveVisibleSnapshot,
   buildAtlasModel,
   deriveAtlasLayout,
-  getAtlasGraphFingerprint,
   resolveAtlasVisibleSnapshot,
   resolveAtlasSelectedNodeId,
   getAtlasDensityMode,
@@ -150,125 +149,6 @@ describe("atlas state contract", () => {
     assert.deepEqual(
       { x: model.byId.origin.x, y: model.byId.origin.y },
       { x: 5, y: 8 }
-    );
-  });
-
-  it("applies manual node positions before graph-data coordinates", () => {
-    const model = buildAtlasModel({
-      nodes: [
-        { id: "a", label: "A", x: 10, y: 20 },
-        { id: "b", label: "B", x: 30, y: 40 }
-      ],
-      edges: []
-    });
-    const fingerprint = getAtlasGraphFingerprint(model);
-    deriveAtlasLayout(model, {
-      manualPositions: {
-        version: 1,
-        graph_fingerprint: fingerprint,
-        positions: {
-          a: { x: 42.5, y: 61.25 }
-        }
-      }
-    });
-
-    assert.deepEqual(
-      { x: model.byId.a.x, y: model.byId.a.y },
-      { x: 42.5, y: 61.25 }
-    );
-    assert.deepEqual(
-      { x: model.byId.b.x, y: model.byId.b.y },
-      { x: 30, y: 40 }
-    );
-  });
-
-  it("ignores unknown manual nodes and stale manual graph fingerprints", () => {
-    const model = buildAtlasModel({
-      nodes: [
-        { id: "a", label: "A", x: 10, y: 20 },
-        { id: "b", label: "B", x: 30, y: 40 }
-      ],
-      edges: []
-    });
-    deriveAtlasLayout(model, {
-      manualPositions: {
-        version: 1,
-        graph_fingerprint: "atlas-v1:stale",
-        positions: {
-          a: { x: 42.5, y: 61.25 },
-          missing: { x: 88, y: 88 }
-        }
-      }
-    });
-
-    assert.deepEqual(
-      { x: model.byId.a.x, y: model.byId.a.y },
-      { x: 10, y: 20 }
-    );
-    assert.equal(model.byId.missing, undefined);
-  });
-
-  it("clamps manual layout positions to atlas-safe bounds", () => {
-    const model = buildAtlasModel({
-      nodes: [
-        { id: "a", label: "A" },
-        { id: "b", label: "B" }
-      ],
-      edges: []
-    });
-    const fingerprint = getAtlasGraphFingerprint(model);
-    deriveAtlasLayout(model, {
-      manualPositions: {
-        version: 1,
-        graph_fingerprint: fingerprint,
-        positions: {
-          a: { x: -100, y: 200 },
-          b: { x: 140, y: -20 }
-        }
-      }
-    });
-
-    assert.deepEqual(
-      { x: model.byId.a.x, y: model.byId.a.y },
-      { x: 5, y: 92 }
-    );
-    assert.deepEqual(
-      { x: model.byId.b.x, y: model.byId.b.y },
-      { x: 95, y: 8 }
-    );
-  });
-
-  it("returns to raw graph-data or automatic coordinates when manual overrides are cleared", () => {
-    const raw = {
-      nodes: [
-        { id: "explicit", label: "Explicit", x: 20, y: 30 },
-        { id: "auto", label: "Automatic" }
-      ],
-      edges: []
-    };
-    const moved = buildAtlasModel(raw);
-    const fingerprint = getAtlasGraphFingerprint(moved);
-    deriveAtlasLayout(moved, {
-      manualPositions: {
-        version: 1,
-        graph_fingerprint: fingerprint,
-        positions: {
-          explicit: { x: 70, y: 80 },
-          auto: { x: 74, y: 82 }
-        }
-      }
-    });
-
-    const reset = buildAtlasModel(raw);
-    deriveAtlasLayout(reset);
-
-    assert.deepEqual(
-      { x: reset.byId.explicit.x, y: reset.byId.explicit.y },
-      { x: 20, y: 30 }
-    );
-    assert.notDeepEqual(
-      { x: reset.byId.auto.x, y: reset.byId.auto.y },
-      { x: 74, y: 82 }
     );
   });
 

@@ -10,7 +10,7 @@
 
 把碎片化的信息变成持续积累、互相链接的知识库
 
-[![version](https://img.shields.io/badge/v3.7.0-数字山水图谱-E8D5B5?style=flat-square&labelColor=3a3026&color=E8D5B5)](https://github.com/sdyckjq-lab/llm-wiki-skill/releases)
+[![version](https://img.shields.io/badge/v3.6.2-数字山水图谱-E8D5B5?style=flat-square&labelColor=3a3026&color=E8D5B5)](https://github.com/sdyckjq-lab/llm-wiki-skill/releases)
 [![license](https://img.shields.io/badge/MIT-license-5a6e5c?style=flat-square&labelColor=3a3026)](LICENSE)
 [![platforms](https://img.shields.io/badge/Claude·Codex·OpenClaw·Hermes-多平台-7a96a6?style=flat-square&labelColor=3a3026)]
 
@@ -24,7 +24,7 @@
 <img src="docs/assets/graph-demo.gif?v=20260428" width="100%" alt="知识图谱演示">
 </div>
 
-东方编辑部 × 数字山水风交互式知识图谱 — 双击 HTML 文件即可在浏览器中探索。搜索、过滤、节点视觉分层、节点手动拖动、首屏推荐预览、右侧摘要与正文、社区聚类和小地图定位，全部离线运行，不依赖服务器。
+东方编辑部 × 数字山水风交互式知识图谱 — 双击 HTML 文件即可在浏览器中探索。搜索、过滤、节点视觉分层、首屏推荐预览、右侧摘要与正文、社区聚类和小地图定位，全部离线运行，不依赖服务器。
 
 ---
 
@@ -59,7 +59,7 @@ bash install.sh --platform hermes
 
 | | 功能 | 说明 |
 |---|---|---|
-| 🗺️ | **数字山水知识图谱** | 自包含 HTML，双击即可浏览；三栏国风布局、山水底图、可拖拽缩放画布、可手动调整节点、小地图定位和左右阅读区全部离线运行 |
+| 🗺️ | **数字山水知识图谱** | 自包含 HTML，双击即可浏览；三栏国风布局、山水底图、可拖拽缩放画布、小地图定位和左右阅读区全部离线运行 |
 | ✨ | **图谱阅读体验打磨** | 节点按地名、索引签条、朱砂批注分层；首次打开只显示推荐预览，点击后才进入阅读态 |
 | 🎓 | **本地阅读动线** | 左侧社区、聚焦、搜索、学习队列、推荐起点保持联动；搜索跟随当前可见范围，收藏和学习笔记按 wiki 本地隔离 |
 | 📦 | **零配置初始化** | 一句话创建完整知识库，自动生成目录结构、模板和研究方向页 |
@@ -110,7 +110,6 @@ bash install.sh --platform claude --with-optional-adapters
 - **核心优先安装** — 默认只准备知识库主线，网页/X/公众号/YouTube/知乎按需显式开启
 - **伴随升级命令** — Claude Code 安装后自带 `/llm-wiki-upgrade`
 - **素材删除** — 级联删除时自动清理关联页面、断链和缓存
-- **图谱节点手动调整** — 节点可拖动避开遮挡，关联线实时跟随；刷新后保留当前位置，也可一键恢复自动布局
 - **图谱运行时兜底更稳** — helper 同时支持浏览器全局与 CommonJS，旧运行时下的复杂 emoji 截断和离线 HTML 失败回滚都更可靠
 - **查询结果持久化** — 有价值的综合回答可保存回知识库，越用越完整
 - **批量消化** — 给一个文件夹路径，批量处理所有文件

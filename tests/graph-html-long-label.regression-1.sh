@@ -40,8 +40,7 @@ test_graph_html_has_truncate_label_markup_hooks() {
     build_graph_html_fixture "$tmp_dir"
     local html="$output_dir/knowledge-graph.html"
 
-    assert_file_contains "$output_dir/graph-wash.js" 'button.title = `${node.label} · 拖动调整位置，点击查看`;'
-    assert_file_contains "$output_dir/graph-wash.js" '可拖动调整位置'
+    assert_file_contains "$output_dir/graph-wash.js" "button.title = node.label;"
     assert_file_contains "$output_dir/graph-wash.js" "dataset.densityMode"
     assert_file_contains "$output_dir/graph-wash.js" "queue-item"
     assert_file_contains "$html" ".node-name {"
