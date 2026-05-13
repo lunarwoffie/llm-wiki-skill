@@ -19,9 +19,18 @@
     appendQueueNote,
     summarizeQueue,
     buildAtlasModel,
+    getAtlasGraphFingerprint,
+    normalizeAtlasManualPositions,
+    createAtlasManualPositionPayload,
+    clampAtlasPosition,
     deriveAtlasLayout,
     resolveAtlasVisibleSnapshot,
     resolveAtlasSelectedNodeId,
+    resolveAtlasDraggedPosition,
+    isAtlasSecondaryPointer,
+    atlasEdgeTouchesNode,
+    resolveAtlasDragCancel,
+    resolveAtlasDragFinish,
     atlasNodePoint,
     getAtlasModelBounds,
     fitAtlasViewport,
@@ -84,14 +93,17 @@
     rawLocalStorage = window.localStorage;
   } catch (_) {}
 
-  const atlasModel = buildAtlasModel(DATA);
-  const atlasLayout = deriveAtlasLayout(atlasModel);
   const safeLocalStorage = createSafeStorage(rawLocalStorage, console.warn);
-  const storageNamespace = getWikiStorageNamespace(atlasModel.meta, window.location && window.location.pathname);
+  const namespaceModel = buildAtlasModel(DATA);
+  const storageNamespace = getWikiStorageNamespace(namespaceModel.meta, window.location && window.location.pathname);
+  const initialManualPositionPayload = loadManualPositionPayload();
+  const initialAtlasState = buildAtlasState(DATA, initialManualPositionPayload);
 
   const state = {
-    atlasModel,
-    atlasLayout,
+    atlasModel: initialAtlasState.atlasModel,
+    atlasLayout: initialAtlasState.atlasLayout,
+    graphFingerprint: initialAtlasState.graphFingerprint,
+    manualPositions: initialAtlasState.manualPositions,
     queue: loadQueueState(),
     ui: {
       selectedNodeId: null,
@@ -99,7 +111,7 @@
       focusMode: "all",
       query: "",
       dimUnselected: false,
-      dataMode: dataError ? "error" : (atlasModel.nodes.length ? "normal" : "empty"),
+      dataMode: dataError ? "error" : (initialAtlasState.atlasModel.nodes.length ? "normal" : "empty"),
       neighborExpanded: false,
       filters: { EXTRACTED: true, INFERRED: true, AMBIGUOUS: true, UNVERIFIED: true }
     },
@@ -110,9 +122,84 @@
 
   let viewportPaintFrame = 0;
   let panState = null;
+  let nodeDragState = null;
+  let suppressNodeClickId = null;
 
   function queueStorageKey(name) {
     return storageNamespace + ":" + name;
+  }
+
+  function manualPositionStorageKey() {
+    return queueStorageKey("manual-node-positions");
+  }
+
+  function buildAtlasState(rawData, manualPayload) {
+    const model = buildAtlasModel(rawData);
+    const graphFingerprint = getAtlasGraphFingerprint(model);
+    const manualPositions = normalizeAtlasManualPositions(manualPayload, model, graphFingerprint);
+    const manualPositionPayload = {
+      version: 1,
+      graph_fingerprint: graphFingerprint,
+      positions: manualPositions
+    };
+    const layout = deriveAtlasLayout(model, {
+      manualPositions: manualPositionPayload,
+      graphFingerprint
+    });
+    return {
+      atlasModel: model,
+      atlasLayout: layout,
+      graphFingerprint,
+      manualPositions
+    };
+  }
+
+  function loadManualPositionPayload() {
+    const raw = safeLocalStorage.get(manualPositionStorageKey());
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw);
+    } catch (err) {
+      console.warn("[wiki] manual position storage parse failed:", err);
+      return null;
+    }
+  }
+
+  function hasManualPositions() {
+    return Object.keys(state.manualPositions || {}).length > 0;
+  }
+
+  function updateResetLayoutControl() {
+    const resetButton = document.getElementById("reset-layout");
+    if (!resetButton) return;
+    resetButton.disabled = !hasManualPositions();
+    resetButton.setAttribute("aria-disabled", resetButton.disabled ? "true" : "false");
+  }
+
+  function persistManualPosition(nodeId, position) {
+    if (!state.atlasModel.byId[nodeId]) return;
+    const nextPositions = Object.assign({}, state.manualPositions || {});
+    nextPositions[nodeId] = clampAtlasPosition(position);
+    const payload = createAtlasManualPositionPayload(nextPositions, state.atlasModel, state.graphFingerprint);
+    state.manualPositions = payload.positions || {};
+    if (hasManualPositions()) {
+      safeLocalStorage.set(manualPositionStorageKey(), JSON.stringify(payload));
+    } else {
+      safeLocalStorage.remove(manualPositionStorageKey());
+    }
+    updateResetLayoutControl();
+  }
+
+  function resetManualLayout() {
+    cancelNodeDrag();
+    safeLocalStorage.remove(manualPositionStorageKey());
+    const nextAtlasState = buildAtlasState(DATA, null);
+    state.atlasModel = nextAtlasState.atlasModel;
+    state.atlasLayout = nextAtlasState.atlasLayout;
+    state.graphFingerprint = nextAtlasState.graphFingerprint;
+    state.manualPositions = nextAtlasState.manualPositions;
+    updateResetLayoutControl();
+    renderAtlasView({ fitViewport: true });
   }
 
   function loadQueueState() {
@@ -287,6 +374,138 @@
     return String(edge.type || "EXTRACTED").toLowerCase();
   }
 
+  function updateNodeElementPosition(nodeEl, position) {
+    if (!nodeEl || !position) return;
+    nodeEl.style.left = `${position.x}%`;
+    nodeEl.style.top = `${position.y}%`;
+  }
+
+  function connectedEdgeElements(nodeId) {
+    return Array.from(edgeLayer.querySelectorAll(".edge")).filter((edgeEl) => atlasEdgeTouchesNode(edgeEl, nodeId));
+  }
+
+  function updateConnectedEdgePaths(nodeId) {
+    connectedEdgeElements(nodeId).forEach((edgeEl) => {
+      const edge = state.atlasModel.edges.find((item) => item.id === edgeEl.dataset.edgeId);
+      if (!edge) return;
+      const source = state.atlasModel.byId[edge.source];
+      const target = state.atlasModel.byId[edge.target];
+      if (!source || !target) return;
+      edgeEl.setAttribute("d", makePath(source, target, edge));
+    });
+  }
+
+  function clearNodeDragClasses() {
+    atlas.classList.remove("is-node-dragging");
+    document.querySelectorAll(".node.is-dragging").forEach((nodeEl) => {
+      nodeEl.classList.remove("is-dragging");
+    });
+  }
+
+  function releaseNodeDragPointer(dragState) {
+    const active = dragState || nodeDragState;
+    if (!active || !active.nodeEl || !active.nodeEl.hasPointerCapture) return;
+    if (active.nodeEl.hasPointerCapture(active.pointerId)) {
+      active.nodeEl.releasePointerCapture(active.pointerId);
+    }
+  }
+
+  function cancelNodeDrag() {
+    const cancelOutcome = resolveAtlasDragCancel(nodeDragState, { reason: "external" });
+    if (!cancelOutcome.shouldCancel) return;
+    const dragState = nodeDragState;
+    nodeDragState = null;
+    const node = state.atlasModel.byId[dragState.nodeId];
+    if (node) {
+      node.x = dragState.startPosition.x;
+      node.y = dragState.startPosition.y;
+      updateNodeElementPosition(dragState.nodeEl, dragState.startPosition);
+      updateConnectedEdgePaths(dragState.nodeId);
+    }
+    releaseNodeDragPointer(dragState);
+    clearNodeDragClasses();
+  }
+
+  function finishNodeDrag(event) {
+    const finishOutcome = resolveAtlasDragFinish(nodeDragState, event);
+    if (!finishOutcome.shouldFinish) return;
+    const dragState = nodeDragState;
+    const node = state.atlasModel.byId[dragState.nodeId];
+    nodeDragState = null;
+    releaseNodeDragPointer(dragState);
+    clearNodeDragClasses();
+    if (!node || !finishOutcome.persist) return;
+    const finalPosition = finishOutcome.position;
+    node.x = finalPosition.x;
+    node.y = finalPosition.y;
+    state.atlasLayout.nodePositions[dragState.nodeId] = finalPosition;
+    updateNodeElementPosition(dragState.nodeEl, finalPosition);
+    updateConnectedEdgePaths(dragState.nodeId);
+    persistManualPosition(dragState.nodeId, finalPosition);
+    renderMinimap();
+    suppressNodeClickId = dragState.nodeId;
+    window.setTimeout(() => {
+      if (suppressNodeClickId === dragState.nodeId) suppressNodeClickId = null;
+    }, 0);
+    if (event) event.preventDefault();
+  }
+
+  function consumeSuppressedNodeClick(nodeId) {
+    if (suppressNodeClickId !== nodeId) return false;
+    suppressNodeClickId = null;
+    return true;
+  }
+
+  function startNodeDrag(event, node, nodeEl) {
+    if (!node || !nodeEl || isAtlasSecondaryPointer(event, nodeDragState && nodeDragState.pointerId)) return;
+    if (panState) return;
+    nodeDragState = {
+      pointerId: event.pointerId,
+      nodeId: node.id,
+      nodeEl,
+      startPointer: { x: event.clientX, y: event.clientY },
+      startPosition: clampAtlasPosition({ x: node.x, y: node.y }),
+      currentPosition: clampAtlasPosition({ x: node.x, y: node.y }),
+      viewport: { x: state.viewport.x, y: state.viewport.y, scale: state.viewport.scale },
+      moved: false
+    };
+    nodeEl.addEventListener("lostpointercapture", handleNodeDragLostCapture, { once: true });
+    if (nodeEl.setPointerCapture) nodeEl.setPointerCapture(event.pointerId);
+  }
+
+  function handleNodeDragLostCapture(event) {
+    const cancelOutcome = resolveAtlasDragCancel(nodeDragState, event);
+    if (cancelOutcome.shouldCancel) cancelNodeDrag();
+  }
+
+  function moveNodeDrag(event) {
+    if (!nodeDragState || event.pointerId !== nodeDragState.pointerId) return;
+    const node = state.atlasModel.byId[nodeDragState.nodeId];
+    if (!node || !nodeDragState.nodeEl || !nodeDragState.nodeEl.isConnected) {
+      const cancelOutcome = resolveAtlasDragCancel(nodeDragState, { reason: "active-node-removed" });
+      if (cancelOutcome.shouldCancel) cancelNodeDrag();
+      return;
+    }
+    const result = resolveAtlasDraggedPosition({
+      startPosition: nodeDragState.startPosition,
+      startPointer: nodeDragState.startPointer,
+      currentPointer: { x: event.clientX, y: event.clientY },
+      viewport: nodeDragState.viewport,
+      viewportSize: currentViewportSize(),
+      threshold: 4
+    });
+    if (!result.moved && !nodeDragState.moved) return;
+    nodeDragState.moved = true;
+    nodeDragState.currentPosition = result.position;
+    node.x = result.position.x;
+    node.y = result.position.y;
+    nodeDragState.nodeEl.classList.add("is-dragging");
+    atlas.classList.add("is-node-dragging");
+    updateNodeElementPosition(nodeDragState.nodeEl, result.position);
+    updateConnectedEdgePaths(nodeDragState.nodeId);
+    event.preventDefault();
+  }
+
   function connectedIds(id) {
     const out = new Set([id]);
     state.atlasModel.edges.forEach((edge) => {
@@ -417,6 +636,7 @@
   }
 
   function renderCanvas() {
+    cancelNodeDrag();
     const visible = state.visible || refreshVisibleSnapshot();
     atlas.dataset.mode = state.ui.dataMode;
     atlas.dataset.density = visible.densityMode;
@@ -464,14 +684,22 @@
       button.dataset.previewStart = node.id === previewNodeId ? "true" : "false";
       button.style.left = `${node.x}%`;
       button.style.top = `${node.y}%`;
-      button.title = node.label;
+      button.title = `${node.label} · 拖动调整位置，点击查看`;
+      button.setAttribute("aria-label", `${node.label}，可拖动调整位置，点击查看详情`);
       button.setAttribute("aria-pressed", node.id === state.ui.selectedNodeId ? "true" : "false");
       button.innerHTML = `
         <span class="node-kind">${node.kind}</span>
         <span class="node-name">${escapeHtml(node.label)}</span>
         <span class="node-meta"><i class="spark"></i>${node.unavailable ? "来源暂不可用" : Math.round(node.priority || node.weight || 0)}</span>
       `;
-      button.addEventListener("click", () => selectNode(node.id));
+      button.addEventListener("pointerdown", (event) => startNodeDrag(event, node, button));
+      button.addEventListener("click", (event) => {
+        if (consumeSuppressedNodeClick(node.id)) {
+          event.preventDefault();
+          return;
+        }
+        selectNode(node.id);
+      });
       button.addEventListener("mouseenter", () => highlightNeighborhood(node.id));
       button.addEventListener("mouseleave", () => applyFilters());
       nodeLayer.appendChild(button);
@@ -837,6 +1065,7 @@
 
   function setupViewportInteractions() {
     atlas.addEventListener("pointerdown", (event) => {
+      if (nodeDragState) return;
       if (event.button !== 0 || !isCanvasPanTarget(event.target)) return;
       panState = {
         pointerId: event.pointerId,
@@ -850,6 +1079,8 @@
     });
 
     atlas.addEventListener("pointermove", (event) => {
+      moveNodeDrag(event);
+      if (nodeDragState && nodeDragState.pointerId === event.pointerId) return;
       if (!panState || panState.pointerId !== event.pointerId) return;
       setViewport({
         x: panState.viewport.x + event.clientX - panState.startX,
@@ -869,7 +1100,11 @@
     }
 
     atlas.addEventListener("pointerup", finishPan);
-    atlas.addEventListener("pointercancel", finishPan);
+    atlas.addEventListener("pointerup", finishNodeDrag);
+    atlas.addEventListener("pointercancel", (event) => {
+      if (nodeDragState && nodeDragState.pointerId === event.pointerId) cancelNodeDrag();
+      finishPan(event);
+    });
     atlas.addEventListener("wheel", (event) => {
       if (!isCanvasPanTarget(event.target) && !(event.target && event.target.closest && event.target.closest(".node"))) return;
       const rect = atlas.getBoundingClientRect();
@@ -946,6 +1181,15 @@
       });
     }
 
+    const resetLayoutButton = document.getElementById("reset-layout");
+    if (resetLayoutButton) {
+      resetLayoutButton.addEventListener("click", () => {
+        if (!hasManualPositions()) return;
+        resetManualLayout();
+      });
+      updateResetLayoutControl();
+    }
+
     const queueAction = document.getElementById("queue-action");
     if (queueAction) queueAction.addEventListener("click", handleQueueAction);
 
@@ -1004,5 +1248,11 @@
   setupNeighborToggle();
   applyMinimapCollapsed(false);
   window.addEventListener("resize", () => renderAtlasView({ fitViewport: true }));
+  window.addEventListener("blur", cancelNodeDrag);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden" && resolveAtlasDragCancel(nodeDragState, { reason: "visibility-hidden" }).shouldCancel) {
+      cancelNodeDrag();
+    }
+  });
   renderAtlasView({ fitViewport: true });
 })();

@@ -121,6 +121,10 @@
       set: function (key, value) {
         try { storage.setItem(key, value); }
         catch (err) { if (logger) logger("[wiki] storage.set failed:", key, err); }
+      },
+      remove: function (key) {
+        try { storage.removeItem(key); }
+        catch (err) { if (logger) logger("[wiki] storage.remove failed:", key, err); }
       }
     };
   }
@@ -141,6 +145,18 @@
       hash = ((hash << 5) - hash + input.charCodeAt(i)) >>> 0;
     }
     return hash.toString(36);
+  }
+
+  function stableStringify(value) {
+    if (Array.isArray(value)) {
+      return "[" + value.map(stableStringify).join(",") + "]";
+    }
+    if (value && typeof value === "object") {
+      return "{" + Object.keys(value).sort().map(function (key) {
+        return JSON.stringify(key) + ":" + stableStringify(value[key]);
+      }).join(",") + "}";
+    }
+    return JSON.stringify(value);
   }
 
   function getWikiStorageNamespace(meta, pathname) {
@@ -623,6 +639,15 @@
     return numeric;
   }
 
+  function clampAtlasPosition(position, fallback) {
+    var safeFallback = fallback && typeof fallback === "object" ? fallback : { x: 50, y: 50 };
+    var safePosition = position && typeof position === "object" ? position : {};
+    return {
+      x: clampAtlasNumber(safePosition.x, safeFallback.x, 5, 95),
+      y: clampAtlasNumber(safePosition.y, safeFallback.y, 8, 92)
+    };
+  }
+
   function normalizeAtlasViewportSize(size) {
     var safe = size && typeof size === "object" ? size : {};
     return {
@@ -1063,8 +1088,181 @@
     };
   }
 
-  function deriveAtlasLayout(model) {
+  function getAtlasGraphFingerprint(model) {
+    var safe = model && typeof model === "object" ? model : {};
+    var nodes = Array.isArray(safe.nodes) ? safe.nodes : [];
+    var edges = Array.isArray(safe.edges) ? safe.edges : [];
+    var nodeParts = nodes.map(function (node) {
+      return {
+        id: node && node.id == null ? "" : String(node.id),
+        label: node && node.label == null ? "" : String(node.label),
+        type: node && node.type == null ? "" : String(node.type),
+        community: node && node.community == null ? "" : String(node.community),
+        source_path: node && node.source_path == null ? "" : String(node.source_path)
+      };
+    }).sort(function (left, right) {
+      return left.id.localeCompare(right.id);
+    });
+    var edgeParts = edges.map(function (edge) {
+      return {
+        source: edge && edge.source == null ? "" : String(edge.source),
+        target: edge && edge.target == null ? "" : String(edge.target),
+        type: edge && edge.type == null ? "" : String(edge.type)
+      };
+    }).sort(function (left, right) {
+      return (left.source + "\u0000" + left.target + "\u0000" + left.type)
+        .localeCompare(right.source + "\u0000" + right.target + "\u0000" + right.type);
+    });
+    return "atlas-v1:" + hashString(stableStringify({ nodes: nodeParts, edges: edgeParts }));
+  }
+
+  function getAtlasNodeIdSet(model) {
+    var safe = model && typeof model === "object" ? model : {};
+    var ids = {};
+    (Array.isArray(safe.nodes) ? safe.nodes : []).forEach(function (node) {
+      if (node && node.id != null) ids[String(node.id)] = true;
+    });
+    return ids;
+  }
+
+  function normalizeAtlasManualPositions(payload, model, graphFingerprint) {
+    var safePayload = payload && typeof payload === "object" ? payload : null;
+    if (!safePayload || safePayload.version !== 1 || !safePayload.positions || typeof safePayload.positions !== "object" || Array.isArray(safePayload.positions)) {
+      return {};
+    }
+    var expectedFingerprint = graphFingerprint == null ? getAtlasGraphFingerprint(model) : String(graphFingerprint);
+    if (String(safePayload.graph_fingerprint || "") !== expectedFingerprint) return {};
+
+    var nodeIds = getAtlasNodeIdSet(model);
+    return Object.keys(safePayload.positions).reduce(function (out, nodeId) {
+      if (!nodeIds[nodeId]) return out;
+      var position = safePayload.positions[nodeId];
+      if (!position || typeof position !== "object") return out;
+      var x = position.x;
+      var y = position.y;
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return out;
+      out[nodeId] = clampAtlasPosition({ x: x, y: y });
+      return out;
+    }, {});
+  }
+
+  function createAtlasManualPositionPayload(positions, model, graphFingerprint) {
+    var fingerprint = graphFingerprint == null ? getAtlasGraphFingerprint(model) : String(graphFingerprint);
+    var payload = {
+      version: 1,
+      graph_fingerprint: fingerprint,
+      positions: positions && typeof positions === "object" && !Array.isArray(positions) ? positions : {}
+    };
+    return {
+      version: 1,
+      graph_fingerprint: fingerprint,
+      positions: normalizeAtlasManualPositions(payload, model, fingerprint)
+    };
+  }
+
+  function atlasPointerPoint(eventLike) {
+    var safe = eventLike && typeof eventLike === "object" ? eventLike : {};
+    return {
+      x: clampAtlasNumber(safe.clientX != null ? safe.clientX : safe.x, 0, -1000000, 1000000),
+      y: clampAtlasNumber(safe.clientY != null ? safe.clientY : safe.y, 0, -1000000, 1000000)
+    };
+  }
+
+  function atlasDragDistance(startPoint, currentPoint) {
+    var start = atlasPointerPoint(startPoint);
+    var current = atlasPointerPoint(currentPoint);
+    var dx = current.x - start.x;
+    var dy = current.y - start.y;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  function hasAtlasDragMoved(startPoint, currentPoint, threshold) {
+    var dragThreshold = Number.isFinite(Number(threshold)) ? Math.max(0, Number(threshold)) : 4;
+    return atlasDragDistance(startPoint, currentPoint) >= dragThreshold;
+  }
+
+  function atlasScreenDeltaToPercent(startPoint, currentPoint, viewport, viewportSize) {
+    var start = atlasPointerPoint(startPoint);
+    var current = atlasPointerPoint(currentPoint);
+    var safeViewport = normalizeAtlasViewport(viewport);
+    var size = normalizeAtlasViewportSize(viewportSize);
+    return {
+      x: ((current.x - start.x) / safeViewport.scale / size.width) * 100,
+      y: ((current.y - start.y) / safeViewport.scale / size.height) * 100
+    };
+  }
+
+  function resolveAtlasDraggedPosition(options) {
+    var safe = options && typeof options === "object" ? options : {};
+    var startPosition = clampAtlasPosition(safe.startPosition);
+    var moved = hasAtlasDragMoved(safe.startPointer, safe.currentPointer, safe.threshold);
+    if (!moved) {
+      return {
+        moved: false,
+        position: startPosition,
+        delta: { x: 0, y: 0 }
+      };
+    }
+    var delta = atlasScreenDeltaToPercent(safe.startPointer, safe.currentPointer, safe.viewport, safe.viewportSize);
+    var position = clampAtlasPosition({
+      x: startPosition.x + delta.x,
+      y: startPosition.y + delta.y
+    }, startPosition);
+    return {
+      moved: true,
+      position: position,
+      delta: delta
+    };
+  }
+
+  function isAtlasSecondaryPointer(eventLike, activePointerId) {
+    var event = eventLike && typeof eventLike === "object" ? eventLike : {};
+    if (activePointerId != null && event.pointerId != null && event.pointerId !== activePointerId) return true;
+    if (event.isPrimary === false) return true;
+    if (event.button != null && event.button !== 0) return true;
+    return false;
+  }
+
+  function atlasEdgeTouchesNode(edgeLike, nodeId) {
+    var id = nodeId == null ? "" : String(nodeId);
+    var edge = edgeLike && typeof edgeLike === "object" ? edgeLike : {};
+    var data = edge.dataset && typeof edge.dataset === "object" ? edge.dataset : edge;
+    var from = data.from != null ? data.from : data.source;
+    var to = data.to != null ? data.to : data.target;
+    return id !== "" && (String(from) === id || String(to) === id);
+  }
+
+  function resolveAtlasDragCancel(activeDrag, eventLike) {
+    if (!activeDrag) return { shouldCancel: false, persist: false, reason: "idle" };
+    if (!eventLike || typeof eventLike !== "object") {
+      return { shouldCancel: true, persist: false, reason: "external" };
+    }
+    var reason = eventLike.reason || eventLike.type || "external";
+    if (eventLike.pointerId != null && activeDrag.pointerId != null && eventLike.pointerId !== activeDrag.pointerId) {
+      return { shouldCancel: false, persist: false, reason: "other-pointer" };
+    }
+    return { shouldCancel: true, persist: false, reason: String(reason) };
+  }
+
+  function resolveAtlasDragFinish(activeDrag, eventLike) {
+    if (!activeDrag) return { shouldFinish: false, persist: false, reason: "idle" };
+    if (eventLike && eventLike.pointerId != null && activeDrag.pointerId != null && eventLike.pointerId !== activeDrag.pointerId) {
+      return { shouldFinish: false, persist: false, reason: "other-pointer" };
+    }
+    var moved = activeDrag.moved === true;
+    var position = clampAtlasPosition(activeDrag.currentPosition, activeDrag.startPosition);
+    return {
+      shouldFinish: true,
+      persist: moved,
+      reason: moved ? "drag" : "click",
+      position: position
+    };
+  }
+
+  function deriveAtlasLayout(model, options) {
     var safe = model && typeof model === "object" ? model : { nodes: [], communities: [] };
+    var opts = options && typeof options === "object" ? options : {};
+    var manualPositions = normalizeAtlasManualPositions(opts.manualPositions, safe, opts.graphFingerprint);
     var centers = [
       { x: 50, y: 48 },
       { x: 30, y: 34 },
@@ -1091,6 +1289,11 @@
       var center = centers[(communityIndex[communityId] || 0) % centers.length];
       var count = grouped[communityId].length;
       grouped[communityId].forEach(function (node, index) {
+        if (manualPositions[node.id]) {
+          node.x = manualPositions[node.id].x;
+          node.y = manualPositions[node.id].y;
+          return;
+        }
         if (node.x != null && node.y != null && Number.isFinite(Number(node.x)) && Number.isFinite(Number(node.y))) {
           node.x = clampAtlasNumber(node.x, center.x, 5, 95);
           node.y = clampAtlasNumber(node.y, center.y, 8, 92);
@@ -1278,6 +1481,7 @@
     cardDims: cardDims,
     createSafeStorage: createSafeStorage,
     getWikiStorageNamespace: getWikiStorageNamespace,
+    clampAtlasPosition: clampAtlasPosition,
     defaultQueue: defaultQueue,
     normalizeQueue: normalizeQueue,
     toggleQueueFavorite: toggleQueueFavorite,
@@ -1297,6 +1501,18 @@
     resolveVisibleSnapshot: resolveVisibleSnapshot,
     shouldAutoOpenDrawer: shouldAutoOpenDrawer,
     buildAtlasModel: buildAtlasModel,
+    getAtlasGraphFingerprint: getAtlasGraphFingerprint,
+    normalizeAtlasManualPositions: normalizeAtlasManualPositions,
+    createAtlasManualPositionPayload: createAtlasManualPositionPayload,
+    atlasPointerPoint: atlasPointerPoint,
+    atlasDragDistance: atlasDragDistance,
+    hasAtlasDragMoved: hasAtlasDragMoved,
+    atlasScreenDeltaToPercent: atlasScreenDeltaToPercent,
+    resolveAtlasDraggedPosition: resolveAtlasDraggedPosition,
+    isAtlasSecondaryPointer: isAtlasSecondaryPointer,
+    atlasEdgeTouchesNode: atlasEdgeTouchesNode,
+    resolveAtlasDragCancel: resolveAtlasDragCancel,
+    resolveAtlasDragFinish: resolveAtlasDragFinish,
     deriveAtlasLayout: deriveAtlasLayout,
     resolveAtlasVisibleSnapshot: resolveAtlasVisibleSnapshot,
     resolveAtlasSelectedNodeId: resolveAtlasSelectedNodeId,
