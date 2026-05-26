@@ -1,0 +1,15 @@
+{
+  "name": "llm-wiki-agent",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "本地运行的知识库工作台。基于 pi-agent，复用 llm-wiki-skill 内核。",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "workspaces": [
+    "server",
+    "web"
+  ]
+}
