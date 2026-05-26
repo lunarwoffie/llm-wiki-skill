@@ -19,6 +19,11 @@ import {
 	getCurrentKnowledgeBase,
 	setCurrentKnowledgeBase,
 } from "./extensions/knowledge-base.js";
+import {
+	listKnowledgeBases,
+	registerExternalKnowledgeBase,
+	unregisterExternalKnowledgeBase,
+} from "./knowledge-bases.js";
 
 const app = new Hono();
 
@@ -78,6 +83,56 @@ app.post("/api/knowledge-base", async (c) => {
 app.delete("/api/knowledge-base", (c) => {
 	clearCurrentKnowledgeBase();
 	return c.json({ ok: true });
+});
+
+// 所有已知知识库列表（默认根扫描 + 外部登记，带 valid 标志）
+app.get("/api/knowledge-bases", async (c) => {
+	try {
+		const list = await listKnowledgeBases();
+		return c.json({ ok: true, items: list });
+	} catch (err) {
+		return c.json(
+			{ ok: false, error: err instanceof Error ? err.message : String(err) },
+			500,
+		);
+	}
+});
+
+// 登记外部知识库
+app.post("/api/knowledge-bases/external", async (c) => {
+	let body: { path?: unknown };
+	try {
+		body = await c.req.json();
+	} catch {
+		return c.json({ ok: false, error: "Invalid JSON body" }, 400);
+	}
+	if (typeof body.path !== "string" || !body.path.trim()) {
+		return c.json({ ok: false, error: "Missing or empty 'path'" }, 400);
+	}
+	try {
+		const result = await registerExternalKnowledgeBase(body.path);
+		return c.json({ ok: true, ...result });
+	} catch (err) {
+		return c.json(
+			{ ok: false, error: err instanceof Error ? err.message : String(err) },
+			400,
+		);
+	}
+});
+
+// 取消登记外部知识库
+app.delete("/api/knowledge-bases/external", async (c) => {
+	let body: { path?: unknown };
+	try {
+		body = await c.req.json();
+	} catch {
+		return c.json({ ok: false, error: "Invalid JSON body" }, 400);
+	}
+	if (typeof body.path !== "string" || !body.path.trim()) {
+		return c.json({ ok: false, error: "Missing or empty 'path'" }, 400);
+	}
+	const result = await unregisterExternalKnowledgeBase(body.path);
+	return c.json({ ok: true, ...result });
 });
 
 /**
@@ -179,6 +234,9 @@ serve({ fetch: app.fetch, port: PORT }, (info) => {
 	console.log(`  POST   /api/prompt`);
 	console.log(`  POST   /api/reset`);
 	console.log(`  GET    /api/knowledge-base`);
-	console.log(`  POST   /api/knowledge-base   body: {path}`);
+	console.log(`  POST   /api/knowledge-base            body: {path}`);
 	console.log(`  DELETE /api/knowledge-base`);
+	console.log(`  GET    /api/knowledge-bases`);
+	console.log(`  POST   /api/knowledge-bases/external  body: {path}`);
+	console.log(`  DELETE /api/knowledge-bases/external  body: {path}`);
 });

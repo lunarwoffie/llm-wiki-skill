@@ -14,11 +14,13 @@
  */
 
 import type { Dirent } from "node:fs";
-import { readdir, readFile, stat } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import { join, relative } from "node:path";
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
+
+import { inspectKnowledgeBasePath } from "../knowledge-bases.js";
 
 // ============= 状态 =============
 
@@ -34,15 +36,10 @@ export function getCurrentKnowledgeBase(): KnowledgeBaseState | null {
 }
 
 export async function setCurrentKnowledgeBase(absolutePath: string): Promise<KnowledgeBaseState> {
-	// 验证：存在 + 是目录 + 含 .wiki-schema.md（PRODUCT.md §6.2 约定）
-	const info = await stat(absolutePath).catch(() => null);
-	if (!info) throw new Error(`路径不存在：${absolutePath}`);
-	if (!info.isDirectory()) throw new Error(`不是目录：${absolutePath}`);
-
-	const schemaPath = join(absolutePath, ".wiki-schema.md");
-	const schemaInfo = await stat(schemaPath).catch(() => null);
-	if (!schemaInfo) {
-		throw new Error(`目录不是知识库（缺 .wiki-schema.md）：${absolutePath}`);
+	// 共享的有效性检查（PRODUCT.md §6.2 约定）
+	const check = await inspectKnowledgeBasePath(absolutePath);
+	if (!check.valid) {
+		throw new Error(`不是合法知识库（${check.reason}）：${absolutePath}`);
 	}
 
 	const name = absolutePath.split("/").filter(Boolean).pop() ?? absolutePath;
