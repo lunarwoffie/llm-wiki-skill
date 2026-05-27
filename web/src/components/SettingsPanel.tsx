@@ -13,7 +13,10 @@ import { Input } from "@/components/ui/input";
 import {
 	type AuthStatus,
 	getAuthStatus,
+	getConfig,
+	listCommands,
 	setAuthKey,
+	setConfig,
 	testAuthConnection,
 } from "@/lib/api";
 
@@ -33,10 +36,23 @@ export function SettingsPanel({ open, onOpenChange }: Props) {
 	const [provider, setProvider] = useState("anthropic");
 	const [key, setKey] = useState("");
 	const [loading, setLoading] = useState(false);
+	const [showUserGlobalSkills, setShowUserGlobalSkills] = useState(false);
+	const [skillCounts, setSkillCounts] = useState({ builtin: 0, piDefault: 0, userGlobal: 0 });
 	const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
 	const refresh = async () => {
-		setStatus(await getAuthStatus());
+		const [auth, config, allCommands] = await Promise.all([
+			getAuthStatus(),
+			getConfig(),
+			listCommands(true),
+		]);
+		setStatus(auth);
+		setShowUserGlobalSkills(config.showUserGlobalSkills === true);
+		setSkillCounts({
+			builtin: allCommands.filter((item) => item.source === "builtin" && item.skillPath).length,
+			piDefault: allCommands.filter((item) => item.source === "pi-default").length,
+			userGlobal: allCommands.filter((item) => item.source === "user-global").length,
+		});
 	};
 
 	useEffect(() => {
@@ -72,6 +88,17 @@ export function SettingsPanel({ open, onOpenChange }: Props) {
 			setMessage({ type: "error", text: err instanceof Error ? err.message : String(err) });
 		} finally {
 			setLoading(false);
+		}
+	};
+
+	const toggleUserGlobalSkills = async (checked: boolean) => {
+		setShowUserGlobalSkills(checked);
+		try {
+			await setConfig({ showUserGlobalSkills: checked });
+			window.dispatchEvent(new Event("llm-wiki-agent:commands-changed"));
+		} catch (err) {
+			setShowUserGlobalSkills(!checked);
+			setMessage({ type: "error", text: err instanceof Error ? err.message : String(err) });
 		}
 	};
 
@@ -174,6 +201,28 @@ export function SettingsPanel({ open, onOpenChange }: Props) {
 								</div>
 							))}
 						</div>
+					</section>
+
+					<section className="space-y-3 rounded-md border border-input p-3">
+						<div>
+							<div className="text-sm font-medium">Skill 加载</div>
+							<div className="mt-1 text-xs text-muted-foreground">
+								项目内置 {skillCounts.builtin} 个 / pi 默认 {skillCounts.piDefault} 个 / 用户全局{" "}
+								{skillCounts.userGlobal} 个
+							</div>
+						</div>
+						<label className="flex items-center justify-between gap-4 rounded-md bg-muted px-3 py-2 text-sm">
+							<span>
+								<span className="block">展示用户全局 Skill</span>
+								<span className="text-xs text-muted-foreground">~/.claude/skills/</span>
+							</span>
+							<input
+								type="checkbox"
+								checked={showUserGlobalSkills}
+								onChange={(e) => toggleUserGlobalSkills(e.target.checked)}
+								className="size-4 accent-primary"
+							/>
+						</label>
 					</section>
 				</div>
 			</DialogContent>

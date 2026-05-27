@@ -24,6 +24,7 @@ export interface AppConfig {
 	externalKnowledgeBases: string[];
 	/** 最后一次使用的 KB 绝对路径。下次启动用于自动恢复（PRODUCT.md §5.1.1）。 */
 	lastUsedKbPath?: string;
+	showUserGlobalSkills?: boolean;
 	// 未来扩展：默认模型、UI 偏好等
 }
 
@@ -71,10 +72,12 @@ function normalize(raw: unknown): AppConfig {
 		: [];
 	const lastUsedKbPath =
 		typeof obj.lastUsedKbPath === "string" && obj.lastUsedKbPath ? obj.lastUsedKbPath : undefined;
+	const showUserGlobalSkills = obj.showUserGlobalSkills === true;
 	return {
 		version,
 		externalKnowledgeBases: external,
 		lastUsedKbPath,
+		showUserGlobalSkills,
 	};
 }
 

@@ -45,6 +45,7 @@ import {
 	selectKb,
 } from "./agent.js";
 import { getAuthStatus, setAuthKey, testAuthConnection } from "./auth.js";
+import { loadConfig, saveConfig } from "./config.js";
 import { listConversations, piMessagesToUIMessages } from "./conversations.js";
 
 /** 从 session 安全取出模型 provider+id（pi 类型未导出 Model，用结构化访问） */
@@ -262,7 +263,10 @@ app.get("/api/page", async (c) => {
 
 app.get("/api/commands", async (c) => {
 	try {
-		const includeUserGlobal = c.req.query("includeUserGlobal") === "true";
+		const queryValue = c.req.query("includeUserGlobal");
+		const includeUserGlobal =
+			queryValue === "true" ||
+			(queryValue === undefined && (await loadConfig()).showUserGlobalSkills === true);
 		const builtin = [
 			{
 				slug: "/sediment",
@@ -289,6 +293,42 @@ app.get("/api/commands", async (c) => {
 				skillPath: skill.skillPath,
 			}));
 		return c.json({ ok: true, items: [...builtin, ...skills] });
+	} catch (err) {
+		return c.json(
+			{ ok: false, error: err instanceof Error ? err.message : String(err) },
+			500,
+		);
+	}
+});
+
+app.get("/api/config", async (c) => {
+	try {
+		return c.json({ ok: true, config: await loadConfig() });
+	} catch (err) {
+		return c.json(
+			{ ok: false, error: err instanceof Error ? err.message : String(err) },
+			500,
+		);
+	}
+});
+
+app.post("/api/config", async (c) => {
+	let body: { showUserGlobalSkills?: unknown };
+	try {
+		body = await c.req.json();
+	} catch {
+		return c.json({ ok: false, error: "Invalid JSON body" }, 400);
+	}
+	try {
+		const current = await loadConfig();
+		const next = {
+			...current,
+			...(typeof body.showUserGlobalSkills === "boolean"
+				? { showUserGlobalSkills: body.showUserGlobalSkills }
+				: {}),
+		};
+		await saveConfig(next);
+		return c.json({ ok: true, config: next });
 	} catch (err) {
 		return c.json(
 			{ ok: false, error: err instanceof Error ? err.message : String(err) },
@@ -592,4 +632,6 @@ serve({ fetch: app.fetch, port: PORT }, (info) => {
 	console.log(`  GET    /api/artifacts?conversation=<id>`);
 	console.log(`  GET    /api/artifacts/:id`);
 	console.log(`  GET    /api/artifacts/:id/files/:filename`);
+	console.log(`  GET    /api/config`);
+	console.log(`  POST   /api/config`);
 });

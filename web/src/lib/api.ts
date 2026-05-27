@@ -91,6 +91,13 @@ export interface ArtifactManifest {
 	primaryFile: string;
 }
 
+export interface AppConfig {
+	version: 1;
+	externalKnowledgeBases: string[];
+	lastUsedKbPath?: string;
+	showUserGlobalSkills?: boolean;
+}
+
 // ============= API =============
 
 export async function getHealth(): Promise<{
@@ -258,6 +265,24 @@ export async function listCommands(includeUserGlobal = false): Promise<CommandIt
 	const json = (await res.json()) as { ok: boolean; items?: CommandItem[]; error?: string };
 	if (!res.ok || !json.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
 	return json.items ?? [];
+}
+
+export async function getConfig(): Promise<AppConfig> {
+	const res = await fetch("/api/config");
+	const json = (await res.json()) as { ok: boolean; config?: AppConfig; error?: string };
+	if (!res.ok || !json.ok || !json.config) throw new Error(json.error ?? `HTTP ${res.status}`);
+	return json.config;
+}
+
+export async function setConfig(partial: Partial<AppConfig>): Promise<AppConfig> {
+	const res = await fetch("/api/config", {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify(partial),
+	});
+	const json = (await res.json()) as { ok: boolean; config?: AppConfig; error?: string };
+	if (!res.ok || !json.ok || !json.config) throw new Error(json.error ?? `HTTP ${res.status}`);
+	return json.config;
 }
 
 export async function listRefs(kbPath: string, query: string): Promise<PageRef[]> {

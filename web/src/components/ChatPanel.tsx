@@ -99,9 +99,14 @@ export function ChatPanel({
 	);
 
 	useEffect(() => {
-		listCommands()
-			.then(setCommands)
-			.catch(() => setCommands([]));
+		const reload = () => {
+			listCommands()
+				.then(setCommands)
+				.catch(() => setCommands([]));
+		};
+		reload();
+		window.addEventListener("llm-wiki-agent:commands-changed", reload);
+		return () => window.removeEventListener("llm-wiki-agent:commands-changed", reload);
 	}, [currentKnowledgeBaseName]);
 
 	useEffect(() => {
