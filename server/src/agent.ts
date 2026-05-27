@@ -26,6 +26,7 @@ import { loadConfig, saveConfig } from "./config.js";
 import { ensureKbSessionDir, listConversations } from "./conversations.js";
 import knowledgeBaseExtension from "./extensions/knowledge-base.js";
 import { setCurrentKnowledgeBase } from "./extensions/knowledge-base.js";
+import { createNewWikiExtension } from "./extensions/new-wiki.js";
 import { createSynthesisExtension } from "./extensions/synthesis.js";
 
 async function rememberLastUsedKb(kbPath: string): Promise<void> {
@@ -54,7 +55,11 @@ function getResourceLoader(): Promise<DefaultResourceLoader> {
 			const loader = new DefaultResourceLoader({
 				cwd: process.cwd(),
 				agentDir: getAgentDir(),
-				extensionFactories: [knowledgeBaseExtension, createSynthesisExtension(() => active)],
+				extensionFactories: [
+					knowledgeBaseExtension,
+					createSynthesisExtension(() => active),
+					createNewWikiExtension(),
+				],
 			});
 			await loader.reload();
 			console.log("[agent] ResourceLoader ready");
