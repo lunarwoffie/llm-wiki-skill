@@ -158,6 +158,7 @@ function App() {
 					<ChatPanel
 						key={chatKey}
 						currentKnowledgeBaseName={active?.kb.name ?? null}
+						model={active?.model ?? null}
 						initialMessages={initialMessages}
 						onMessageSent={handleMessageSent}
 					/>

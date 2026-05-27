@@ -22,9 +22,20 @@ import {
 	SessionManager,
 } from "@earendil-works/pi-coding-agent";
 
+import { loadConfig, saveConfig } from "./config.js";
 import { ensureKbSessionDir, listConversations } from "./conversations.js";
 import knowledgeBaseExtension from "./extensions/knowledge-base.js";
 import { setCurrentKnowledgeBase } from "./extensions/knowledge-base.js";
+
+async function rememberLastUsedKb(kbPath: string): Promise<void> {
+	try {
+		const config = await loadConfig();
+		if (config.lastUsedKbPath === kbPath) return;
+		await saveConfig({ ...config, lastUsedKbPath: kbPath });
+	} catch (err) {
+		console.warn(`[agent] 写入 lastUsedKbPath 失败: ${err instanceof Error ? err.message : err}`);
+	}
+}
 
 export interface ActiveContext {
 	kb: { path: string; name: string };
@@ -107,6 +118,7 @@ export async function selectKb(kbPath: string): Promise<ActiveContext> {
 	if (modelFallbackMessage) console.log(`[agent] ${modelFallbackMessage}`);
 
 	active = { kb, session, conversationId: session.sessionId, isNew };
+	await rememberLastUsedKb(kbPath);
 	console.log(
 		`[agent] selectKb ${kb.name} → conversation ${active.conversationId.slice(0, 8)} (${isNew ? "new" : "resumed"})`,
 	);
@@ -137,6 +149,7 @@ export async function selectConversation(
 	if (modelFallbackMessage) console.log(`[agent] ${modelFallbackMessage}`);
 
 	active = { kb, session, conversationId: session.sessionId, isNew: false };
+	await rememberLastUsedKb(kbPath);
 	console.log(
 		`[agent] selectConversation ${kb.name} → ${active.conversationId.slice(0, 8)}`,
 	);
@@ -159,6 +172,7 @@ export async function createNewConversation(kbPath: string): Promise<ActiveConte
 	if (modelFallbackMessage) console.log(`[agent] ${modelFallbackMessage}`);
 
 	active = { kb, session, conversationId: session.sessionId, isNew: true };
+	await rememberLastUsedKb(kbPath);
 	console.log(`[agent] createNewConversation ${kb.name} → ${active.conversationId.slice(0, 8)}`);
 	return active;
 }
@@ -168,4 +182,21 @@ export async function createNewConversation(kbPath: string): Promise<ActiveConte
  */
 export async function clearActive(): Promise<void> {
 	await disposeActive();
+}
+
+/**
+ * 启动时自动恢复 config.lastUsedKbPath 指向的 KB（PRODUCT.md §5.1.1）。
+ * 失败（路径已删除等）不抛错，仅记 warn。
+ */
+export async function bootstrapFromConfig(): Promise<void> {
+	try {
+		const config = await loadConfig();
+		if (!config.lastUsedKbPath) return;
+		await selectKb(config.lastUsedKbPath);
+		console.log(`[agent] bootstrap restored: ${config.lastUsedKbPath}`);
+	} catch (err) {
+		console.warn(
+			`[agent] bootstrap restore failed (path may be invalid or removed): ${err instanceof Error ? err.message : err}`,
+		);
+	}
 }

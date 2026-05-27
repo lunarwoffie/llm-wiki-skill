@@ -1,7 +1,8 @@
 import { useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { streamPrompt, type UIMessage } from "@/lib/api";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { type ModelInfo, streamPrompt, type UIMessage } from "@/lib/api";
 
 type ToolMark = { name: string; status: "running" | "done" };
 
@@ -28,19 +29,22 @@ function fromUIMessage(m: UIMessage): Message {
 /**
  * 多轮对话主区。
  *
- * 阶段一 step 8：
+ * 阶段一 step 8 + review 修：
  *   - 接受 initialMessages（历史消息）作为初始状态
  *   - 父组件通过 key 在切换会话时强制重挂载本组件
- *   - 发新消息会追加到本地状态；session 由后端 pi-agent 持久化
+ *   - 顶部状态条按 PRODUCT.md §5.2 占位三栏（KB / 模型 / 设置）
+ *   - 删除"等待 agent 响应…"文字，改用 ▍ 光标
  */
 interface Props {
 	currentKnowledgeBaseName: string | null;
+	model: ModelInfo | null;
 	initialMessages: UIMessage[];
-	onMessageSent?: () => void; // 发完一次 prompt 后回调，父组件可借此刷新对话列表
+	onMessageSent?: () => void;
 }
 
 export function ChatPanel({
 	currentKnowledgeBaseName,
+	model,
 	initialMessages,
 	onMessageSent,
 }: Props) {
@@ -124,6 +128,12 @@ export function ChatPanel({
 		}
 	};
 
+	const lastAssistantId = messages
+		.slice()
+		.reverse()
+		.find((m) => m.role === "assistant")?.id;
+	const showCursorOn = status === "streaming" ? lastAssistantId : null;
+
 	return (
 		<div className="flex h-full flex-col">
 			<header className="flex items-center justify-between border-b border-input px-6 py-3">
@@ -133,8 +143,40 @@ export function ChatPanel({
 						{currentKnowledgeBaseName ?? <span className="italic opacity-60">未选择</span>}
 					</div>
 				</div>
-				<div className="text-xs text-muted-foreground">
-					{messages.length > 0 && `${messages.length} 条消息`}
+				<div className="flex items-center gap-2 text-xs">
+					{messages.length > 0 && (
+						<span className="text-muted-foreground">{messages.length} 条消息</span>
+					)}
+					<Tooltip>
+						<TooltipTrigger asChild>
+							<span className="cursor-help rounded-md border border-input bg-background px-2 py-1 font-mono text-xs text-muted-foreground">
+								🤖 {model ? `${model.provider}/${model.id}` : "无活跃模型"}
+							</span>
+						</TooltipTrigger>
+						<TooltipContent side="bottom">
+							<div className="text-xs">模型路由切换在阶段三</div>
+							<div className="mt-0.5 text-[10px] opacity-70">
+								当前由 pi-agent 默认配置决定（~/.pi/agent/settings.json）
+							</div>
+						</TooltipContent>
+					</Tooltip>
+					<Tooltip>
+						<TooltipTrigger asChild>
+							<button
+								type="button"
+								disabled
+								className="cursor-help rounded-md border border-input bg-background px-2 py-1 text-xs text-muted-foreground opacity-60"
+							>
+								⚙ 设置
+							</button>
+						</TooltipTrigger>
+						<TooltipContent side="bottom">
+							<div className="text-xs">设置面板在阶段二</div>
+							<div className="mt-0.5 text-[10px] opacity-70">
+								将含登录方式 / 默认模型 / UI 偏好 / 库管理
+							</div>
+						</TooltipContent>
+					</Tooltip>
 				</div>
 			</header>
 
@@ -151,13 +193,8 @@ export function ChatPanel({
 					</div>
 				)}
 				{messages.map((m) => (
-					<MessageBubble key={m.id} message={m} />
+					<MessageBubble key={m.id} message={m} showCursor={m.id === showCursorOn} />
 				))}
-				{status === "streaming" &&
-					messages[messages.length - 1]?.content === "" &&
-					messages[messages.length - 1]?.tools.length === 0 && (
-						<div className="text-xs italic text-muted-foreground">等待 agent 响应…</div>
-					)}
 			</div>
 
 			{errorMsg && (
@@ -191,7 +228,7 @@ export function ChatPanel({
 	);
 }
 
-function MessageBubble({ message }: { message: Message }) {
+function MessageBubble({ message, showCursor }: { message: Message; showCursor: boolean }) {
 	const isUser = message.role === "user";
 	return (
 		<div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
@@ -211,7 +248,8 @@ function MessageBubble({ message }: { message: Message }) {
 					</div>
 				)}
 				<div className="whitespace-pre-wrap break-words">
-					{message.content || (message.role === "assistant" ? "…" : "")}
+					{message.content}
+					{showCursor && <span className="ml-0.5 animate-pulse opacity-80">▍</span>}
 				</div>
 			</div>
 		</div>

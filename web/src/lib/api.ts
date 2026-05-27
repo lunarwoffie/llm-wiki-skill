@@ -35,6 +35,11 @@ export interface UIMessage {
 	tools: { name: string; status: "done" }[];
 }
 
+export interface ModelInfo {
+	provider: string;
+	id: string;
+}
+
 export interface ActiveContext {
 	kb: CurrentKnowledgeBase;
 	conversation: {
@@ -42,6 +47,7 @@ export interface ActiveContext {
 		isNew?: boolean;
 		messages: UIMessage[];
 	};
+	model: ModelInfo | null;
 }
 
 // ============= API =============

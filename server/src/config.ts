@@ -22,7 +22,9 @@ const CONFIG_FILE = join(APP_DIR, "config.json");
 export interface AppConfig {
 	version: 1;
 	externalKnowledgeBases: string[];
-	// 未来扩展：默认模型、UI 偏好、最近用过的库等
+	/** 最后一次使用的 KB 绝对路径。下次启动用于自动恢复（PRODUCT.md §5.1.1）。 */
+	lastUsedKbPath?: string;
+	// 未来扩展：默认模型、UI 偏好等
 }
 
 const DEFAULT_CONFIG: AppConfig = {
@@ -67,9 +69,12 @@ function normalize(raw: unknown): AppConfig {
 	const external = Array.isArray(obj.externalKnowledgeBases)
 		? obj.externalKnowledgeBases.filter((p): p is string => typeof p === "string")
 		: [];
+	const lastUsedKbPath =
+		typeof obj.lastUsedKbPath === "string" && obj.lastUsedKbPath ? obj.lastUsedKbPath : undefined;
 	return {
 		version,
 		externalKnowledgeBases: external,
+		lastUsedKbPath,
 	};
 }
 

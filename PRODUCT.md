@@ -709,6 +709,15 @@ open-design 通过启动 CLI 子进程（Claude Code / Codex / Cursor 等 16 个
 
 ## Changelog
 
+- **2026-05-26 v5（阶段一完结 review 修补）**：实际 review 阶段一代码对照文档，发现并修复 3 项硬 gap、4 项偏差对齐
+  - 修 Gap 1：根 `package.json` 加 `npm run dev` 一行起两个服务（用 `concurrently`，符合 §4 阶段一范围第 1 条）
+  - 修 Gap 2：`AppConfig` 加 `lastUsedKbPath`；`selectKb/selectConversation/createNewConversation` 写入；`agent.bootstrapFromConfig()` 启动时 await 恢复（符合 §5.1.1）
+  - 修 Gap 3：`web/index.html` `<html class="dark">`（符合 §5.4 "默认深色"）
+  - §5.2 顶部状态条占位：ChatPanel header 加 `🤖 模型` 显示（disabled，从后端返回的 `active.model` 拿真实 provider/id）+ `⚙ 设置` 占位按钮，tooltip 标注"阶段二/三补"
+  - §5.5 严禁项对齐：删除 "等待 agent 响应…" 文字提示；streaming 时最后一个 assistant 气泡显示 `▍` 光标
+  - §5.4 等宽字体：`index.css` 加 `--font-mono` (JetBrains Mono / SF Mono stack) 给 `code/pre/kbd/samp` 元素
+  - 后端 `/api/knowledge-base` GET/POST、`/api/conversations` POST、`/api/conversations/new` POST 全部在 `active` 上返回 `model: { provider, id } | null`
+  - **明确推迟到阶段二/三**：§5.1 侧栏底部"图谱入口"延迟（阶段四，作者要重新构思）；"设置入口"占位放在 ChatPanel header（阶段二补完整面板）
 - **2026-05-26 v4 (review pass)**：基于源码/文档验证，修复 5 项事实错误 + 4 项精确化 + 3 项软化/标注
   - 修：§3.1 架构图知识库路径 `~/wikis/` → `~/llm-wiki/`，并补充 `~/.pi/agent/auth.json`
   - 修：§6.2 知识库目录补 `wiki/comparisons/`、`wiki/overview.md`、`.wiki-tmp/`、`.gitignore`（依据 `scripts/init-wiki.sh` 实际行为）

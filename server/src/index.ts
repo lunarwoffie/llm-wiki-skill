@@ -23,7 +23,10 @@ import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 
+import type { AgentSession } from "@earendil-works/pi-coding-agent";
+
 import {
+	bootstrapFromConfig,
 	clearActive,
 	createNewConversation,
 	getActive,
@@ -32,6 +35,19 @@ import {
 	selectKb,
 } from "./agent.js";
 import { listConversations, piMessagesToUIMessages } from "./conversations.js";
+
+/** 从 session 安全取出模型 provider+id（pi 类型未导出 Model，用结构化访问） */
+function extractModelInfo(session: AgentSession): { provider: string; id: string } | null {
+	const model = (session.state as { model?: { provider?: unknown; id?: unknown } }).model;
+	if (
+		model &&
+		typeof model.provider === "string" &&
+		typeof model.id === "string"
+	) {
+		return { provider: model.provider, id: model.id };
+	}
+	return null;
+}
 import {
 	listKnowledgeBases,
 	registerExternalKnowledgeBase,
@@ -120,6 +136,7 @@ app.get("/api/knowledge-base", async (c) => {
 				id: ctx.conversationId,
 				messages: piMessagesToUIMessages(ctx.session.state.messages),
 			},
+			model: extractModelInfo(ctx.session),
 		},
 	});
 });
@@ -145,6 +162,7 @@ app.post("/api/knowledge-base", async (c) => {
 					isNew: ctx.isNew,
 					messages: piMessagesToUIMessages(ctx.session.state.messages),
 				},
+				model: extractModelInfo(ctx.session),
 			},
 		});
 	} catch (err) {
@@ -214,6 +232,7 @@ app.post("/api/conversations", async (c) => {
 					isNew: false,
 					messages: piMessagesToUIMessages(ctx.session.state.messages),
 				},
+				model: extractModelInfo(ctx.session),
 			},
 		});
 	} catch (err) {
@@ -241,6 +260,7 @@ app.post("/api/conversations/new", async (c) => {
 			active: {
 				kb: ctx.kb,
 				conversation: { id: ctx.conversationId, isNew: true, messages: [] },
+				model: extractModelInfo(ctx.session),
 			},
 		});
 	} catch (err) {
@@ -326,6 +346,10 @@ app.post("/api/prompt", async (c) => {
 });
 
 const PORT = Number(process.env.PORT ?? 8787);
+
+// 阻塞启动直到 bootstrap 完成。首次启动约 1-2s（pi ResourceLoader + 恢复 session），
+// 换来前端首次 fetch 一致性。dev 模式 tsx watch 重启也会经历此延迟，可接受。
+await bootstrapFromConfig();
 
 serve({ fetch: app.fetch, port: PORT }, (info) => {
 	console.log(`[llm-wiki-agent/server] listening on http://localhost:${info.port}`);
