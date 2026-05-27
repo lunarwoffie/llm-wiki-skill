@@ -1,8 +1,15 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { CommandMenu } from "@/components/CommandMenu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { type ModelInfo, streamPrompt, type UIMessage } from "@/lib/api";
+import {
+	type CommandItem,
+	listCommands,
+	type ModelInfo,
+	streamPrompt,
+	type UIMessage,
+} from "@/lib/api";
 
 type ToolMark = { name: string; status: "running" | "done" };
 
@@ -54,7 +61,61 @@ export function ChatPanel({
 	const [input, setInput] = useState("");
 	const [status, setStatus] = useState<"idle" | "streaming" | "error">("idle");
 	const [errorMsg, setErrorMsg] = useState<string | null>(null);
+	const [commands, setCommands] = useState<CommandItem[]>([]);
+	const [commandMenu, setCommandMenu] = useState<{ open: boolean; query: string; start: number; selected: number }>({
+		open: false,
+		query: "",
+		start: 0,
+		selected: 0,
+	});
 	const abortRef = useRef<AbortController | null>(null);
+	const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+	useEffect(() => {
+		listCommands()
+			.then(setCommands)
+			.catch(() => setCommands([]));
+	}, [currentKnowledgeBaseName]);
+
+	const updateCommandMenu = (value: string, cursor: number) => {
+		const before = value.slice(0, cursor);
+		const match = before.match(/(^|\s)\/(\S*)$/);
+		if (!match) {
+			setCommandMenu((prev) => ({ ...prev, open: false }));
+			return;
+		}
+		const query = match[2] ?? "";
+		setCommandMenu({ open: true, query, start: cursor - query.length - 1, selected: 0 });
+	};
+
+	const visibleCommands = (() => {
+		const normalized = commandMenu.query.toLowerCase();
+		const filtered = commands.filter((item) => {
+			if (!normalized) return true;
+			return (
+				item.slug.toLowerCase().includes(normalized) ||
+				item.name.toLowerCase().includes(normalized) ||
+				item.description.toLowerCase().includes(normalized)
+			);
+		});
+		return [
+			...filtered.filter((item) => item.source === "builtin"),
+			...filtered.filter((item) => item.source !== "builtin"),
+		];
+	})();
+
+	const replaceCommandToken = (item: CommandItem) => {
+		const textarea = textareaRef.current;
+		const cursor = textarea?.selectionStart ?? input.length;
+		const next = `${input.slice(0, commandMenu.start)}${item.slug} ${input.slice(cursor)}`;
+		const nextCursor = commandMenu.start + item.slug.length + 1;
+		setInput(next);
+		setCommandMenu((prev) => ({ ...prev, open: false }));
+		requestAnimationFrame(() => {
+			textareaRef.current?.focus();
+			textareaRef.current?.setSelectionRange(nextCursor, nextCursor);
+		});
+	};
 
 	const sendPrompt = async () => {
 		const text = input.trim();
@@ -124,6 +185,32 @@ export function ChatPanel({
 	};
 
 	const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+		if (e.key === "Escape" && commandMenu.open) {
+			e.preventDefault();
+			setCommandMenu((prev) => ({ ...prev, open: false }));
+			return;
+		}
+		if (commandMenu.open && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+			e.preventDefault();
+			const max = Math.max(visibleCommands.length - 1, 0);
+			setCommandMenu((prev) => ({
+				...prev,
+				selected:
+					e.key === "ArrowDown"
+						? prev.selected >= max
+							? 0
+							: prev.selected + 1
+						: prev.selected <= 0
+							? max
+							: prev.selected - 1,
+			}));
+			return;
+		}
+		if (commandMenu.open && e.key === "Enter" && visibleCommands[commandMenu.selected]) {
+			e.preventDefault();
+			replaceCommandToken(visibleCommands[commandMenu.selected]);
+			return;
+		}
 		if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
 			e.preventDefault();
 			sendPrompt();
@@ -196,19 +283,37 @@ export function ChatPanel({
 			)}
 
 			<div className="border-t border-input p-4">
-				<textarea
-					value={input}
-					onChange={(e) => setInput(e.target.value)}
-					onKeyDown={handleKeyDown}
-					rows={3}
-					className="w-full rounded-md border border-input bg-background p-3 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-					placeholder={
-						currentKnowledgeBaseName
-							? "输入消息… Cmd/Ctrl + Enter 发送"
-							: "请先在左侧选择一个知识库…"
-					}
-					disabled={status === "streaming" || !currentKnowledgeBaseName}
-				/>
+				<div className="relative">
+					<CommandMenu
+						open={commandMenu.open}
+						query={commandMenu.query}
+						items={visibleCommands}
+						selectedIndex={commandMenu.selected}
+						onSelect={replaceCommandToken}
+					/>
+					<textarea
+						ref={textareaRef}
+						value={input}
+						onChange={(e) => {
+							setInput(e.target.value);
+							updateCommandMenu(e.target.value, e.target.selectionStart);
+						}}
+						onClick={(e) => updateCommandMenu(e.currentTarget.value, e.currentTarget.selectionStart)}
+						onKeyUp={(e) => {
+							if (["Escape", "ArrowDown", "ArrowUp", "Enter"].includes(e.key)) return;
+							updateCommandMenu(e.currentTarget.value, e.currentTarget.selectionStart);
+						}}
+						onKeyDown={handleKeyDown}
+						rows={3}
+						className="w-full rounded-md border border-input bg-background p-3 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+						placeholder={
+							currentKnowledgeBaseName
+								? "输入消息… Cmd/Ctrl + Enter 发送"
+								: "请先在左侧选择一个知识库…"
+						}
+						disabled={status === "streaming" || !currentKnowledgeBaseName}
+					/>
+				</div>
 				<div className="mt-2 flex items-center justify-between">
 					<span className="text-xs text-muted-foreground">状态：{status}</span>
 					<Button onClick={sendPrompt} disabled={status === "streaming" || !input.trim() || !currentKnowledgeBaseName}>
