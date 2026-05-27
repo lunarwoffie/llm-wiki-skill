@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { CommandMenu } from "@/components/CommandMenu";
@@ -69,6 +70,7 @@ export function ChatPanel({
 	const [input, setInput] = useState("");
 	const [status, setStatus] = useState<"idle" | "streaming" | "error">("idle");
 	const [errorMsg, setErrorMsg] = useState<string | null>(null);
+	const [ingestDismissedFor, setIngestDismissedFor] = useState<string | null>(null);
 	const [commands, setCommands] = useState<CommandItem[]>([]);
 	const [commandMenu, setCommandMenu] = useState<{ open: boolean; query: string; start: number; selected: number }>({
 		open: false,
@@ -85,6 +87,16 @@ export function ChatPanel({
 	const [refs, setRefs] = useState<PageRef[]>([]);
 	const abortRef = useRef<AbortController | null>(null);
 	const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+	const detectedMaterial = (() => {
+		const text = input.trim();
+		if (/^https?:\/\/\S+$/.test(text)) return { kind: "URL", value: text };
+		if (/^(\/|~\/)\S+$/.test(text)) return { kind: "路径", value: text };
+		return null;
+	})();
+	const ingestChipVisible = Boolean(
+		detectedMaterial && ingestDismissedFor !== detectedMaterial.value,
+	);
 
 	useEffect(() => {
 		listCommands()
@@ -179,9 +191,14 @@ export function ChatPanel({
 	const sendPrompt = async () => {
 		const text = input.trim();
 		if (!text || status === "streaming") return;
+		const outgoingText =
+			ingestChipVisible && detectedMaterial
+				? `请调用 llm-wiki Skill 把以下素材消化到当前知识库的 raw/，完成后回到对话告诉我落地路径：\n${detectedMaterial.value}`
+				: text;
 
 		setErrorMsg(null);
 		setInput("");
+		setIngestDismissedFor(null);
 		const userMsg: Message = { id: newId(), role: "user", content: text, tools: [] };
 		const assistantId = newId();
 		const assistantMsg: Message = { id: assistantId, role: "assistant", content: "", tools: [] };
@@ -192,7 +209,7 @@ export function ChatPanel({
 		abortRef.current = controller;
 
 		try {
-			const stream = await streamPrompt(text, controller.signal);
+			const stream = await streamPrompt(outgoingText, controller.signal);
 			for await (const { event, data } of stream) {
 				if (event === "text_delta") {
 					setMessages((prev) =>
@@ -369,6 +386,19 @@ export function ChatPanel({
 			)}
 
 			<div className="border-t border-input p-4">
+				{ingestChipVisible && detectedMaterial && (
+					<div className="mb-2 flex max-w-xl items-center justify-between gap-3 rounded-md border border-input bg-muted px-3 py-2 text-xs text-muted-foreground">
+						<span className="truncate">检测到{detectedMaterial.kind}，发送时将作为消化素材</span>
+						<button
+							type="button"
+							onClick={() => setIngestDismissedFor(detectedMaterial.value)}
+							className="rounded-sm p-0.5 hover:bg-accent hover:text-accent-foreground"
+							aria-label="关闭消化提示"
+						>
+							<X className="size-3.5" />
+						</button>
+					</div>
+				)}
 				<div className="relative">
 					<CommandMenu
 						open={commandMenu.open}
@@ -389,6 +419,7 @@ export function ChatPanel({
 						value={input}
 						onChange={(e) => {
 							setInput(e.target.value);
+							if (e.target.value.trim() !== ingestDismissedFor) setIngestDismissedFor(null);
 							updateMenus(e.target.value, e.target.selectionStart);
 						}}
 						onClick={(e) => updateMenus(e.currentTarget.value, e.currentTarget.selectionStart)}
