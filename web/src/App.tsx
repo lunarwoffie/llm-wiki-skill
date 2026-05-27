@@ -60,6 +60,7 @@ function App() {
 	const [artifacts, setArtifacts] = useState<ArtifactManifest[]>([]);
 	const [activeArtifactId, setActiveArtifactId] = useState<string | null>(null);
 	const [drawerFullscreen, setDrawerFullscreen] = useState(false);
+	const activeConversationId = active?.conversation.id ?? null;
 
 	const refreshConversations = useCallback(async (kbPath: string) => {
 		try {
@@ -84,6 +85,8 @@ function App() {
 				await refreshConversations(currentActive.kb.path);
 			} else {
 				setConversations([]);
+				setArtifacts([]);
+				setActiveArtifactId(null);
 			}
 		} catch (err) {
 			setSidebarError(err instanceof Error ? err.message : String(err));
@@ -95,6 +98,27 @@ function App() {
 	useEffect(() => {
 		refreshAll();
 	}, [refreshAll]);
+
+	useEffect(() => {
+		if (!activeConversationId) return;
+		let cancelled = false;
+		listArtifacts(activeConversationId)
+			.then((items) => {
+				if (cancelled) return;
+				setArtifacts(items);
+				setActiveArtifactId((current) =>
+					current && items.some((item) => item.id === current)
+						? current
+						: items.at(-1)?.id ?? null,
+				);
+			})
+			.catch((err) => {
+				if (!cancelled) setSidebarError(err instanceof Error ? err.message : String(err));
+			});
+		return () => {
+			cancelled = true;
+		};
+	}, [activeConversationId]);
 
 	const applyActive = (ctx: ActiveContext) => {
 		setActive(ctx);
@@ -185,6 +209,16 @@ function App() {
 		setDrawerMode("artifacts");
 	};
 
+	const handleOpenArtifacts = () => {
+		if (artifacts.length === 0) return;
+		setActiveArtifactId((current) =>
+			current && artifacts.some((item) => item.id === current)
+				? current
+				: artifacts.at(-1)?.id ?? null,
+		);
+		setDrawerMode("artifacts");
+	};
+
 	const handleArtifactCreated = async (id: string) => {
 		if (!active) return;
 		try {
@@ -222,6 +256,8 @@ function App() {
 						currentKnowledgeBasePath={active?.kb.path ?? null}
 						onOpenPage={handleOpenPage}
 						onArtifactCreated={handleArtifactCreated}
+						artifactCount={artifacts.length}
+						onOpenArtifacts={handleOpenArtifacts}
 					/>
 				</main>
 				<RightDrawer

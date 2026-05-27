@@ -41,6 +41,7 @@ import {
 	getActive,
 	getActiveSession,
 	listLoadedSkills,
+	reloadActiveResources,
 	selectConversation,
 	selectKb,
 } from "./agent.js";
@@ -328,13 +329,19 @@ app.post("/api/config", async (c) => {
 	}
 	try {
 		const current = await loadConfig();
-		const next = {
-			...current,
-			...(typeof body.showUserGlobalSkills === "boolean"
-				? { showUserGlobalSkills: body.showUserGlobalSkills }
-				: {}),
+			const next = {
+				...current,
+				...(typeof body.showUserGlobalSkills === "boolean"
+					? { showUserGlobalSkills: body.showUserGlobalSkills }
+					: {}),
 		};
 		await saveConfig(next);
+		if (
+			typeof body.showUserGlobalSkills === "boolean" &&
+			body.showUserGlobalSkills !== current.showUserGlobalSkills
+		) {
+			await reloadActiveResources();
+		}
 		return c.json({ ok: true, config: next });
 	} catch (err) {
 		return c.json(

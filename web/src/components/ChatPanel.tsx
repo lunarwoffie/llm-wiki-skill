@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { X } from "lucide-react";
+import { Files, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { CommandMenu } from "@/components/CommandMenu";
@@ -63,6 +63,8 @@ interface Props {
 	onOpenSettings?: () => void;
 	onOpenPage?: (path: string) => void;
 	onArtifactCreated?: (id: string) => void;
+	artifactCount?: number;
+	onOpenArtifacts?: () => void;
 }
 
 export function ChatPanel({
@@ -74,6 +76,8 @@ export function ChatPanel({
 	onOpenSettings,
 	onOpenPage,
 	onArtifactCreated,
+	artifactCount = 0,
+	onOpenArtifacts,
 }: Props) {
 	const [messages, setMessages] = useState<Message[]>(() => initialMessages.map(fromUIMessage));
 	const [input, setInput] = useState("");
@@ -93,7 +97,7 @@ export function ChatPanel({
 		start: 0,
 		selected: 0,
 	});
-const [refs, setRefs] = useState<PageRef[]>([]);
+	const [refs, setRefs] = useState<PageRef[]>([]);
 	const abortRef = useRef<AbortController | null>(null);
 	const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -179,10 +183,8 @@ const [refs, setRefs] = useState<PageRef[]>([]);
 
 	const replaceCommandToken = (item: CommandItem) => {
 		if (isExportCommand(item.name)) {
-			const prompt = buildExportPrompt(item.name as ExportKind, exportTitleSource());
-			setInput(prompt);
 			setCommandMenu((prev) => ({ ...prev, open: false }));
-			requestAnimationFrame(() => textareaRef.current?.focus());
+			startExport(item.name);
 			return;
 		}
 		const textarea = textareaRef.current;
@@ -214,22 +216,51 @@ const [refs, setRefs] = useState<PageRef[]>([]);
 	const exportTitleSource = () =>
 		messages.find((message) => message.role === "user")?.content ?? input;
 
-	const handleExport = (kind: ExportKind) => {
-		void sendPrompt(buildExportPrompt(kind, exportTitleSource()));
+	const exportDisplayText = (kind: ExportKind) => {
+		const labels: Record<ExportKind, string> = {
+			pdf: "PDF",
+			docx: "Word 文档",
+			pptx: "PPT 演示文稿",
+			xlsx: "Excel 表格",
+			html: "HTML 页面",
+		};
+		return `导出为 ${labels[kind]}`;
 	};
 
-	const sendPrompt = async (overrideText?: string) => {
+	const slashExportKind = (text: string): ExportKind | null => {
+		const match = text.trim().match(/^\/(pdf|docx|pptx|xlsx|html)$/);
+		return match && isExportCommand(match[1]) ? match[1] : null;
+	};
+
+	const startExport = (kind: ExportKind) => {
+		void sendPrompt(buildExportPrompt(kind, exportTitleSource()), exportDisplayText(kind));
+	};
+
+	const handleExport = (kind: ExportKind) => {
+		startExport(kind);
+	};
+
+	const sendPrompt = async (overrideText?: string, displayText?: string) => {
 		const text = (overrideText ?? input).trim();
 		if (!text || status === "streaming") return;
+		if (!overrideText) {
+			const exportKind = slashExportKind(text);
+			if (exportKind) {
+				setCommandMenu((prev) => ({ ...prev, open: false }));
+				startExport(exportKind);
+				return;
+			}
+		}
 		const outgoingText =
 			!overrideText && ingestChipVisible && detectedMaterial
 				? `请调用 llm-wiki Skill 把以下素材消化到当前知识库的 raw/，完成后回到对话告诉我落地路径：\n${detectedMaterial.value}`
 				: text;
+		const visibleText = displayText ?? text;
 
 		setErrorMsg(null);
 		setInput("");
 		setIngestDismissedFor(null);
-		const userMsg: Message = { id: newId(), role: "user", content: text, tools: [] };
+		const userMsg: Message = { id: newId(), role: "user", content: visibleText, tools: [] };
 		const assistantId = newId();
 		const assistantMsg: Message = { id: assistantId, role: "assistant", content: "", tools: [] };
 		setMessages((prev) => [...prev, userMsg, assistantMsg]);
@@ -366,6 +397,16 @@ const [refs, setRefs] = useState<PageRef[]>([]);
 				<div className="flex items-center gap-2 text-xs">
 					{messages.length > 0 && (
 						<span className="text-muted-foreground">{messages.length} 条消息</span>
+					)}
+					{artifactCount > 0 && (
+						<button
+							type="button"
+							onClick={onOpenArtifacts}
+							className="inline-flex items-center gap-1 rounded-md border border-input bg-background px-2 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+						>
+							<Files className="size-3.5" />
+							产物 {artifactCount}
+						</button>
 					)}
 					<Tooltip>
 						<TooltipTrigger asChild>

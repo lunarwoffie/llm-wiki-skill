@@ -1,4 +1,4 @@
-import { Download, ExternalLink } from "lucide-react";
+import { Download } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { getArtifactFileUrl, type ArtifactManifest } from "@/lib/api";
@@ -35,10 +35,6 @@ export function DownloadOnlyRenderer({ manifest }: Props) {
 					<Button onClick={() => downloadFile(primaryUrl, manifest.primaryFile)}>
 						<Download className="size-4" />
 						下载 {manifest.primaryFile}
-					</Button>
-					<Button variant="outline" onClick={() => window.open(primaryUrl, "_blank", "noopener,noreferrer")}>
-						<ExternalLink className="size-4" />
-						打开文件
 					</Button>
 				</div>
 			</div>

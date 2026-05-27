@@ -58,32 +58,51 @@ export interface ActiveContext {
 	isNew: boolean; // 本次 select 是否新建的会话
 }
 
-let resourceLoaderPromise: Promise<DefaultResourceLoader> | null = null;
+let resourceLoaderState: {
+	includeUserGlobal: boolean;
+	promise: Promise<DefaultResourceLoader>;
+} | null = null;
 let active: ActiveContext | null = null;
 
-function getResourceLoader(): Promise<DefaultResourceLoader> {
-	if (!resourceLoaderPromise) {
-		resourceLoaderPromise = (async () => {
-			const loader = new DefaultResourceLoader({
-				cwd: REPO_ROOT,
-				agentDir: getAgentDir(),
-				additionalSkillPaths: [USER_GLOBAL_SKILLS_DIR],
-				extensionFactories: [
-					knowledgeBaseExtension,
-					createSynthesisExtension(() => active),
-					createNewWikiExtension(),
-					createArtifactsExtension(() => active),
-				],
-			});
-			await loader.reload();
-			console.log("[agent] ResourceLoader ready");
-			return loader;
-		})().catch((err) => {
-			resourceLoaderPromise = null;
-			throw err;
-		});
+async function getResourceLoader(): Promise<DefaultResourceLoader> {
+	const includeUserGlobal = (await loadConfig()).showUserGlobalSkills === true;
+	if (!resourceLoaderState || resourceLoaderState.includeUserGlobal !== includeUserGlobal) {
+		const additionalSkillPaths = [
+			PROJECT_SKILLS_DIR,
+			...(includeUserGlobal ? [USER_GLOBAL_SKILLS_DIR] : []),
+		];
+		resourceLoaderState = {
+			includeUserGlobal,
+			promise: (async () => {
+				const loader = new DefaultResourceLoader({
+					cwd: REPO_ROOT,
+					agentDir: getAgentDir(),
+					additionalSkillPaths,
+					extensionFactories: [
+						knowledgeBaseExtension,
+						createSynthesisExtension(() => active),
+						createNewWikiExtension(),
+						createArtifactsExtension(() => active),
+					],
+				});
+				await loader.reload();
+				console.log(
+					`[agent] ResourceLoader ready (project skills + user-global ${includeUserGlobal ? "on" : "off"})`,
+				);
+				return loader;
+			})().catch((err) => {
+				resourceLoaderState = null;
+				throw err;
+			}),
+		};
 	}
-	return resourceLoaderPromise;
+	return resourceLoaderState.promise;
+}
+
+export async function reloadActiveResources(): Promise<ActiveContext | null> {
+	resourceLoaderState = null;
+	if (!active) return null;
+	return selectConversation(active.kb.path, active.conversationId);
 }
 
 async function disposeActive(): Promise<void> {
