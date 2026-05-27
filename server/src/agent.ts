@@ -29,6 +29,8 @@ import {
 
 import { loadConfig, saveConfig } from "./config.js";
 import { ensureKbSessionDir, listConversations } from "./conversations.js";
+import { scanAndRebuildArtifactIndex } from "./artifacts.js";
+import { createArtifactsExtension } from "./extensions/artifacts.js";
 import knowledgeBaseExtension from "./extensions/knowledge-base.js";
 import { setCurrentKnowledgeBase } from "./extensions/knowledge-base.js";
 import { createNewWikiExtension } from "./extensions/new-wiki.js";
@@ -70,6 +72,7 @@ function getResourceLoader(): Promise<DefaultResourceLoader> {
 					knowledgeBaseExtension,
 					createSynthesisExtension(() => active),
 					createNewWikiExtension(),
+					createArtifactsExtension(() => active),
 				],
 			});
 			await loader.reload();
@@ -324,6 +327,7 @@ export async function clearActive(): Promise<void> {
  */
 export async function bootstrapFromConfig(): Promise<void> {
 	try {
+		await scanAndRebuildArtifactIndex();
 		const config = await loadConfig();
 		if (!config.lastUsedKbPath) return;
 		await selectKb(config.lastUsedKbPath);

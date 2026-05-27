@@ -71,6 +71,26 @@ export interface AuthStatus {
 	envKeys: { name: string; present: boolean }[];
 }
 
+export interface ArtifactManifest {
+	id: string;
+	kind: "html" | "pdf" | "docx" | "pptx" | "xlsx";
+	renderer: "iframe" | "download-only";
+	metadata: {
+		title: string;
+		createdAt: string;
+		sourceConversationId: string;
+		sourceKbPath: string;
+		sourceSkill: string;
+		sizeBytes: number;
+	};
+	files: Array<{
+		name: string;
+		sizeBytes: number;
+		mimeType: string;
+	}>;
+	primaryFile: string;
+}
+
 // ============= API =============
 
 export async function getHealth(): Promise<{
@@ -254,6 +274,25 @@ export async function readPage(kbPath: string, relPath: string): Promise<string>
 	const json = (await res.json()) as { ok: boolean; content?: string; error?: string };
 	if (!res.ok || !json.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
 	return json.content ?? "";
+}
+
+export async function listArtifacts(conversationId?: string): Promise<ArtifactManifest[]> {
+	const suffix = conversationId ? `?conversation=${encodeURIComponent(conversationId)}` : "";
+	const res = await fetch(`/api/artifacts${suffix}`);
+	const json = (await res.json()) as { ok: boolean; items?: ArtifactManifest[]; error?: string };
+	if (!res.ok || !json.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
+	return json.items ?? [];
+}
+
+export async function getArtifactManifest(id: string): Promise<ArtifactManifest> {
+	const res = await fetch(`/api/artifacts/${encodeURIComponent(id)}`);
+	const json = (await res.json()) as { ok: boolean; manifest?: ArtifactManifest; error?: string };
+	if (!res.ok || !json.ok || !json.manifest) throw new Error(json.error ?? `HTTP ${res.status}`);
+	return json.manifest;
+}
+
+export function getArtifactFileUrl(id: string, filename: string): string {
+	return `/api/artifacts/${encodeURIComponent(id)}/files/${encodeURIComponent(filename)}`;
 }
 
 export async function getAuthStatus(): Promise<AuthStatus> {

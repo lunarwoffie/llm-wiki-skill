@@ -22,9 +22,18 @@
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
+import { readFile } from "node:fs/promises";
 
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
 
+import {
+	artifactEvents,
+	getArtifact,
+	isValidArtifactId,
+	listArtifacts,
+	resolveArtifactFile,
+	type ArtifactCreatedEvent,
+} from "./artifacts.js";
 import {
 	bootstrapFromConfig,
 	clearActive,
@@ -288,6 +297,46 @@ app.get("/api/commands", async (c) => {
 	}
 });
 
+// ============= 产物 Artifacts =============
+
+app.get("/api/artifacts", (c) => {
+	const conversationId = c.req.query("conversation");
+	return c.json({ ok: true, items: listArtifacts(conversationId) });
+});
+
+app.get("/api/artifacts/:id", (c) => {
+	const id = c.req.param("id");
+	if (!isValidArtifactId(id)) {
+		return c.json({ ok: false, error: "Invalid artifact id" }, 400);
+	}
+	const manifest = getArtifact(id);
+	if (!manifest) return c.json({ ok: false, error: "Artifact not found" }, 404);
+	return c.json({ ok: true, manifest });
+});
+
+app.get("/api/artifacts/:id/files/:filename", async (c) => {
+	const id = c.req.param("id");
+	const filename = c.req.param("filename");
+	if (!isValidArtifactId(id)) {
+		return c.json({ ok: false, error: "Invalid artifact id" }, 400);
+	}
+	try {
+		const file = resolveArtifactFile(id, filename);
+		const body = await readFile(file.path);
+		return new Response(body, {
+			headers: {
+				"Content-Type": file.mimeType,
+				"Content-Length": String(file.sizeBytes),
+				"Content-Disposition": `attachment; filename="${encodeURIComponent(filename)}"`,
+			},
+		});
+	} catch (err) {
+		const message = err instanceof Error ? err.message : String(err);
+		const status = message.includes("不存在") || message.includes("不在 manifest") ? 404 : 400;
+		return c.json({ ok: false, error: message }, status);
+	}
+});
+
 // ============= 模型认证 =============
 
 app.get("/api/auth/status", async (c) => {
@@ -486,6 +535,22 @@ app.post("/api/prompt", async (c) => {
 				// 客户端断开，吞
 			}
 		});
+		const onArtifactCreated = async (event: ArtifactCreatedEvent) => {
+			if (event.conversationId !== getActive()?.conversationId) return;
+			try {
+				await stream.writeSSE({
+					event: "artifact_created",
+					data: JSON.stringify({
+						id: event.id,
+						kind: event.kind,
+						title: event.title,
+					}),
+				});
+			} catch {
+				// 客户端断开，吞
+			}
+		};
+		artifactEvents.on("artifact_created", onArtifactCreated);
 
 		try {
 			await session.prompt(message);
@@ -499,6 +564,7 @@ app.post("/api/prompt", async (c) => {
 			});
 		} finally {
 			unsubscribe();
+			artifactEvents.off("artifact_created", onArtifactCreated);
 		}
 	});
 });
@@ -523,4 +589,7 @@ serve({ fetch: app.fetch, port: PORT }, (info) => {
 	console.log(`  GET    /api/conversations?kb=<path>`);
 	console.log(`  POST   /api/conversations`);
 	console.log(`  POST   /api/conversations/new`);
+	console.log(`  GET    /api/artifacts?conversation=<id>`);
+	console.log(`  GET    /api/artifacts/:id`);
+	console.log(`  GET    /api/artifacts/:id/files/:filename`);
 });
