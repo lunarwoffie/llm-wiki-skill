@@ -194,7 +194,7 @@ llm-wiki-agent/                       ← 你的仓库
 
 每个阶段：**目标 → 范围 → 不包含 → 验收**。验收不过不进下一阶段。
 
-### 阶段一：主干打通（最小可用）
+### 阶段一：主干打通（最小可用） ✅ 已完成 2026-05-26
 
 **目标**：验证"前端 ↔ 后端 ↔ pi-agent ↔ Skill ↔ 文件系统"全链路。
 
@@ -219,6 +219,30 @@ llm-wiki-agent/                       ← 你的仓库
 2. 切到另一个库再问，对话上下文完全切换
 3. 同一库内开两个对话，互不污染
 4. 关闭浏览器再打开，自动选中最近对话，历史完整
+
+**完成情况** ✅ 2026-05-26（最终 commit `dd021bc`）
+
+- 8 个 step commit + 2 个 review 修补 commit，详见 §10 进度追踪
+- 范围全部交付；4 项验收标准实测全通（验收 1 实测中 agent 用 `list_knowledge_base_pages` Extension 工具回答，效果等价于读 `index.md`，更精准）
+- **接受的妥协（不阻塞阶段二）**：
+  - §5.2 顶部 "⚙ 设置" 按钮仅占位（disabled + tooltip）—— 完整设置面板在阶段二
+  - §5.1 侧栏底部"图谱入口"未实现 —— 作者要重新构思图谱设计，推迟到阶段四
+  - 默认模型不强制 Sonnet，沿用 pi-agent 用户设置（见 TBD-2）
+- **启动 & 运行速查**（compact 后从这里恢复上下文）：
+
+| 维度 | 值 |
+|---|---|
+| 一行启动 | `npm run dev`（从仓库根；用 `concurrently` 同时起前后端）|
+| 后端端口 | `8787`（`server/src/index.ts`，Hono）|
+| 前端端口 | `5180`（`web/vite.config.ts`，`strictPort: true`，冲突直接报错而非漂移）|
+| 启动耗时 | ~2-5s（pi ResourceLoader + `bootstrapFromConfig` 自动恢复）|
+| 默认模型 | 由 `~/.pi/agent/settings.json` 决定（不由本项目强制；作者当前为 `zai/glm-5.1`）|
+| 自动恢复 | `selectKb` 写 `~/.llm-wiki-agent/config.json` 的 `lastUsedKbPath`，server 启动 `await bootstrapFromConfig()` |
+| 知识库 | 默认根 `~/llm-wiki/` + 外部登记（`config.externalKnowledgeBases[]`）|
+| 会话目录 | `~/.llm-wiki-agent/sessions/<sha256-of-kb-path>/*.jsonl`（pi `SessionManager` 管理）|
+| Extension 工具 | `current_knowledge_base()` / `list_knowledge_base_pages()`（仅这俩，阶段二补 `@`/`/`/`/sediment` 等）|
+| 已知 endpoints | 13 个，列表见 `server/src/index.ts` 顶部注释 |
+| Node 版本要求 | `>=22.19.0`（pi-coding-agent 0.75.x 硬要求，仓库根 `.mise.toml` / `.nvmrc` 锁定）|
 
 ### 阶段二：核心循环（@、/、结晶、消化）
 
@@ -652,25 +676,47 @@ open-design 通过启动 CLI 子进程（Claude Code / Codex / Cursor 等 16 个
 
 ---
 
-## 10. 下一步行动
+## 10. 进度追踪
 
-阶段一拆解（每一步动手前 AI 都要先说计划，作者确认后再动）：
+### 阶段一：主干打通 ✅ 已完成 2026-05-26
 
-1. 仓库骨架：`package.json` / `.gitignore` / `README.md` / `LICENSE` / `tsconfig.json`
-2. 后端骨架：Node + Hono，跑通最小 `/api/echo` 接口（先不接 agent，验证起服务）
-3. 前端骨架：Vite + React + shadcn/ui，对话框 UI，连通后端 SSE（先收回显事件流）
-4. 接入 pi-coding-agent SDK，实现真正的对话
-5. 第一个 Extension：注入 `currentKnowledgeBase` 上下文
-6. 知识库扫描接口：扫 `~/llm-wiki/` + 读 `config.json` 外部库 → 返回列表
-7. 前端知识库选择 UI（侧栏列表 + 添加外部库按钮）
-8. 同库内对话列表 + 切换 + 新建对话
-9. 阶段一验收
+| # | 任务 | Commit |
+|---|---|---|
+| 1 | 仓库骨架：`package.json` / `.gitignore` / `README.md` / `LICENSE` / `tsconfig.json` | `81ddb29` |
+| 2 | 后端骨架：Node + Hono，最小 `/api/echo` | `5ffd2c0` |
+| 3 | 前端骨架：Vite + React + shadcn/ui + SSE echo 排练 | `3662b60` |
+| 4 | 接入 pi-coding-agent SDK，实现真 agent 对话 | `c4e0dad` |
+| 5 | 第一个 Extension：注入 `currentKnowledgeBase` 上下文 | `ebe054b` |
+| 6 | 知识库扫描接口：扫 `~/llm-wiki/` + 读 `config.json` 外部库 | `daebc62` |
+| 7 | 前端知识库选择 UI + 三栏布局雏形 | `49dc00e` |
+| 8 | 同库多对话 + 切换 + 持久化（阶段一完结） | `75e176b` |
+| – | review 修补：一行 `npm run dev` / auto-restore / 默认深色 / 顶部状态条占位 | `f835433` |
+| – | TBD-2 删 Sonnet 表述 + 光标真闪烁 | `dd021bc` |
 
-每完成一步：
+阶段一完成情况详见 §4 阶段一末尾的"完成情况"小节。
+
+### 阶段二：核心循环（@、/、结晶、消化）⏸ 未开始
+
+预定拆解（启动阶段二时再细化，下面是待办骨架）：
+
+1. `@` 引用补全：弹出当前库的页面/实体/主题列表，选中后插入 wiki 链接
+2. `/` 命令补全：列出已加载 Skill 命令 + 内置命令
+3. 内置命令 `/sediment`：把对话或选中片段结晶到 `wiki/synthesis/sessions/`
+4. 内置命令 `/new-wiki`：app 内新建知识库（调用 llm-wiki-skill 的 `init-wiki.sh`）
+5. wiki 链接预览：对话中的 `[[...]]` 可点 → 右抽屉打开页面
+6. 消化新素材：粘贴 URL / 拖文件 → 触发 llm-wiki-skill 消化流程
+7. 设置面板 UI：三层认证（pi login / API key / env）+ 偏好（默认模型、根目录、外部库管理）
+8. 阶段二验收（详见 §4 阶段二）
+
+### 阶段三 / 四 / 五：未开始（详见 §4）
+
+### 协作约定（持续生效）
+
+每一步动手前 AI 都要先说计划，作者确认后再动。每完成一步：
 
 - AI 列改动清单（文件、依赖、决策）
 - 作者确认理解
-- 作者执行 git commit
+- AI 创建 git commit（commit message 含本步范围 + 实测验收要点）
 - 进入下一步
 
 ---
@@ -709,6 +755,11 @@ open-design 通过启动 CLI 子进程（Claude Code / Codex / Cursor 等 16 个
 
 ## Changelog
 
+- **2026-05-26 v7（阶段一完成标记）**：阶段一全部 step + review 修补完成，作者确认 MVP 可用
+  - §4 阶段一标题加 `✅ 已完成 2026-05-26`
+  - §4 阶段一末尾新增"完成情况"小节：含最终 commit、验收实况、接受的妥协、**启动 & 运行速查表**（compact 后从这里恢复上下文）
+  - §10 重命名 "下一步行动" → "进度追踪"：阶段一 8 step + 2 review commit 全部 ✅ + commit hash 表；阶段二预占骨架（7 项待办）；阶段三/四/五标 "未开始"
+  - 协作约定移到 §10 末尾，作为持续生效条款
 - **2026-05-26 v6**：
   - TBD-2 表述改：删"阶段一固定 Claude Sonnet"，改为"沿用 pi-agent 默认设置"。实际作者通过 pi-agent 的 provider 体系接入了其他 provider（如 zai/glm-5.1），llm-wiki-agent 本不该假设固定 Sonnet
   - §阶段后规划"多模型路由"措辞更通用，不锁死 Anthropic
