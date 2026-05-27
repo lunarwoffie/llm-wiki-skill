@@ -59,6 +59,7 @@ function getResourceLoader(): Promise<DefaultResourceLoader> {
 			const loader = new DefaultResourceLoader({
 				cwd: process.cwd(),
 				agentDir: getAgentDir(),
+				additionalSkillPaths: [path.join(homedir(), ".claude", "skills")],
 				extensionFactories: [
 					knowledgeBaseExtension,
 					createSynthesisExtension(() => active),
