@@ -50,6 +50,26 @@ export interface ActiveContext {
 	model: ModelInfo | null;
 }
 
+export interface CommandItem {
+	slug: string;
+	name: string;
+	description: string;
+	source: string;
+}
+
+export interface PageRef {
+	path: string;
+	name: string;
+	category: string;
+	title: string;
+}
+
+export interface AuthStatus {
+	authFileExists: boolean;
+	providers: { id: string; type: string; configured: boolean }[];
+	envKeys: { name: string; present: boolean }[];
+}
+
 // ============= API =============
 
 export async function getHealth(): Promise<{
@@ -117,6 +137,19 @@ export async function registerExternalKnowledgeBase(path: string): Promise<{
 		throw new Error(json.error ?? `HTTP ${res.status}`);
 	}
 	return { registered: json.registered ?? false, info: json.info };
+}
+
+export async function createKnowledgeBase(name: string, purpose: string): Promise<KnowledgeBaseInfo> {
+	const res = await fetch("/api/knowledge-bases/new", {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({ name, purpose }),
+	});
+	const json = (await res.json()) as { ok: boolean; info?: KnowledgeBaseInfo; error?: string };
+	if (!res.ok || !json.ok || !json.info) {
+		throw new Error(json.error ?? `HTTP ${res.status}`);
+	}
+	return json.info;
 }
 
 export async function unregisterExternalKnowledgeBase(path: string): Promise<{ removed: boolean }> {
@@ -194,4 +227,57 @@ export async function streamPrompt(
 		throw new Error(`HTTP ${res.status} ${res.statusText}`);
 	}
 	return parseSSE(res.body);
+}
+
+// ============= 阶段二：命令与认证 =============
+
+export async function listCommands(): Promise<CommandItem[]> {
+	const res = await fetch("/api/commands");
+	const json = (await res.json()) as { ok: boolean; items?: CommandItem[]; error?: string };
+	if (!res.ok || !json.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
+	return json.items ?? [];
+}
+
+export async function listRefs(kbPath: string, query: string): Promise<PageRef[]> {
+	const url = `/api/refs?kb=${encodeURIComponent(kbPath)}&q=${encodeURIComponent(query)}&limit=20`;
+	const res = await fetch(url);
+	const json = (await res.json()) as { ok: boolean; items?: PageRef[]; error?: string };
+	if (!res.ok || !json.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
+	return json.items ?? [];
+}
+
+export async function readPage(kbPath: string, relPath: string): Promise<string> {
+	const url = `/api/page?kb=${encodeURIComponent(kbPath)}&path=${encodeURIComponent(relPath)}`;
+	const res = await fetch(url);
+	const json = (await res.json()) as { ok: boolean; content?: string; error?: string };
+	if (!res.ok || !json.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
+	return json.content ?? "";
+}
+
+export async function getAuthStatus(): Promise<AuthStatus> {
+	const res = await fetch("/api/auth/status");
+	const json = (await res.json()) as ({ ok: true } & AuthStatus) | { ok: false; error?: string };
+	if (!res.ok || !json.ok) throw new Error(("error" in json && json.error) || `HTTP ${res.status}`);
+	return json;
+}
+
+export async function setAuthKey(provider: string, key: string): Promise<void> {
+	const res = await fetch("/api/auth/set", {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({ provider, type: "api_key", key }),
+	});
+	const json = (await res.json()) as { ok: boolean; error?: string };
+	if (!res.ok || !json.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
+}
+
+export async function testAuthConnection(provider: string): Promise<{ ok: boolean; message?: string; error?: string }> {
+	const res = await fetch("/api/auth/test", {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({ provider }),
+	});
+	const json = (await res.json()) as { ok: boolean; message?: string; error?: string };
+	if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
+	return json;
 }

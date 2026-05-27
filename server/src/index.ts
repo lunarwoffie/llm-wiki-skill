@@ -31,9 +31,11 @@ import {
 	createNewConversation,
 	getActive,
 	getActiveSession,
+	listLoadedSkills,
 	selectConversation,
 	selectKb,
 } from "./agent.js";
+import { getAuthStatus, setAuthKey, testAuthConnection } from "./auth.js";
 import { listConversations, piMessagesToUIMessages } from "./conversations.js";
 
 /** 从 session 安全取出模型 provider+id（pi 类型未导出 Model，用结构化访问） */
@@ -53,6 +55,8 @@ import {
 	registerExternalKnowledgeBase,
 	unregisterExternalKnowledgeBase,
 } from "./knowledge-bases.js";
+import { listPageRefs, readWikiPage } from "./pages.js";
+import { createWiki } from "./wiki-init.js";
 
 const app = new Hono();
 
@@ -123,6 +127,37 @@ app.delete("/api/knowledge-bases/external", async (c) => {
 	return c.json({ ok: true, ...result });
 });
 
+app.post("/api/knowledge-bases/new", async (c) => {
+	let body: { name?: unknown; purpose?: unknown };
+	try {
+		body = await c.req.json();
+	} catch {
+		return c.json({ ok: false, error: "Invalid JSON body" }, 400);
+	}
+	if (typeof body.name !== "string" || typeof body.purpose !== "string") {
+		return c.json({ ok: false, error: "Missing 'name' or 'purpose'" }, 400);
+	}
+	try {
+		const result = await createWiki(body.name, body.purpose);
+		return c.json({
+			ok: true,
+			info: {
+				path: result.path,
+				name: result.name,
+				origin: "default",
+				valid: true,
+			},
+			stdout: result.stdout,
+			stderr: result.stderr,
+		});
+	} catch (err) {
+		return c.json(
+			{ ok: false, error: err instanceof Error ? err.message : String(err) },
+			400,
+		);
+	}
+});
+
 // ============= 活跃上下文（当前选中的 KB + 对话） =============
 
 app.get("/api/knowledge-base", async (c) => {
@@ -176,6 +211,123 @@ app.post("/api/knowledge-base", async (c) => {
 app.delete("/api/knowledge-base", async (c) => {
 	await clearActive();
 	return c.json({ ok: true });
+});
+
+// ============= Wiki 页面引用候选 =============
+
+app.get("/api/refs", async (c) => {
+	const kbPath = c.req.query("kb");
+	if (!kbPath) return c.json({ ok: false, error: "Missing query param 'kb'" }, 400);
+	const q = c.req.query("q") ?? "";
+	const rawLimit = Number(c.req.query("limit") ?? 20);
+	const limit = Number.isFinite(rawLimit) ? rawLimit : 20;
+	try {
+		const items = await listPageRefs(kbPath, q, limit);
+		return c.json({ ok: true, items });
+	} catch (err) {
+		return c.json(
+			{ ok: false, error: err instanceof Error ? err.message : String(err) },
+			400,
+		);
+	}
+});
+
+app.get("/api/page", async (c) => {
+	const kbPath = c.req.query("kb");
+	const relPath = c.req.query("path");
+	if (!kbPath || !relPath) {
+		return c.json({ ok: false, error: "Missing query params 'kb' or 'path'" }, 400);
+	}
+	try {
+		const content = await readWikiPage(kbPath, relPath);
+		return c.json({ ok: true, content });
+	} catch (err) {
+		return c.json(
+			{ ok: false, error: err instanceof Error ? err.message : String(err) },
+			400,
+		);
+	}
+});
+
+// ============= Slash 命令列表 =============
+
+app.get("/api/commands", async (c) => {
+	try {
+		const builtin = [
+			{
+				slug: "/sediment",
+				name: "sediment_to_wiki",
+				description: "把当前对话结晶为 wiki/synthesis/sessions/ 下的页面",
+				source: "builtin",
+			},
+			{
+				slug: "/new-wiki",
+				name: "new_wiki",
+				description: "在默认目录下新建一个 llm-wiki 知识库",
+				source: "builtin",
+			},
+		];
+		const skills = (await listLoadedSkills()).map((skill) => ({
+			slug: `/${skill.name}`,
+			name: skill.name,
+			description: skill.description,
+			source: `skill:${skill.name}`,
+		}));
+		return c.json({ ok: true, items: [...builtin, ...skills] });
+	} catch (err) {
+		return c.json(
+			{ ok: false, error: err instanceof Error ? err.message : String(err) },
+			500,
+		);
+	}
+});
+
+// ============= 模型认证 =============
+
+app.get("/api/auth/status", async (c) => {
+	try {
+		return c.json({ ok: true, ...(await getAuthStatus()) });
+	} catch (err) {
+		return c.json(
+			{ ok: false, error: err instanceof Error ? err.message : String(err) },
+			500,
+		);
+	}
+});
+
+app.post("/api/auth/set", async (c) => {
+	let body: { provider?: unknown; type?: unknown; key?: unknown };
+	try {
+		body = await c.req.json();
+	} catch {
+		return c.json({ ok: false, error: "Invalid JSON body" }, 400);
+	}
+	if (body.type !== "api_key" || typeof body.provider !== "string" || typeof body.key !== "string") {
+		return c.json({ ok: false, error: "Missing provider/type/key" }, 400);
+	}
+	try {
+		await setAuthKey(body.provider, body.key);
+		return c.json({ ok: true });
+	} catch (err) {
+		return c.json(
+			{ ok: false, error: err instanceof Error ? err.message : String(err) },
+			400,
+		);
+	}
+});
+
+app.post("/api/auth/test", async (c) => {
+	let body: { provider?: unknown };
+	try {
+		body = await c.req.json();
+	} catch {
+		return c.json({ ok: false, error: "Invalid JSON body" }, 400);
+	}
+	if (typeof body.provider !== "string") {
+		return c.json({ ok: false, error: "Missing provider" }, 400);
+	}
+	const result = await testAuthConnection(body.provider);
+	return c.json(result);
 });
 
 // ============= 对话列表与切换 =============

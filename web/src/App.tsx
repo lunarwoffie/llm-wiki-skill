@@ -1,17 +1,21 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { ChatPanel } from "@/components/ChatPanel";
+import { RightDrawer } from "@/components/RightDrawer";
+import { SettingsPanel } from "@/components/SettingsPanel";
 import { Sidebar } from "@/components/Sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import {
 	type ActiveContext,
 	type ConversationInfo,
 	createNewConversation,
+	createKnowledgeBase,
 	getActiveContext,
 	type KnowledgeBaseInfo,
 	listConversations,
 	listKnowledgeBases,
 	registerExternalKnowledgeBase,
+	readPage,
 	selectConversation,
 	selectKnowledgeBase,
 	type UIMessage,
@@ -45,6 +49,11 @@ function App() {
 	const [loading, setLoading] = useState(false);
 	const [chatKey, setChatKey] = useState(0);
 	const [initialMessages, setInitialMessages] = useState<UIMessage[]>([]);
+	const [settingsOpen, setSettingsOpen] = useState(false);
+	const [drawerPage, setDrawerPage] = useState<string | null>(null);
+	const [drawerContent, setDrawerContent] = useState("");
+	const [drawerLoading, setDrawerLoading] = useState(false);
+	const [drawerError, setDrawerError] = useState<string | null>(null);
 
 	const refreshConversations = useCallback(async (kbPath: string) => {
 		try {
@@ -133,9 +142,30 @@ function App() {
 		if (info.valid) await handleSelectKb(info);
 	};
 
+	const handleCreateWiki = async (name: string, purpose: string) => {
+		const info = await createKnowledgeBase(name, purpose);
+		await refreshAll();
+		await handleSelectKb(info);
+	};
+
 	const handleMessageSent = async () => {
 		// 用户发了一次消息后，刷新对话列表，把 "(新对话)" stub 替换为带 firstMessage 的真实条目
 		if (active) await refreshConversations(active.kb.path);
+	};
+
+	const handleOpenPage = async (pagePath: string) => {
+		if (!active) return;
+		setDrawerPage(pagePath);
+		setDrawerLoading(true);
+		setDrawerError(null);
+		try {
+			setDrawerContent(await readPage(active.kb.path, pagePath));
+		} catch (err) {
+			setDrawerContent("");
+			setDrawerError(err instanceof Error ? err.message : String(err));
+		} finally {
+			setDrawerLoading(false);
+		}
 	};
 
 	return (
@@ -153,6 +183,7 @@ function App() {
 					onNewConversation={handleNewConversation}
 					onRefresh={refreshAll}
 					onAddExternal={handleAddExternal}
+					onCreateWiki={handleCreateWiki}
 				/>
 				<main className="flex-1 overflow-hidden">
 					<ChatPanel
@@ -161,8 +192,19 @@ function App() {
 						model={active?.model ?? null}
 						initialMessages={initialMessages}
 						onMessageSent={handleMessageSent}
+						onOpenSettings={() => setSettingsOpen(true)}
+						currentKnowledgeBasePath={active?.kb.path ?? null}
+						onOpenPage={handleOpenPage}
 					/>
 				</main>
+				<RightDrawer
+					path={drawerPage}
+					content={drawerContent}
+					loading={drawerLoading}
+					error={drawerError}
+					onClose={() => setDrawerPage(null)}
+				/>
+				<SettingsPanel open={settingsOpen} onOpenChange={setSettingsOpen} />
 			</div>
 		</TooltipProvider>
 	);

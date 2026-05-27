@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import { AddExternalDialog } from "@/components/AddExternalDialog";
+import { NewWikiDialog } from "@/components/NewWikiDialog";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { ConversationInfo, KnowledgeBaseInfo } from "@/lib/api";
@@ -18,6 +19,7 @@ interface Props {
 	onNewConversation: () => void;
 	onRefresh: () => void;
 	onAddExternal: (path: string) => Promise<void>;
+	onCreateWiki: (name: string, purpose: string) => Promise<void>;
 }
 
 export function Sidebar({
@@ -32,8 +34,10 @@ export function Sidebar({
 	onNewConversation,
 	onRefresh,
 	onAddExternal,
+	onCreateWiki,
 }: Props) {
 	const [dialogOpen, setDialogOpen] = useState(false);
+	const [newWikiOpen, setNewWikiOpen] = useState(false);
 
 	const defaultKbs = knowledgeBases.filter((i) => i.origin === "default");
 	const externalKbs = knowledgeBases.filter((i) => i.origin === "external");
@@ -114,7 +118,15 @@ export function Sidebar({
 				)}
 			</div>
 
-			<div className="border-t border-input p-2">
+			<div className="space-y-2 border-t border-input p-2">
+				<Button
+					variant="default"
+					size="sm"
+					className="w-full"
+					onClick={() => setNewWikiOpen(true)}
+				>
+					+ 新建知识库
+				</Button>
 				<Button
 					variant="outline"
 					size="sm"
@@ -125,6 +137,11 @@ export function Sidebar({
 				</Button>
 			</div>
 
+			<NewWikiDialog
+				open={newWikiOpen}
+				onOpenChange={setNewWikiOpen}
+				onSubmit={onCreateWiki}
+			/>
 			<AddExternalDialog
 				open={dialogOpen}
 				onOpenChange={setDialogOpen}

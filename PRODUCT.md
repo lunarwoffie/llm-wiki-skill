@@ -134,6 +134,8 @@
 | 桌面打包（未来） | **Tauri** | 用系统 webview + Rust 后端；二进制和内存占用通常显著低于 Electron（5-30 MB vs 100+ MB） |
 | 包管理 | npm（统一）| 不混用 pnpm/bun，避免新手版本混乱 |
 | Node 版本管理 | **mise** 或 nvm | mise 是多语言版本管理（含 Node）；锁版本至少 `>=22.19.0`（pi-coding-agent 0.75.x 的最低要求） |
+| Markdown 渲染（阶段二+）| **react-markdown** ^9 + **remark-gfm** ^4 | 生态最稳、类型完备、GFM 表格/任务列表/自动链接；shadcn 生态常用 |
+| 命令/补全菜单（阶段二+）| **cmdk** ^1 | shadcn `<Command>` 底层；键盘导航与 a11y 完备；同时承载 `/` 命令菜单和 `@` 引用菜单 |
 
 ### 3.3 关键流程：一次对话发生了什么
 
@@ -648,6 +650,26 @@ open-design 通过启动 CLI 子进程（Claude Code / Codex / Cursor 等 16 个
 - 强化 **ADR-13b**（不抄 open-design 的多 CLI 子进程模式，因为我们最终是同仓库 agent）
 - 兼容 **ADR-10**（pi-agent 作 npm 依赖）和 **ADR-14**（app 内一键新建知识库）
 
+### ADR-17：阶段二新增前端依赖（react-markdown + cmdk）
+
+**背景**：阶段二引入 markdown 渲染（右抽屉显示 wiki 页面）+ 命令补全菜单（`/` 和 `@`）。两个能力都需要新依赖。
+
+**决策**（已在 `web/package.json` 落地）：
+
+| 依赖 | 版本 | 用途 |
+|---|---|---|
+| `react-markdown` | ^9 | assistant 消息 + 右抽屉的 markdown 渲染 |
+| `remark-gfm` | ^4 | GFM 支持：表格、任务列表、自动链接 |
+| `cmdk` | ^1 | `/` 命令菜单 + `@` 引用菜单底层（即 shadcn `<Command>` 基础） |
+
+**拒绝项**：
+- marked / markdown-it：生态/类型/插件不如 react-markdown 稳
+- Radix Popover 自写：键盘导航与 a11y 都要重写，工作量大
+
+**与 ADR-9（shadcn/ui）的关系**：cmdk 即 shadcn 官方 Command 底层；react-markdown 在 shadcn 生态里是社区主流选型。两者都与现有 UI 体系自然契合，无破坏性。
+
+**长期**：阶段三引入产出类 Skill（docx / pdf / pptx）+ open-design 设计 Skill 时，UI 端会需要更多依赖（PPT 渲染、文件预览等）。届时再补 ADR-18+。
+
 ---
 
 ## 8. 给 0 代码作者的盲区与协作规则
@@ -718,18 +740,42 @@ open-design 通过启动 CLI 子进程（Claude Code / Codex / Cursor 等 16 个
 
 阶段一完成情况详见 §4 阶段一末尾的"完成情况"小节。
 
-### 阶段二：核心循环（@、/、结晶、消化）⏸ 未开始
+### 阶段二：核心循环（@、/、结晶、消化）✅ 已完成 2026-05-27
 
-预定拆解（启动阶段二时再细化，下面是待办骨架）：
+**最终 PR**：[#1 feat: complete stage 2 core loop](https://github.com/sdyckjq-lab/llm-wiki-agent/pull/1)（base: main, head: stage-2）
 
-1. `@` 引用补全：弹出当前库的页面/实体/主题列表，选中后插入 wiki 链接
-2. `/` 命令补全：列出已加载 Skill 命令 + 内置命令
-3. 内置命令 `/sediment`：把对话或选中片段结晶到 `wiki/synthesis/sessions/`
-4. 内置命令 `/new-wiki`：app 内新建知识库（调用 llm-wiki-skill 的 `init-wiki.sh`）
-5. wiki 链接预览：对话中的 `[[...]]` 可点 → 右抽屉打开页面
-6. 消化新素材：粘贴 URL / 拖文件 → 触发 llm-wiki-skill 消化流程
-7. 设置面板 UI：三层认证（pi login / API key / env）+ 偏好（默认模型、根目录、外部库管理）
-8. 阶段二验收（详见 §4 阶段二）
+**8 step commit + 5 fix commit + 1 doc 修订 commit**：
+
+| # | 任务 | Commit |
+|---|---|---|
+| 1 | `/sediment` Extension：结晶对话到 `wiki/synthesis/sessions/` | `fe54d47` |
+| 2 | `/new-wiki` Extension：spawn `init-wiki.sh` 新建库 | `5ab13dc` |
+| 3 | `/api/refs`：候选页面列表（递归 fingerprint 缓存） | `b0802b8` |
+| 4 | `/api/commands`：内置 + Skill 命令合并（TBD-1 方案 B） | `202bf4d` |
+| 5 | 设置面板：API key 三层认证 + 测试连接（TBD-2 方案 B） | `3654791` |
+| 6 | `/` 命令补全 UI（cmdk） | `b6dffc0` |
+| 7 | `@` 补全 + 右抽屉 + markdown 渲染（react-markdown） | `7801d2c` |
+| 8 | 消化新素材 chip | `7a46f4b` |
+| – | fix: 设置面板可关闭 | `c045b9e` |
+| – | fix: `/api/commands` 包含 Claude skill | `791d73a` |
+| – | fix: agent resource loader 加载 Claude skill 目录 | `f990229` |
+| – | fix: 新建库 UI 端点 + refs cache fingerprint 升级 + Sidebar 加按钮 | `a088b97` |
+| – | fix: 右抽屉支持 Esc 关闭 | `2686b51` |
+| – | docs(stage-2): 闭合验收 issue #2/#3/#4 + 标 TBD-3 已解决 | `208ad4d` |
+
+**阶段二完成情况** ✅ 2026-05-27（合并 PR #1 后）
+- 范围 7 项全部交付（@、/、/sediment、/new-wiki、链接预览、消化、设置面板）
+- 验收 3 条全过：建库 / 消化→讨论→结晶 闭环 / API key 落 `~/.pi/agent/auth.json`
+- 关键架构决策：**D9 能力归属原则**（消化等知识库本职 → Skill；对话结晶等 agent 元能力 → Extension）落地，对应 ADR-16 长期合并愿景
+- **超出原设计的增强**：
+  - `POST /api/knowledge-bases/new` + `NewWikiDialog`（UI 直接建库，不必先与 agent 对话）
+  - `pages.ts` cache 升级 mtime → 递归 fingerprint（修了"嵌套新建后 refs 看不到"的潜在 bug）
+  - `wiki-init.ts::findInitScript()` 兼容 init-wiki.sh 在 skill 根目录或 `scripts/` 两种位置
+- **接受的妥协**（不阻塞阶段三）：
+  - 设置面板只做认证 Tab（默认模型 / 根目录 / 外部库管理推迟）
+  - Anthropic 测试连接未跑（缺 key），但代码路径同 DeepSeek 一致
+  - 阶段二完整设计 + 8 step 细则 + 总验收剧本归档在 `docs/stage-2-design.md`（已标 ✅）
+- **新增依赖**：见 §3.2 + ADR-17
 
 ### 阶段三 / 四 / 五：未开始（详见 §4）
 

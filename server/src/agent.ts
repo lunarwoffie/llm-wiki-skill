@@ -14,6 +14,10 @@
  *   createNewConversation(kbPath)              → dispose 老 + 新建空白对话
  */
 
+import { readdir, readFile, stat } from "node:fs/promises";
+import { homedir } from "node:os";
+import path from "node:path";
+
 import {
 	type AgentSession,
 	createAgentSession,
@@ -26,6 +30,8 @@ import { loadConfig, saveConfig } from "./config.js";
 import { ensureKbSessionDir, listConversations } from "./conversations.js";
 import knowledgeBaseExtension from "./extensions/knowledge-base.js";
 import { setCurrentKnowledgeBase } from "./extensions/knowledge-base.js";
+import { createNewWikiExtension } from "./extensions/new-wiki.js";
+import { createSynthesisExtension } from "./extensions/synthesis.js";
 
 async function rememberLastUsedKb(kbPath: string): Promise<void> {
 	try {
@@ -53,7 +59,12 @@ function getResourceLoader(): Promise<DefaultResourceLoader> {
 			const loader = new DefaultResourceLoader({
 				cwd: process.cwd(),
 				agentDir: getAgentDir(),
-				extensionFactories: [knowledgeBaseExtension],
+				additionalSkillPaths: [path.join(homedir(), ".claude", "skills")],
+				extensionFactories: [
+					knowledgeBaseExtension,
+					createSynthesisExtension(() => active),
+					createNewWikiExtension(),
+				],
 			});
 			await loader.reload();
 			console.log("[agent] ResourceLoader ready");
@@ -86,6 +97,95 @@ export async function getActiveSession(): Promise<AgentSession> {
 		throw new Error("没有活跃对话。请先选择知识库或新建对话。");
 	}
 	return active.session;
+}
+
+export interface LoadedSkillInfo {
+	name: string;
+	description: string;
+}
+
+async function findSkillFiles(root: string): Promise<string[]> {
+	const rootInfo = await stat(root).catch(() => null);
+	if (!rootInfo?.isDirectory()) return [];
+	const results: string[] = [];
+
+	async function walk(dir: string): Promise<void> {
+		const entries = await readdir(dir, { withFileTypes: true }).catch(() => []);
+		if (entries.some((entry) => entry.isFile() && entry.name === "SKILL.md")) {
+			results.push(path.join(dir, "SKILL.md"));
+			return;
+		}
+		for (const entry of entries) {
+			if (!entry.isDirectory() || entry.name === "node_modules" || entry.name.startsWith(".")) {
+				continue;
+			}
+			await walk(path.join(dir, entry.name));
+		}
+	}
+
+	await walk(root);
+	return results;
+}
+
+function parseSkillFrontmatter(content: string): LoadedSkillInfo | null {
+	const match = content.match(/^---\n([\s\S]*?)\n---/);
+	if (!match) return null;
+	const frontmatter = match[1] ?? "";
+	const name = frontmatter.match(/^name:\s*(.+)$/m)?.[1]?.trim();
+	let description = frontmatter.match(/^description:\s*(.+)$/m)?.[1]?.trim();
+	if (description === "|") {
+		const lines = frontmatter.split("\n");
+		const start = lines.findIndex((line) => line.startsWith("description:"));
+		description = lines
+			.slice(start + 1)
+			.filter((line) => line.startsWith("  "))
+			.map((line) => line.trim())
+			.join(" ")
+			.trim();
+	}
+	if (!name || !description) return null;
+	return { name, description };
+}
+
+async function scanSkillDirs(): Promise<LoadedSkillInfo[]> {
+	const activeKbPath = active?.kb.path;
+	const roots = [
+		activeKbPath ? path.join(activeKbPath, ".claude", "skills") : null,
+		path.join(homedir(), ".claude", "skills"),
+		path.join(homedir(), ".pi", "agent", "skills"),
+	].filter((item): item is string => Boolean(item));
+
+	const skills: LoadedSkillInfo[] = [];
+	for (const root of roots) {
+		for (const file of await findSkillFiles(root)) {
+			const parsed = parseSkillFrontmatter(await readFile(file, "utf8").catch(() => ""));
+			if (parsed) skills.push(parsed);
+		}
+	}
+	return skills;
+}
+
+export async function listLoadedSkills(): Promise<LoadedSkillInfo[]> {
+	const loader = await getResourceLoader();
+	const seen = new Set<string>();
+	const sdkSkills = loader
+		.getSkills()
+		.skills.filter((skill) => {
+			if (seen.has(skill.name)) return false;
+			seen.add(skill.name);
+			return true;
+		})
+		.map((skill) => ({
+			name: skill.name,
+			description: skill.description,
+		}));
+	const scanned = await scanSkillDirs();
+	for (const skill of scanned) {
+		if (seen.has(skill.name)) continue;
+		seen.add(skill.name);
+		sdkSkills.push(skill);
+	}
+	return sdkSkills;
 }
 
 /**

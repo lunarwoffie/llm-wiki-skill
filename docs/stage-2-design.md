@@ -1,8 +1,14 @@
 # 阶段二设计文档：核心循环（@、/、结晶、消化）
 
-> 状态：**设计待 codex 实施** · 创建于 2026-05-27 · 阶段二验收通过后归档不再修改
+> 状态：**✅ 已完成 2026-05-27**（已归档，仅作历史参考）· 创建于 2026-05-27
 >
-> 与 PRODUCT.md 的关系：PRODUCT.md §4 阶段二 + §10 是**顶层意图**，本文档是**落地细则**。冲突时以 PRODUCT.md 为准；本文档外发现新决策需要先回写 PRODUCT.md。
+> **最终交付**：PR [#1 feat: complete stage 2 core loop](https://github.com/sdyckjq-lab/llm-wiki-agent/pull/1)（14 commit）
+>
+> **验收结果**：3 条总验收全过；6 个 issue 全部闭合；超出原设计 3 处增强（详见 PRODUCT.md §10 阶段二）
+>
+> 与 PRODUCT.md 的关系：PRODUCT.md §4 阶段二 + §10 是**顶层意图**，本文档是**落地细则**。冲突时以 PRODUCT.md 为准。
+>
+> ⚠️ 本文档已归档，**不再修改**。阶段三另开 `docs/stage-3-design.md`。
 
 ---
 
@@ -707,6 +713,7 @@ ls ~/.pi/agent/auth.json.bak.*  # 应有备份
 ### 7.2 工作节奏
 - **一次性按 §9 顺序做完 8 step**，不等逐 step 验收
 - **每个 step 一个原子 commit**（共 8 个，方便 review 和回滚；禁止 1 大 commit）
+- **允许在 8 个 step commit 之外补充 `fix(stage-2): ...` 修复 commit**：codex 自查或 claude 验收过程中发现真实 bug 应立即补修复 commit（比"留给作者"更负责）；每个 fix 也是原子 commit，不要把多个修复揉一起；触发 fix 时在 PR body 的"已知妥协"段落里说明"额外 N 个修复 commit + 原因"
 - commit message 格式：
   ```
   feat(stage-2-step-N): <一句话>
@@ -727,7 +734,7 @@ ls ~/.pi/agent/auth.json.bak.*  # 应有备份
 - ❌ 重构阶段一已有代码（除非本文档明确写要改）
 - ❌ 顺手"改善"旁边的代码 / 注释 / 格式
 - ❌ commit message 或代码里出现 "康佳琦"，统一用 `Kiro`
-- ❌ 任何文件出现 `/Users/kangjiaqi/...` 绝对路径
+- ❌ `server/src/` 或 `web/src/` 出现本机绝对路径形如 `/Users/<author>/...`（用相对路径或 `homedir()`；docs/ 内允许此类示例文本）
 - ❌ `--no-verify` 跳 hook、`--amend` 改前一个 commit、`-f` push
 - ❌ push 到 main、合并到 main
 - ❌ 修改 PRODUCT.md（除非本文档明确要求）
@@ -788,14 +795,17 @@ ls ~/.pi/agent/auth.json.bak.*  # 应有备份
 
 **推荐**：先按 A 试，遇阻降到 B（仅 Anthropic + OpenAI），都失败降到 C 并修改本文档 + 与作者确认。
 
-### TBD-3：llm-wiki-skill 的 init-wiki.sh 参数签名
-**影响**：Step 2 实现
+### TBD-3：llm-wiki-skill 的 init-wiki.sh 参数签名 ✅ 已解决（codex Step 2 实施时确认）
 
-**事实**：当前用户机器 `~/.claude/skills/llm-wiki-skill/` 和 `~/.pi/agent/skills/llm-wiki-skill/` **都没有**这个 Skill
+**设计期事实**：当时用户机器 `~/.claude/skills/llm-wiki-skill/` 和 `~/.pi/agent/skills/llm-wiki-skill/` **都没有**这个 Skill。
 
-**作者操作**：Step 2 实施前手动 clone 到 `~/.claude/skills/llm-wiki-skill/`，然后 codex 自己读 `init-wiki.sh` 顶部确认参数
+**已确认参数签名**：`init-wiki.sh <wiki path> <topic> <language>`（三个位置参数）
 
-**长期**：阶段五打包时考虑把 llm-wiki-skill 作为 onboarding 一键安装项
+**已确认脚本实际位置**：`~/.claude/skills/llm-wiki-skill/scripts/init-wiki.sh`（**不在** skill 根目录）。codex 的 `server/src/wiki-init.ts::findInitScript()` 已兼容两种位置——先查根目录后查 `scripts/`，对未来 llm-wiki-skill 重组目录有韧性。
+
+**作者操作**（已完成）：手动 clone llm-wiki-skill 到 `~/.claude/skills/llm-wiki-skill/`。
+
+**长期**：阶段五打包时考虑把 llm-wiki-skill 作为 onboarding 一键安装项。
 
 ### TBD-4：右抽屉与 PRODUCT.md §5.1 的契合度
 **事实**：PRODUCT.md §5.1 说"右抽屉默认隐藏，呼出场景：产物预览、引用页面查看、设置面板"
@@ -894,7 +904,7 @@ ls ~/.pi/agent/auth.json.bak.*  # 应有备份
 |---|---|---|---|---|
 | TBD-1（Skill 列表 API） | 3 | grep SDK dist + 读 pi-agent docs 确认 API 存在 → 直接调 | fs 扫 `~/.claude/skills/` + `~/.pi/agent/skills/` + 解析 SKILL.md frontmatter | 内置命令 only，不列 Skill |
 | TBD-2（测试连接） | 8 | SDK 临时 session 发空 prompt | 直打 Anthropic `/v1/messages`（model=claude-haiku-4-5, max_tokens=1）+ OpenAI `/v1/models` | 不做按钮，仅靠 auth.json 落地 + 0600 作硬验收 |
-| TBD-3（init-wiki.sh 参数） | 2 | 读 `~/.claude/skills/llm-wiki-skill/init-wiki.sh` 头部注释 / `--help` 输出 | 试 `init-wiki.sh <name> <purpose>` 看是否工作 | Step 2 工具返回"参数签名未知，请手动跑 init-wiki.sh"，等作者补 |
+| ~~TBD-3~~（init-wiki.sh 参数，✅ 已由 Step 2 实施时解决） | 2 | 已确认参数 `<wiki path> <topic> <language>`；脚本实际在 `~/.claude/skills/llm-wiki-skill/scripts/init-wiki.sh`；`findInitScript()` 兼容根目录与 `scripts/` 两种位置 | — | — |
 | TBD-4（设置面板形态） | 8 | 实现成 modal（推荐方案） | — | — |
 | ~~TBD-5~~（消化包装语，✅ 已由 D9 / ADR-16 解决） | 7 | 固定使用 §8 TBD-5 已选定的"请调用 llm-wiki Skill 消化..."文本 | — | — |
 
@@ -903,7 +913,7 @@ ls ~/.pi/agent/auth.json.bak.*  # 应有备份
 ### 9.6 前置准备（作者在 codex 启动前完成）
 
 - [ ] git clone llm-wiki-skill → `~/.claude/skills/llm-wiki-skill/`（D5 / TBD-3）
-- [ ] 确认 `chmod +x ~/.claude/skills/llm-wiki-skill/init-wiki.sh`
+- [ ] 确认 `chmod +x ~/.claude/skills/llm-wiki-skill/scripts/init-wiki.sh`（实际位置）；旧版若在根目录请 chmod 那个；codex 的 findInitScript 已兼容两种位置
 - [ ] 准备 1 个 Anthropic / OpenAI test key（用于 Step 8 验收，可临时）
 - [ ] 准备 1-2 个测试用 URL（karpathy 博客或任意公开文章）
 - [ ] git checkout 新分支 `stage-2`（codex 在此分支 commit）
@@ -1007,6 +1017,8 @@ curl http://localhost:8787/api/health  # 200 OK
 
 ### 10.5 安全审计 checklist
 
+> ⚠️ 本 checklist 故意只扫 `server/src/`、`web/src/`，**不扫 `docs/`**——避免本设计文档自身的占位/示例文本被自报警。
+
 - [ ] `grep -rE "sk-[a-zA-Z0-9_-]{20,}" ~/.llm-wiki-agent/` 无输出
 - [ ] `grep -rE "sk-[a-zA-Z0-9_-]{20,}" server/src/` 无输出
 - [ ] `grep -rE "sk-[a-zA-Z0-9_-]{20,}" web/src/` 无输出
@@ -1014,7 +1026,7 @@ curl http://localhost:8787/api/health  # 200 OK
 - [ ] 试 `curl 'http://localhost:8787/api/page?kb=<valid>&path=../../../../etc/passwd'` → 应 400
 - [ ] 试 `curl 'http://localhost:8787/api/refs?kb=/etc'` → 应 400（未注册的 kb）
 - [ ] React DevTools 看 SettingsPanel：保存后任何 state 都不含 key 明文
-- [ ] commit log + 代码都不含 `/Users/kangjiaqi/` 绝对路径
+- [ ] commit log + `server/src/` + `web/src/` 不含本机绝对路径形如 `/Users/<author>/...`（请用相对路径或 `homedir()`；不在 `docs/` 范围内扫，文档可以用 `/Users/<author>/...` 占位）
 - [ ] commit log 不含真实姓名（应统一 `Kiro`）
 
 ### 10.6 体感测试

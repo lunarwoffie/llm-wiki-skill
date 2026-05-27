@@ -1,8 +1,20 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { CommandMenu } from "@/components/CommandMenu";
+import { MarkdownView } from "@/components/MarkdownView";
+import { RefMenu } from "@/components/RefMenu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { type ModelInfo, streamPrompt, type UIMessage } from "@/lib/api";
+import {
+	type CommandItem,
+	listCommands,
+	listRefs,
+	type ModelInfo,
+	type PageRef,
+	streamPrompt,
+	type UIMessage,
+} from "@/lib/api";
 
 type ToolMark = { name: string; status: "running" | "done" };
 
@@ -37,29 +49,156 @@ function fromUIMessage(m: UIMessage): Message {
  */
 interface Props {
 	currentKnowledgeBaseName: string | null;
+	currentKnowledgeBasePath: string | null;
 	model: ModelInfo | null;
 	initialMessages: UIMessage[];
 	onMessageSent?: () => void;
+	onOpenSettings?: () => void;
+	onOpenPage?: (path: string) => void;
 }
 
 export function ChatPanel({
 	currentKnowledgeBaseName,
+	currentKnowledgeBasePath,
 	model,
 	initialMessages,
 	onMessageSent,
+	onOpenSettings,
+	onOpenPage,
 }: Props) {
 	const [messages, setMessages] = useState<Message[]>(() => initialMessages.map(fromUIMessage));
 	const [input, setInput] = useState("");
 	const [status, setStatus] = useState<"idle" | "streaming" | "error">("idle");
 	const [errorMsg, setErrorMsg] = useState<string | null>(null);
+	const [ingestDismissedFor, setIngestDismissedFor] = useState<string | null>(null);
+	const [commands, setCommands] = useState<CommandItem[]>([]);
+	const [commandMenu, setCommandMenu] = useState<{ open: boolean; query: string; start: number; selected: number }>({
+		open: false,
+		query: "",
+		start: 0,
+		selected: 0,
+	});
+	const [refMenu, setRefMenu] = useState<{ open: boolean; query: string; start: number; selected: number }>({
+		open: false,
+		query: "",
+		start: 0,
+		selected: 0,
+	});
+	const [refs, setRefs] = useState<PageRef[]>([]);
 	const abortRef = useRef<AbortController | null>(null);
+	const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+	const detectedMaterial = (() => {
+		const text = input.trim();
+		if (/^https?:\/\/\S+$/.test(text)) return { kind: "URL", value: text };
+		if (/^(\/|~\/)\S+$/.test(text)) return { kind: "路径", value: text };
+		return null;
+	})();
+	const ingestChipVisible = Boolean(
+		detectedMaterial && ingestDismissedFor !== detectedMaterial.value,
+	);
+
+	useEffect(() => {
+		listCommands()
+			.then(setCommands)
+			.catch(() => setCommands([]));
+	}, [currentKnowledgeBaseName]);
+
+	useEffect(() => {
+		if (!refMenu.open || !currentKnowledgeBasePath) {
+			setRefs([]);
+			return;
+		}
+		let cancelled = false;
+		const timer = window.setTimeout(() => {
+			listRefs(currentKnowledgeBasePath, refMenu.query)
+				.then((items) => {
+					if (!cancelled) setRefs(items);
+				})
+				.catch(() => {
+					if (!cancelled) setRefs([]);
+				});
+		}, 120);
+		return () => {
+			cancelled = true;
+			window.clearTimeout(timer);
+		};
+	}, [currentKnowledgeBasePath, refMenu.open, refMenu.query]);
+
+	const updateMenus = (value: string, cursor: number) => {
+		const before = value.slice(0, cursor);
+		const commandMatch = before.match(/(^|\s)\/(\S*)$/);
+		if (commandMatch) {
+			const query = commandMatch[2] ?? "";
+			setCommandMenu({ open: true, query, start: cursor - query.length - 1, selected: 0 });
+			setRefMenu((prev) => ({ ...prev, open: false }));
+			return;
+		}
+		const refMatch = before.match(/(^|\s)@(\S*)$/);
+		if (refMatch && currentKnowledgeBasePath) {
+			const query = refMatch[2] ?? "";
+			setRefMenu({ open: true, query, start: cursor - query.length - 1, selected: 0 });
+			setCommandMenu((prev) => ({ ...prev, open: false }));
+			return;
+		}
+		setCommandMenu((prev) => ({ ...prev, open: false }));
+		setRefMenu((prev) => ({ ...prev, open: false }));
+	};
+
+	const visibleCommands = (() => {
+		const normalized = commandMenu.query.toLowerCase();
+		const filtered = commands.filter((item) => {
+			if (!normalized) return true;
+			return (
+				item.slug.toLowerCase().includes(normalized) ||
+				item.name.toLowerCase().includes(normalized) ||
+				item.description.toLowerCase().includes(normalized)
+			);
+		});
+		return [
+			...filtered.filter((item) => item.source === "builtin"),
+			...filtered.filter((item) => item.source !== "builtin"),
+		];
+	})();
+
+	const replaceCommandToken = (item: CommandItem) => {
+		const textarea = textareaRef.current;
+		const cursor = textarea?.selectionStart ?? input.length;
+		const next = `${input.slice(0, commandMenu.start)}${item.slug} ${input.slice(cursor)}`;
+		const nextCursor = commandMenu.start + item.slug.length + 1;
+		setInput(next);
+		setCommandMenu((prev) => ({ ...prev, open: false }));
+		requestAnimationFrame(() => {
+			textareaRef.current?.focus();
+			textareaRef.current?.setSelectionRange(nextCursor, nextCursor);
+		});
+	};
+
+	const replaceRefToken = (item: PageRef) => {
+		const textarea = textareaRef.current;
+		const cursor = textarea?.selectionStart ?? input.length;
+		const link = `[[${item.path}]]`;
+		const next = `${input.slice(0, refMenu.start)}${link} ${input.slice(cursor)}`;
+		const nextCursor = refMenu.start + link.length + 1;
+		setInput(next);
+		setRefMenu((prev) => ({ ...prev, open: false }));
+		requestAnimationFrame(() => {
+			textareaRef.current?.focus();
+			textareaRef.current?.setSelectionRange(nextCursor, nextCursor);
+		});
+	};
 
 	const sendPrompt = async () => {
 		const text = input.trim();
 		if (!text || status === "streaming") return;
+		const outgoingText =
+			ingestChipVisible && detectedMaterial
+				? `请调用 llm-wiki Skill 把以下素材消化到当前知识库的 raw/，完成后回到对话告诉我落地路径：\n${detectedMaterial.value}`
+				: text;
 
 		setErrorMsg(null);
 		setInput("");
+		setIngestDismissedFor(null);
 		const userMsg: Message = { id: newId(), role: "user", content: text, tools: [] };
 		const assistantId = newId();
 		const assistantMsg: Message = { id: assistantId, role: "assistant", content: "", tools: [] };
@@ -70,7 +209,7 @@ export function ChatPanel({
 		abortRef.current = controller;
 
 		try {
-			const stream = await streamPrompt(text, controller.signal);
+			const stream = await streamPrompt(outgoingText, controller.signal);
 			for await (const { event, data } of stream) {
 				if (event === "text_delta") {
 					setMessages((prev) =>
@@ -122,6 +261,54 @@ export function ChatPanel({
 	};
 
 	const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+		if (e.key === "Escape" && (commandMenu.open || refMenu.open)) {
+			e.preventDefault();
+			setCommandMenu((prev) => ({ ...prev, open: false }));
+			setRefMenu((prev) => ({ ...prev, open: false }));
+			return;
+		}
+		if (commandMenu.open && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+			e.preventDefault();
+			const max = Math.max(visibleCommands.length - 1, 0);
+			setCommandMenu((prev) => ({
+				...prev,
+				selected:
+					e.key === "ArrowDown"
+						? prev.selected >= max
+							? 0
+							: prev.selected + 1
+						: prev.selected <= 0
+							? max
+							: prev.selected - 1,
+			}));
+			return;
+		}
+		if (refMenu.open && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+			e.preventDefault();
+			const max = Math.max(refs.length - 1, 0);
+			setRefMenu((prev) => ({
+				...prev,
+				selected:
+					e.key === "ArrowDown"
+						? prev.selected >= max
+							? 0
+							: prev.selected + 1
+						: prev.selected <= 0
+							? max
+							: prev.selected - 1,
+			}));
+			return;
+		}
+		if (commandMenu.open && e.key === "Enter" && visibleCommands[commandMenu.selected]) {
+			e.preventDefault();
+			replaceCommandToken(visibleCommands[commandMenu.selected]);
+			return;
+		}
+		if (refMenu.open && e.key === "Enter" && refs[refMenu.selected]) {
+			e.preventDefault();
+			replaceRefToken(refs[refMenu.selected]);
+			return;
+		}
 		if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
 			e.preventDefault();
 			sendPrompt();
@@ -160,23 +347,13 @@ export function ChatPanel({
 							</div>
 						</TooltipContent>
 					</Tooltip>
-					<Tooltip>
-						<TooltipTrigger asChild>
-							<button
-								type="button"
-								disabled
-								className="cursor-help rounded-md border border-input bg-background px-2 py-1 text-xs text-muted-foreground opacity-60"
-							>
-								⚙ 设置
-							</button>
-						</TooltipTrigger>
-						<TooltipContent side="bottom">
-							<div className="text-xs">设置面板在阶段二</div>
-							<div className="mt-0.5 text-[10px] opacity-70">
-								将含登录方式 / 默认模型 / UI 偏好 / 库管理
-							</div>
-						</TooltipContent>
-					</Tooltip>
+					<button
+						type="button"
+						onClick={onOpenSettings}
+						className="rounded-md border border-input bg-background px-2 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+					>
+						⚙ 设置
+					</button>
 				</div>
 			</header>
 
@@ -193,7 +370,12 @@ export function ChatPanel({
 					</div>
 				)}
 				{messages.map((m) => (
-					<MessageBubble key={m.id} message={m} showCursor={m.id === showCursorOn} />
+					<MessageBubble
+						key={m.id}
+						message={m}
+						showCursor={m.id === showCursorOn}
+						onOpenPage={onOpenPage}
+					/>
 				))}
 			</div>
 
@@ -204,19 +386,58 @@ export function ChatPanel({
 			)}
 
 			<div className="border-t border-input p-4">
-				<textarea
-					value={input}
-					onChange={(e) => setInput(e.target.value)}
-					onKeyDown={handleKeyDown}
-					rows={3}
-					className="w-full rounded-md border border-input bg-background p-3 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-					placeholder={
-						currentKnowledgeBaseName
-							? "输入消息… Cmd/Ctrl + Enter 发送"
-							: "请先在左侧选择一个知识库…"
-					}
-					disabled={status === "streaming" || !currentKnowledgeBaseName}
-				/>
+				{ingestChipVisible && detectedMaterial && (
+					<div className="mb-2 flex max-w-xl items-center justify-between gap-3 rounded-md border border-input bg-muted px-3 py-2 text-xs text-muted-foreground">
+						<span className="truncate">检测到{detectedMaterial.kind}，发送时将作为消化素材</span>
+						<button
+							type="button"
+							onClick={() => setIngestDismissedFor(detectedMaterial.value)}
+							className="rounded-sm p-0.5 hover:bg-accent hover:text-accent-foreground"
+							aria-label="关闭消化提示"
+						>
+							<X className="size-3.5" />
+						</button>
+					</div>
+				)}
+				<div className="relative">
+					<CommandMenu
+						open={commandMenu.open}
+						query={commandMenu.query}
+						items={visibleCommands}
+						selectedIndex={commandMenu.selected}
+						onSelect={replaceCommandToken}
+					/>
+					<RefMenu
+						open={refMenu.open}
+						query={refMenu.query}
+						items={refs}
+						selectedIndex={refMenu.selected}
+						onSelect={replaceRefToken}
+					/>
+					<textarea
+						ref={textareaRef}
+						value={input}
+						onChange={(e) => {
+							setInput(e.target.value);
+							if (e.target.value.trim() !== ingestDismissedFor) setIngestDismissedFor(null);
+							updateMenus(e.target.value, e.target.selectionStart);
+						}}
+						onClick={(e) => updateMenus(e.currentTarget.value, e.currentTarget.selectionStart)}
+						onKeyUp={(e) => {
+							if (["Escape", "ArrowDown", "ArrowUp", "Enter"].includes(e.key)) return;
+							updateMenus(e.currentTarget.value, e.currentTarget.selectionStart);
+						}}
+						onKeyDown={handleKeyDown}
+						rows={3}
+						className="w-full rounded-md border border-input bg-background p-3 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+						placeholder={
+							currentKnowledgeBaseName
+								? "输入消息… Cmd/Ctrl + Enter 发送"
+								: "请先在左侧选择一个知识库…"
+						}
+						disabled={status === "streaming" || !currentKnowledgeBaseName}
+					/>
+				</div>
 				<div className="mt-2 flex items-center justify-between">
 					<span className="text-xs text-muted-foreground">状态：{status}</span>
 					<Button onClick={sendPrompt} disabled={status === "streaming" || !input.trim() || !currentKnowledgeBaseName}>
@@ -228,7 +449,15 @@ export function ChatPanel({
 	);
 }
 
-function MessageBubble({ message, showCursor }: { message: Message; showCursor: boolean }) {
+function MessageBubble({
+	message,
+	showCursor,
+	onOpenPage,
+}: {
+	message: Message;
+	showCursor: boolean;
+	onOpenPage?: (path: string) => void;
+}) {
 	const isUser = message.role === "user";
 	return (
 		<div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
@@ -247,8 +476,12 @@ function MessageBubble({ message, showCursor }: { message: Message; showCursor: 
 						))}
 					</div>
 				)}
-				<div className="whitespace-pre-wrap break-words">
-					{message.content}
+				<div className="break-words">
+					{isUser ? (
+						<span className="whitespace-pre-wrap">{message.content}</span>
+					) : (
+						<MarkdownView content={message.content} onOpenPage={onOpenPage} />
+					)}
 					{showCursor && <span className="animate-cursor-blink ml-0.5">▍</span>}
 				</div>
 			</div>
