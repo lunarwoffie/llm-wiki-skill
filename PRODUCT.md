@@ -284,7 +284,7 @@ llm-wiki-agent/                       ← 你的仓库
 ### 阶段后规划（暂不锁定，记录想法）
 
 - 浏览器扩展：当前页面一键消化进库
-- 多模型路由：消化用 Haiku，对话用 Sonnet，自动切换
+- 多模型路由：按任务类型自动切（消化用便宜模型、深度对话用强模型），与 pi-agent provider 体系打通
 - 全局快捷键 / 系统托盘
 - 主题与自定义样式
 - 多端同步（如果未来真有需求）
@@ -642,7 +642,7 @@ open-design 通过启动 CLI 子进程（Claude Code / Codex / Cursor 等 16 个
 | 编号 | 事项 | 现状 | 何时定 |
 |---|---|---|---|
 | ~~TBD-1~~ | ~~项目正式名~~ | **已定：`llm-wiki-agent`**。桌面应用显示名留到阶段五前再定 | ✅ |
-| TBD-2 | 默认模型 | 阶段一固定 Claude Sonnet；阶段三再做多模型路由（消化用 Haiku、对话用 Sonnet） | 阶段三 |
+| TBD-2 | 默认模型 | **沿用 pi-agent 默认设置**（用户在 pi CLI 里 `pi -m <model>` 切换或编辑 `~/.pi/agent/settings.json`）；llm-wiki-agent 不强制固定任何 provider，由 pi-agent 的 ResourceLoader 决定。阶段三再做"消化用便宜模型 / 对话用强模型"的智能路由 | 阶段三 |
 | ~~TBD-3~~ | ~~多库会话隔离~~ | **已定：会话绑定知识库，同库支持多并行对话**（见 ADR-12） | ✅ |
 | TBD-4 | 危险操作确认 | 删除 / 覆盖类是否弹窗 | 阶段二 |
 | ~~TBD-5~~ | ~~API key 配置 UI~~ | **已定：三层 fallback（pi CLI 登录 / UI 填 key / env var），统一存 `~/.pi/agent/auth.json`**（见 ADR-13） | ✅ |
@@ -709,6 +709,10 @@ open-design 通过启动 CLI 子进程（Claude Code / Codex / Cursor 等 16 个
 
 ## Changelog
 
+- **2026-05-26 v6**：
+  - TBD-2 表述改：删"阶段一固定 Claude Sonnet"，改为"沿用 pi-agent 默认设置"。实际作者通过 pi-agent 的 provider 体系接入了其他 provider（如 zai/glm-5.1），llm-wiki-agent 本不该假设固定 Sonnet
+  - §阶段后规划"多模型路由"措辞更通用，不锁死 Anthropic
+  - 微调：ChatPanel 流式光标 `animate-pulse` → 自定义 `animate-cursor-blink`（1s steps 真闪烁，原 pulse 在 ▍ 粗块上视觉太弱）
 - **2026-05-26 v5（阶段一完结 review 修补）**：实际 review 阶段一代码对照文档，发现并修复 3 项硬 gap、4 项偏差对齐
   - 修 Gap 1：根 `package.json` 加 `npm run dev` 一行起两个服务（用 `concurrently`，符合 §4 阶段一范围第 1 条）
   - 修 Gap 2：`AppConfig` 加 `lastUsedKbPath`；`selectKb/selectConversation/createNewConversation` 写入；`agent.bootstrapFromConfig()` 启动时 await 恢复（符合 §5.1.1）

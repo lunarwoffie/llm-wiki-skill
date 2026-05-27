@@ -249,7 +249,7 @@ function MessageBubble({ message, showCursor }: { message: Message; showCursor: 
 				)}
 				<div className="whitespace-pre-wrap break-words">
 					{message.content}
-					{showCursor && <span className="ml-0.5 animate-pulse opacity-80">▍</span>}
+					{showCursor && <span className="animate-cursor-blink ml-0.5">▍</span>}
 				</div>
 			</div>
 		</div>

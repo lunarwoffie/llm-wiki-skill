@@ -51,7 +51,15 @@
   --ring: oklch(0.556 0 0);
 }
 
+/* 终端式光标闪烁：opacity 1→0 突变，1s 一次，比默认 animate-pulse 的渐变明显 */
+@keyframes cursor-blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
 @theme inline {
+  --animate-cursor-blink: cursor-blink 1s steps(1) infinite;
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
