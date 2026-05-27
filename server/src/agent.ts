@@ -94,6 +94,27 @@ export async function getActiveSession(): Promise<AgentSession> {
 	return active.session;
 }
 
+export interface LoadedSkillInfo {
+	name: string;
+	description: string;
+}
+
+export async function listLoadedSkills(): Promise<LoadedSkillInfo[]> {
+	const loader = await getResourceLoader();
+	const seen = new Set<string>();
+	return loader
+		.getSkills()
+		.skills.filter((skill) => {
+			if (seen.has(skill.name)) return false;
+			seen.add(skill.name);
+			return true;
+		})
+		.map((skill) => ({
+			name: skill.name,
+			description: skill.description,
+		}));
+}
+
 /**
  * 选择/进入一个知识库：dispose 老 session，加载/新建该库下的活跃对话。
  *   - 该 KB 有对话：opens most recent

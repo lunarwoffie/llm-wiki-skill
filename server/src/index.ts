@@ -31,6 +31,7 @@ import {
 	createNewConversation,
 	getActive,
 	getActiveSession,
+	listLoadedSkills,
 	selectConversation,
 	selectKb,
 } from "./agent.js";
@@ -194,6 +195,39 @@ app.get("/api/refs", async (c) => {
 		return c.json(
 			{ ok: false, error: err instanceof Error ? err.message : String(err) },
 			400,
+		);
+	}
+});
+
+// ============= Slash 命令列表 =============
+
+app.get("/api/commands", async (c) => {
+	try {
+		const builtin = [
+			{
+				slug: "/sediment",
+				name: "sediment_to_wiki",
+				description: "把当前对话结晶为 wiki/synthesis/sessions/ 下的页面",
+				source: "builtin",
+			},
+			{
+				slug: "/new-wiki",
+				name: "new_wiki",
+				description: "在默认目录下新建一个 llm-wiki 知识库",
+				source: "builtin",
+			},
+		];
+		const skills = (await listLoadedSkills()).map((skill) => ({
+			slug: `/${skill.name}`,
+			name: skill.name,
+			description: skill.description,
+			source: `skill:${skill.name}`,
+		}));
+		return c.json({ ok: true, items: [...builtin, ...skills] });
+	} catch (err) {
+		return c.json(
+			{ ok: false, error: err instanceof Error ? err.message : String(err) },
+			500,
 		);
 	}
 });
