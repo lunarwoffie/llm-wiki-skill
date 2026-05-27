@@ -1,3 +1,4 @@
+import { HtmlRenderer } from "@/components/renderers/HtmlRenderer";
 import type { ArtifactManifest } from "@/lib/api";
 
 interface Props {
@@ -5,6 +6,10 @@ interface Props {
 }
 
 export function ArtifactView({ manifest }: Props) {
+	if (manifest.renderer === "iframe") {
+		return <HtmlRenderer manifest={manifest} />;
+	}
+
 	return (
 		<div className="rounded-md border border-input bg-muted/30 p-4 text-sm">
 			<div className="font-medium">{manifest.metadata.title}</div>
