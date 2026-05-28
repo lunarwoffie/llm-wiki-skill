@@ -85,6 +85,15 @@ function normalizeRoleModelRef(raw: unknown): AppConfig["modelRoles"] extends in
 	return { provider: obj.provider.trim(), modelId: obj.modelId.trim() };
 }
 
+function sameModelRef(a: unknown, b: unknown): boolean {
+	const left = normalizeRoleModelRef(a);
+	const right = normalizeRoleModelRef(b);
+	if (left === undefined && right === undefined) return true;
+	if (left === null || right === null) return left === right;
+	if (left === undefined || right === undefined) return false;
+	return left.provider === right.provider && left.modelId === right.modelId;
+}
+
 const app = new Hono();
 
 app.get("/api/health", (c) => {
@@ -411,16 +420,16 @@ app.post("/api/config", async (c) => {
 				? { showUserGlobalSkills: body.showUserGlobalSkills }
 				: {}),
 		};
+		let mainRoleChanged = false;
 		if (typeof body.modelRoles === "object" && body.modelRoles !== null) {
 			const roles = body.modelRoles as Record<string, unknown>;
+			const nextMain = normalizeRoleModelRef(roles.main);
+			const nextDigest = normalizeRoleModelRef(roles.digest);
+			mainRoleChanged = nextMain !== undefined && !sameModelRef(current.modelRoles?.main, nextMain);
 			next.modelRoles = {
 				...(current.modelRoles ?? {}),
-				...(normalizeRoleModelRef(roles.main) !== undefined
-					? { main: normalizeRoleModelRef(roles.main) }
-					: {}),
-				...(normalizeRoleModelRef(roles.digest) !== undefined
-					? { digest: normalizeRoleModelRef(roles.digest) }
-					: {}),
+				...(nextMain !== undefined ? { main: nextMain } : {}),
+				...(nextDigest !== undefined ? { digest: nextDigest } : {}),
 			};
 		}
 		if (typeof body.uiPrefs === "object" && body.uiPrefs !== null) {
@@ -438,8 +447,9 @@ app.post("/api/config", async (c) => {
 		}
 		await saveConfig(next);
 		if (
-			typeof body.showUserGlobalSkills === "boolean" &&
-			body.showUserGlobalSkills !== current.showUserGlobalSkills
+			(typeof body.showUserGlobalSkills === "boolean" &&
+				body.showUserGlobalSkills !== current.showUserGlobalSkills) ||
+			mainRoleChanged
 		) {
 			await reloadActiveResources();
 		}

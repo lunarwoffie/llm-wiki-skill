@@ -315,6 +315,18 @@ function App() {
 		})();
 	};
 
+	const handleConfigChanged = async () => {
+		try {
+			const currentActive = await getActiveContext();
+			setActive(currentActive);
+			if (currentActive) {
+				setInitialMessages(currentActive.conversation.messages);
+			}
+		} catch (err) {
+			setSidebarError(err instanceof Error ? err.message : String(err));
+		}
+	};
+
 	return (
 		<TooltipProvider delayDuration={200}>
 			<div className="flex h-screen w-screen">
@@ -364,7 +376,11 @@ function App() {
 					onToggleFullscreen={() => setDrawerFullscreen((value) => !value)}
 					onClose={() => setDrawerMode("closed")}
 				/>
-				<SettingsPanel open={settingsOpen} onOpenChange={setSettingsOpen} />
+				<SettingsPanel
+					open={settingsOpen}
+					onOpenChange={setSettingsOpen}
+					onConfigChanged={handleConfigChanged}
+				/>
 				<BatchDigestPanel job={batchJob} onClose={() => setBatchJob(null)} />
 			</div>
 		</TooltipProvider>

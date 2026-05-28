@@ -346,11 +346,13 @@ export async function selectKb(kbPath: string): Promise<ActiveContext> {
 		isNew = true;
 	}
 
+	const model = await getRoleModel("main");
 	const { session, modelFallbackMessage } = await createAgentSession({
 		resourceLoader: loader,
 		sessionManager,
 		authStorage,
 		modelRegistry,
+		...(model ? { model } : {}),
 	});
 	if (modelFallbackMessage) console.log(`[agent] ${modelFallbackMessage}`);
 
@@ -379,11 +381,13 @@ export async function selectConversation(
 	const kb = await setCurrentKnowledgeBase(kbPath);
 	const loader = await getResourceLoader();
 
+	const model = await getRoleModel("main");
 	const { session, modelFallbackMessage } = await createAgentSession({
 		resourceLoader: loader,
 		sessionManager: SessionManager.open(target.path),
 		authStorage,
 		modelRegistry,
+		...(model ? { model } : {}),
 	});
 	if (modelFallbackMessage) console.log(`[agent] ${modelFallbackMessage}`);
 
@@ -404,11 +408,13 @@ export async function createNewConversation(kbPath: string): Promise<ActiveConte
 	const dir = await ensureKbSessionDir(kbPath);
 	const loader = await getResourceLoader();
 
+	const model = await getRoleModel("main");
 	const { session, modelFallbackMessage } = await createAgentSession({
 		resourceLoader: loader,
 		sessionManager: SessionManager.create(process.cwd(), dir),
 		authStorage,
 		modelRegistry,
+		...(model ? { model } : {}),
 	});
 	if (modelFallbackMessage) console.log(`[agent] ${modelFallbackMessage}`);
 

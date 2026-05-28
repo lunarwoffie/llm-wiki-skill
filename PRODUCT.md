@@ -303,13 +303,13 @@ llm-wiki-agent/                       ← 你的仓库
 - 批量消化 UI + SSE 进度推送：浮窗实时显示每个子代理的"排队/进行中/完成/失败"
 - 总验收 + UX 体感打磨
 
-**不包含**：图谱（阶段四）、Tauri 打包（阶段五）、媒体创作 / 浏览器扩展（阶段后规划）、子代理嵌套 / 工作树隔离（omp 那一套）、main 角色对主对话的强制接管（暂不动，避免破坏现有 session 创建路径）
+**不包含**：图谱（阶段四）、Tauri 打包（阶段五）、媒体创作 / 浏览器扩展（阶段后规划）、子代理嵌套 / 工作树隔离（omp 那一套）
 
 **验收标准**（5 条）：
 1. **侧栏统一**：KB 列表一栏到底无 default/external 分隔；点 KB 展开对话子树；外部 KB 用文字 badge 而非分区
 2. **拖拽添加**：从 Finder 拖文件夹到 dialog 拖拽区；若浏览器暴露真实 `file://`，路径自动填入输入框；若不暴露，UI 明确提示用户粘贴路径（不立即提交，给用户最后修改机会）
 3. **非 wiki 兜底**：拖入无 `.wiki-schema.md` 的目录，弹"是否初始化并批量消化"对话框；选"是"→ 后台跑 init + 子代理并行消化
-4. **多模型双角色**：设置面板新增"模型分配"区，main / digest 两个角色各自的 provider+model；digest 写入 `config.json` 后对新批量消化立即生效，main 本阶段只保存与展示，不接管主对话
+4. **多模型双角色**：设置面板新增"模型分配"区，main / digest 两个角色各自的 provider+model；digest 写入 `config.json` 后对新批量消化立即生效，main 写入后当前主对话立即重载并使用该模型
 5. **并发消化**：批量消化 10 个 `.md` 文件能看到 ≥3 个子代理同时跑（默认并发=3），SSE 实时推送状态，全部完成后右抽屉刷新出新增的 wiki 页面
 
 **完整设计**：[docs/stage-3.5-design.md](docs/stage-3.5-design.md)（含 7 step 细则、13 项关键决策、5 个 TBD、API 契约、验收剧本）
@@ -317,7 +317,7 @@ llm-wiki-agent/                       ← 你的仓库
 **完成情况**：
 - 侧栏已统一为一栏 KB 列表，当前 KB 下直接展开对话子树，外部库用 badge 标记
 - 添加现有库支持拖拽探测、路径输入、目录检查；非 wiki 目录可就地初始化并可接着批量消化
-- 设置面板新增 main / digest 角色选择；digest 角色用于批量消化，main 本阶段只保存不接管主对话
+- 设置面板新增 main / digest 角色选择；digest 角色用于批量消化，main 角色用于主对话并在切换后立即刷新生效
 - 批量消化使用 pi SDK 原生 in-memory 子会话，并发档位为 1 / 3 / 5，通过 SSE 推送进度
 - **新增依赖**：无
 
@@ -717,7 +717,7 @@ open-design 通过启动 CLI 子进程（Claude Code / Codex / Cursor 等 16 个
 
 1. **双角色而非 N 角色**：只引入 `main`（聊天）+ `digest`（消化）两个角色。拒绝项："per-task 模型路由"（消化/沉淀/产出/对话各自一个）太复杂、用户配不动；"只有一个 default model"则无法承载阶段 3.5 的核心需求
 2. **角色配置存项目 config.json 不写 pi settings.json**：跨工具污染坏处大于好处；`~/.llm-wiki-agent/config.json` 是我们自己的偏好文件
-3. **main 角色暂不强制接管主对话**：保持当前 pi 默认逻辑兜底，避免破坏现有 session 创建路径。digest 角色是新功能，强制走子代理才能保证"消化用便宜模型"的承诺
+3. **main 角色接管主对话**：设置里的 main 角色用于主对话创建和切换；保存 main 后重载当前活跃对话，让右上角模型显示与设置保持一致。digest 角色强制走子代理，保证"消化用便宜模型"的承诺
 4. **子代理用 pi SDK 原生 API 而非自建框架**：`createAgentSession({ model, authStorage, modelRegistry, sessionManager: inMemory(), tools: ["read"] })` 已经够用。拒绝项：抄 omp 的 `executor.ts` / `index.ts` 那 3000 行（工作树隔离 / 嵌套子代理 / worker IPC 我们都不需要）；自建独立子代理 runtime 重复造轮子
 5. **并发控制自写 30 行**：拒绝引入 p-limit / async-pool 等并发库（一个 while 循环就能做）；拒绝 `Promise.all` 一把开（N 个文件 = N 个并发模型请求会 429）
 6. **子代理不挂业务 extension**：阶段 3.5 的批量本地文件消化是 ADR-16 的明确例外，消化是裸 prompt + 只读工具的简单任务，挂 KB / synthesis / artifacts extension 反而让 cheap 模型困惑
@@ -735,7 +735,7 @@ open-design 通过启动 CLI 子进程（Claude Code / Codex / Cursor 等 16 个
 - 强化 **ADR-13**（凭证落 `~/.pi/agent/auth.json`）：modelRoles 只存 `{provider, modelId}`，不存任何 key
 
 **何时重新评估**：
-- 用户反馈"配了 main 但主对话没生效" → 把 `selectKb` 改为读 `modelRoles.main`
+- main 角色切换后如果出现历史会话恢复异常 → 回退为仅对新会话生效
 - 用户反馈"批量消化输出格式漂移" → 引入 schema 校验 + 重试
 - 用户反馈"并发 3 还是太慢" → 提供更高档位 + 自适应降级（429 自动退避）
 
@@ -780,7 +780,7 @@ open-design 通过启动 CLI 子进程（Claude Code / Codex / Cursor 等 16 个
 | 编号 | 事项 | 现状 | 何时定 |
 |---|---|---|---|
 | ~~TBD-1~~ | ~~项目正式名~~ | **已定：`llm-wiki-agent`**。桌面应用显示名留到阶段五前再定 | ✅ |
-| TBD-2 | 默认模型 | **阶段 3.5 已落地**：双角色 `modelRoles.{main, digest}` 写入 `~/.llm-wiki-agent/config.json`；digest 角色强制走子代理用于批量消化；main 角色暂不强制接管主对话（保持 pi 默认兜底）。详见 ADR-18 | ✅ |
+| TBD-2 | 默认模型 | **阶段 3.5 已落地**：双角色 `modelRoles.{main, digest}` 写入 `~/.llm-wiki-agent/config.json`；main 角色用于主对话，digest 角色用于批量消化。详见 ADR-18 | ✅ |
 | ~~TBD-3~~ | ~~多库会话隔离~~ | **已定：会话绑定知识库，同库支持多并行对话**（见 ADR-12） | ✅ |
 | TBD-4 | 危险操作确认 | 删除 / 覆盖类是否弹窗 | 阶段二 |
 | ~~TBD-5~~ | ~~API key 配置 UI~~ | **已定：三层 fallback（pi CLI 登录 / UI 填 key / env var），统一存 `~/.pi/agent/auth.json`**（见 ADR-13） | ✅ |
@@ -896,7 +896,7 @@ open-design 通过启动 CLI 子进程（Claude Code / Codex / Cursor 等 16 个
 **关键风险**：
 - TBD-3.5-1：子代理 session 共享 `authStorage` / `modelRegistry` 的资源生命周期未实测（codex 起手第一件事写 60 行验证）
 - TBD-3.5-2：`init-wiki.sh` 就地初始化会写入固定文件，必须先做冲突检测与备份（Step 3 起手看源码确认文件列表）
-- TBD-3.5-3：main 角色是否接管主对话（本阶段不动）
+- TBD-3.5-3：main 角色已接管主对话；设置切换后重载当前活跃对话
 
 **验收实况**：
 - `npm run --silent typecheck` 通过
@@ -953,7 +953,7 @@ open-design 通过启动 CLI 子进程（Claude Code / Codex / Cursor 等 16 个
 
 - **2026-05-27 v9（阶段 3.5 完成）**：阶段 3.5 实施完成并本地验证
   - 侧栏统一、拖拽/输入路径检查、非 wiki 目录初始化、多模型角色、批量消化子代理、SSE 进度浮窗均已落地
-  - 保持零新增 npm 依赖；main 角色仍按 ADR-18 不接管主对话
+  - 保持零新增 npm 依赖；main 角色已接管主对话，digest 角色用于批量消化
 - **2026-05-27 v8（阶段 3.5 设计完成）**：阶段 3.5 设计完成，待 codex 实施
   - §4 新增"阶段 3.5：导航 UX 重构 + 多模型子代理批量消化"小节，列出背景、7 step 范围、5 条验收标准、设计文档指引
   - §7 新增 **ADR-18：阶段 3.5 多模型双角色 + 轻量子代理框架**（9 条核心决策 + 与既有 ADR 关系 + 重新评估触发条件）

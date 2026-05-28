@@ -32,9 +32,10 @@ const PROVIDERS = [
 interface Props {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
+	onConfigChanged?: () => void;
 }
 
-export function SettingsPanel({ open, onOpenChange }: Props) {
+export function SettingsPanel({ open, onOpenChange, onConfigChanged }: Props) {
 	const [status, setStatus] = useState<AuthStatus | null>(null);
 	const [provider, setProvider] = useState("anthropic");
 	const [key, setKey] = useState("");
@@ -125,6 +126,7 @@ export function SettingsPanel({ open, onOpenChange }: Props) {
 				},
 			});
 			setMessage({ type: "success", text: "模型设置已保存" });
+			onConfigChanged?.();
 		} catch (err) {
 			setMessage({ type: "error", text: err instanceof Error ? err.message : String(err) });
 		}
@@ -235,7 +237,7 @@ export function SettingsPanel({ open, onOpenChange }: Props) {
 						<div>
 							<div className="text-sm font-medium">模型角色</div>
 							<div className="mt-1 text-xs text-muted-foreground">
-								主对话保持当前默认；批量消化会使用 digest 角色
+								主对话会立即使用所选模型；批量消化会使用 digest 角色
 							</div>
 						</div>
 						<ModelRoleSelect
