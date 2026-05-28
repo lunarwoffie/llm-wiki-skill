@@ -1,5 +1,7 @@
 # 当前知识库自动检索增强设计
 
+> 状态：**已完成** · 实施于 2026-05-28 · 对应 ADR-19 · 阶段 3.5 收尾补强
+>
 > 本文档是 codex 实施手册。先读 §0 决策摘要，再按 §9 顺序动手。
 > 任何与 [PRODUCT.md](../PRODUCT.md) 冲突的描述以 PRODUCT.md 为准；本文档需要破例的地方在 §12 明确写出并对应到 ADR-19。
 
@@ -566,3 +568,20 @@ PRODUCT.md §6.6 UTF-8 铁律。
 - 主流模型工具调用稳定性显著提升 → 考虑改回纯工具路径
 - 用户大量反馈"参考页面被编造" → 强化 prompt 约束 + 引入后置校验
 - KB 规模 > 100 篇时检索耗时不可接受 → 引入向量检索
+
+## 13. 完成情况
+
+本设计已在阶段 3.5 收尾中落地。
+
+- `/api/prompt` 已接入当前知识库自动检索；每轮用户消息独立判断，触发时推送 `knowledge_search_start` / `knowledge_search_done` / `knowledge_search_empty` / `knowledge_search_error`
+- `query_knowledge_base` 工具已注册，和主对话预检索共用同一套检索函数
+- 检索结果复用 `pages.ts` 的缓存与扫描路径，覆盖 `wiki/synthesis/sessions/`、`purpose.md`、`index.md`、`wiki/overview.md`
+- `[[wiki/...]]` 显式引用会优先进入结果；缺失页面会进入包装提示，不静默吞掉
+- 检索日志写入 `~/.llm-wiki-agent/logs/retrieval/<YYYY-MM-DD>.jsonl`
+- 普通寒暄、`/` 命令、模型/设置类问题、导出产物指令不会触发知识库检索
+
+**验收实况**：
+
+- `node --import tsx --test server/src/retrieval.test.ts server/src/digest/concurrency.test.ts` 通过
+- `npm run --silent typecheck` 通过
+- 真实接口验证通过：`这是我自媒体创作的文章，总结一下` 触发检索并返回参考页面；`你好` 不触发检索；导出 PDF 指令不触发检索

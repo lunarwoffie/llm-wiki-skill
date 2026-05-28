@@ -927,6 +927,7 @@ open-design 通过启动 CLI 子进程（Claude Code / Codex / Cursor 等 16 个
 - 本地接口实测通过：目录 inspect、初始化冲突 409、就地初始化成功、模型列表、模型角色保存、批量消化参数校验
 - 单文件批量消化真实跑通，SSE 返回 start / file_start / file_complete / done，并写入 `wiki/synthesis/sessions/`
 - 验收后补强：批量消化改为逐文件失败隔离，进度面板显示每个文件状态、生成字数和结果入口；外部目录批量消化改用 inspect 扫描凭据，不再信任前端传任意 sourceRoot；初始化后批量消化可临时选择 digest 模型
+- 收尾补强：当前知识库自动检索已落地（见 [docs/current-kb-retrieval-design.md](docs/current-kb-retrieval-design.md)）；批量消化后直接提问会先检索当前知识库，普通寒暄和导出指令不会误触发检索
 
 ### 阶段四 / 五：未开始（详见 §4）
 
@@ -975,6 +976,11 @@ open-design 通过启动 CLI 子进程（Claude Code / Codex / Cursor 等 16 个
 
 ## Changelog
 
+- **2026-05-28 v10（阶段 3.5 收尾）**：阶段 3.5 收尾补强完成，准备合并推送
+  - 新增当前知识库自动检索：主对话提问时后端先检索当前 KB 并注入上下文，避免批量消化后模型反问用户提供文章
+  - `query_knowledge_base` 工具与 `/api/prompt` 共用同一套检索逻辑，ADR-19 已写入 §7
+  - 检索失败降级为普通对话并写 retrieval 日志；寒暄、`/` 命令、导出产物指令不会误触发检索
+  - 验证覆盖：检索单测、并发单测、类型检查、真实接口总结/寒暄/导出三条路径
 - **2026-05-27 v9（阶段 3.5 完成）**：阶段 3.5 实施完成并本地验证
   - 侧栏统一、拖拽/输入路径检查、非 wiki 目录初始化、多模型角色、批量消化子代理、SSE 进度浮窗均已落地
   - 保持零新增 npm 依赖；main 角色已接管主对话，digest 角色用于批量消化
