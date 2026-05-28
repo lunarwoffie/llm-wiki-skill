@@ -57,7 +57,7 @@
 
 当前进度、阶段验收、commit 表和接受的妥协，以 `PRODUCT.md` 第 10 节为准。
 
-当前状态：**阶段 3.5 已完成并进入收尾合并**（分支 `stage-3.5`，2026-05-28）。
+当前状态：**阶段 3.5 已完成并合并到 `main`**。当前处于阶段四开始前的收尾维护期（2026-05-28）。
 
 阶段 3.5 范围：导航 UX 重构（侧栏统一 + 拖拽添加 KB + 非 wiki 目录初始化引导）+ 多模型双角色（`config.json` 的 `modelRoles.{main, digest}`）+ 子代理批量消化（30 行并发框架 + pi SDK 原生 `SessionManager.inMemory()`）。共 7 step，详见 `docs/stage-3.5-design.md`。
 
@@ -67,6 +67,8 @@
 - 阶段三：`docs/stage-3-design.md`（✅ 已完成 2026-05-27）
 - 阶段 3.5：`docs/stage-3.5-design.md`（✅ 已完成 2026-05-27）
 - 阶段 3.5 收尾补强：`docs/current-kb-retrieval-design.md`（✅ 已完成 2026-05-28）
+- 阶段 3.5 预览布局补强：`docs/superpowers/specs/2026-05-28-resizable-preview-layout-design.md`（✅ 已完成 2026-05-28）
+- 阶段 3.5 设置面板滚动补强：`docs/superpowers/specs/2026-05-28-settings-panel-scroll-fix.md`（✅ 已完成 2026-05-28）
 
 ## 关键路径速查
 

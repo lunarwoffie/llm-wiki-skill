@@ -906,7 +906,10 @@ open-design 通过启动 CLI 子进程（Claude Code / Codex / Cursor 等 16 个
 
 **设计文档**：[docs/stage-3.5-design.md](docs/stage-3.5-design.md)（1148 行：7 step 细则 + 13 项关键决策 + 5 个 TBD + API 契约 + 验收剧本）
 
-**收尾补强设计文档**：[docs/superpowers/specs/2026-05-28-resizable-preview-layout-design.md](docs/superpowers/specs/2026-05-28-resizable-preview-layout-design.md)
+**收尾补强设计文档**：
+- [docs/current-kb-retrieval-design.md](docs/current-kb-retrieval-design.md)
+- [docs/superpowers/specs/2026-05-28-resizable-preview-layout-design.md](docs/superpowers/specs/2026-05-28-resizable-preview-layout-design.md)
+- [docs/superpowers/specs/2026-05-28-settings-panel-scroll-fix.md](docs/superpowers/specs/2026-05-28-settings-panel-scroll-fix.md)
 
 **7 step 概览**：
 
@@ -934,6 +937,7 @@ open-design 通过启动 CLI 子进程（Claude Code / Codex / Cursor 等 16 个
 - 收尾补强：当前知识库自动检索已落地（见 [docs/current-kb-retrieval-design.md](docs/current-kb-retrieval-design.md)）；批量消化后直接提问会先检索当前知识库，普通寒暄和导出指令不会误触发检索
 - UI 视觉迁移补强：基于本地原型 `index.html` 统一工作台视觉，补齐浅色 / 深色主题切换；保持原有侧栏、对话、引用、命令、产物抽屉、设置、批量消化流程不变，不新增依赖
 - 预览布局补强：侧栏可折叠为 52px 窄图标栏，右抽屉支持拖动调宽和双击恢复默认宽度；折叠状态与抽屉宽度保存在本机；移动端继续使用全屏抽屉
+- 设置面板补强：设置弹窗限制最大高度，标题区保留在顶部，设置内容在弹窗内部滚动；底部 Skill 加载区在较矮屏幕下也可达
 
 ### 阶段四 / 五：未开始（详见 §4）
 
@@ -982,6 +986,10 @@ open-design 通过启动 CLI 子进程（Claude Code / Codex / Cursor 等 16 个
 
 ## Changelog
 
+- **2026-05-28 v13（设置面板滚动修复）**：补记设置弹窗高度与内部滚动修复
+  - 设置面板限制最大高度，避免底部设置被屏幕遮住
+  - 设置内容区改为内部滚动，标题和关闭按钮保留在顶部
+  - 设计与验证记录见 `docs/superpowers/specs/2026-05-28-settings-panel-scroll-fix.md`
 - **2026-05-28 v12（阶段 3.5 预览布局收尾）**：补记可拖动预览区与侧栏折叠
   - 右抽屉支持拖动左边缘调整预览宽度，双击恢复默认宽度；宽度保存在本机
   - 左侧栏支持折叠为 52px 窄图标栏，保留核心入口并提供悬停提示；折叠状态保存在本机

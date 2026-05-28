@@ -136,7 +136,7 @@ export function SettingsPanel({ open, onOpenChange, onConfigChanged }: Props) {
 
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="dialog-surface max-w-2xl" showCloseButton={false}>
+			<DialogContent className="dialog-surface grid max-h-[calc(100vh-2rem)] max-w-2xl grid-rows-[auto_minmax(0,1fr)] overflow-hidden" showCloseButton={false}>
 				<DialogHeader className="flex-row items-start justify-between gap-4 space-y-0">
 					<div>
 						<DialogTitle>设置</DialogTitle>
@@ -147,7 +147,7 @@ export function SettingsPanel({ open, onOpenChange, onConfigChanged }: Props) {
 					</Button>
 				</DialogHeader>
 
-				<div className="space-y-5">
+				<div className="-mx-2 min-h-0 space-y-5 overflow-y-auto px-2 pb-1">
 					<section className="space-y-2 rounded-md border border-[var(--app-border)] p-3">
 						<div className="flex items-center gap-2 text-sm font-medium">
 							<KeyRound className="size-4" />
