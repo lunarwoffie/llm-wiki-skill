@@ -250,6 +250,7 @@ export interface GraphEngineCapabilities {
   persistPins?: (pins: PinMap) => Promise<void>;
   onAsk?: (selection: Selection) => void;
   onOpenPage?: (path: WikiPath) => void;
+  onDragStateChange?: (dragging: boolean) => void;
 }
 
 export interface GraphEngineOptions {
@@ -260,7 +261,8 @@ export interface GraphEngineOptions {
 }
 
 export interface GraphEngine {
-  applyDiff(diff: GraphDiff): Promise<void>;
+  applyDiff(diff: GraphDiff, options?: { reducedMotion?: boolean; durationMs?: number }): Promise<void>;
+  isDragging(): boolean;
   focusNode(path: WikiPath): void;
   select(selector: SelectionInput): Selection;
   setTheme(theme: ThemeId): void;

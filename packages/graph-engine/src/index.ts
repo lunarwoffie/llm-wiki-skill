@@ -5,6 +5,7 @@ export * from "./select";
 export * from "./sim";
 export * from "./themes";
 export * from "./diff";
+export * from "./anim";
 
 import type {
   GraphDiff,
@@ -33,15 +34,22 @@ export function createGraphEngine(container: HTMLElement, options: GraphEngineOp
     theme: currentTheme,
     onOpenPage: options.capabilities?.onOpenPage,
     onSelect: canAsk ? (input) => options.capabilities?.onAsk?.(resolveForHostCapabilities(input)) : undefined,
-    persistPins: options.capabilities?.persistPins
+    persistPins: options.capabilities?.persistPins,
+    onDragStateChange: options.capabilities?.onDragStateChange
   });
 
   container.dataset.llmWikiGraphEngine = "mounted";
   container.dataset.llmWikiGraphTheme = currentTheme;
 
   return {
-    async applyDiff(_diff: GraphDiff): Promise<void> {
+    async applyDiff(diff: GraphDiff, animationOptions?: { reducedMotion?: boolean; durationMs?: number }): Promise<void> {
       assertActive();
+      await renderer.applyDiff(diff, animationOptions);
+    },
+
+    isDragging(): boolean {
+      assertActive();
+      return renderer.isDragging();
     },
 
     focusNode(path: string): void {

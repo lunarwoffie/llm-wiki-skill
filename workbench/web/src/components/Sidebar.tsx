@@ -29,6 +29,7 @@ interface Props {
 	error: string | null;
 	collapsed: boolean;
 	activeView: MainView;
+	graphHasPendingUpdate?: boolean;
 	onSelectKb: (item: KnowledgeBaseInfo) => void;
 	onSelectConversation: (item: ConversationInfo) => void;
 	onSelectView: (view: MainView) => void;
@@ -56,6 +57,7 @@ export function Sidebar({
 	error,
 	collapsed,
 	activeView,
+	graphHasPendingUpdate = false,
 	onSelectKb,
 	onSelectConversation,
 	onSelectView,
@@ -117,6 +119,7 @@ export function Sidebar({
 						onClick={() => onSelectView("graph")}
 						active={activeView === "graph"}
 						disabled={!currentKb?.valid}
+						badge={graphHasPendingUpdate}
 					>
 						<Network />
 					</RailButton>
@@ -197,9 +200,11 @@ export function Sidebar({
 						className={cn("main-view-btn", activeView === "graph" && "main-view-btn-active")}
 						onClick={() => onSelectView("graph")}
 						disabled={!currentKb?.valid}
+						data-pending-update={graphHasPendingUpdate ? "true" : "false"}
 					>
 						<Network className="size-3.5" />
 						<span>图谱</span>
+						{graphHasPendingUpdate && <span className="graph-update-dot" aria-label="图谱有更新" />}
 					</button>
 				</div>
 
@@ -292,12 +297,14 @@ function RailButton({
 	label,
 	active,
 	disabled,
+	badge,
 	onClick,
 	children,
 }: {
 	label: string;
 	active?: boolean;
 	disabled?: boolean;
+	badge?: boolean;
 	onClick?: () => void;
 	children: React.ReactNode;
 }) {
@@ -312,6 +319,7 @@ function RailButton({
 					aria-label={label}
 				>
 					{children}
+					{badge && <span className="sidebar-rail-badge" />}
 				</button>
 			</TooltipTrigger>
 			<TooltipContent side="right">

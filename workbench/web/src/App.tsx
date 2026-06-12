@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { GraphDiff } from "@llm-wiki/graph-engine";
 
 import { BatchDigestPanel, type BatchDigestJob } from "@/components/BatchDigestPanel";
 import { ChatPanel } from "@/components/ChatPanel";
@@ -24,6 +25,7 @@ import {
 	selectConversation,
 	selectKnowledgeBase,
 	streamBatchDigest,
+	type GraphEvent,
 	type UIMessage,
 } from "@/lib/api";
 import { WIKI_LINK_SEEN_EVENT } from "@/lib/wiki-links";
@@ -119,10 +121,14 @@ function App() {
 		displayText: string;
 	} | null>(null);
 	const [graphFocusPath, setGraphFocusPath] = useState<string | null>(null);
+	const [pendingGraphDiff, setPendingGraphDiff] = useState<GraphDiff | null>(null);
+	const [graphRefreshToken, setGraphRefreshToken] = useState(0);
+	const [graphHasPendingUpdate, setGraphHasPendingUpdate] = useState(false);
 	const [mainView, setMainView] = useState<MainView>(() => {
 		if (typeof window === "undefined") return "chat";
 		return window.localStorage.getItem(MAIN_VIEW_STORAGE_KEY) === "graph" ? "graph" : "chat";
 	});
+	const mainViewRef = useRef(mainView);
 	const activeConversationId = active?.conversation.id ?? null;
 
 	useEffect(() => {
@@ -138,6 +144,30 @@ function App() {
 
 	useEffect(() => {
 		window.localStorage.setItem(MAIN_VIEW_STORAGE_KEY, mainView);
+		mainViewRef.current = mainView;
+	}, [mainView]);
+
+	useEffect(() => {
+		if (!active?.kb.path) return;
+		const events = new EventSource("/api/events");
+		events.addEventListener("graph_updated", (message) => {
+			const event = JSON.parse((message as MessageEvent).data) as GraphEvent;
+			if (event.type !== "graph_updated" || event.kbPath !== active.kb.path) return;
+			setGraphRefreshToken((token) => token + 1);
+			setPendingGraphDiff(event.diff);
+			if (mainViewRef.current !== "graph" && event.diff) setGraphHasPendingUpdate(true);
+		});
+		events.addEventListener("graph_error", (message) => {
+			const event = JSON.parse((message as MessageEvent).data) as GraphEvent;
+			if (event.type === "graph_error" && event.kbPath === active.kb.path) {
+				setSidebarError(event.message);
+			}
+		});
+		return () => events.close();
+	}, [active?.kb.path]);
+
+	useEffect(() => {
+		if (mainView === "graph") setGraphHasPendingUpdate(false);
 	}, [mainView]);
 
 	useEffect(() => {
@@ -518,6 +548,7 @@ function App() {
 					onRefresh={refreshAll}
 					onOpenSettings={() => setSettingsOpen(true)}
 					onToggleCollapsed={() => setSidebarCollapsed((value) => !value)}
+					graphHasPendingUpdate={graphHasPendingUpdate}
 					onAddExternal={handleAddExternal}
 					onCreateWiki={handleCreateWiki}
 					onStartBatchDigest={handleStartBatchDigest}
@@ -532,6 +563,9 @@ function App() {
 							onOpenPage={handleOpenPage}
 							onAskSelection={handleAskSelection}
 							focusPath={graphFocusPath}
+							pendingDiff={pendingGraphDiff}
+							refreshToken={graphRefreshToken}
+							onDiffConsumed={() => setPendingGraphDiff(null)}
 						/>
 					) : (
 						<ChatPanel

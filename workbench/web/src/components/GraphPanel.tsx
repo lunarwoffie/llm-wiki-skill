@@ -2,7 +2,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { MessageSquarePlus, Moon, Plus, RefreshCw, RotateCcw, Send, Sun, X } from "lucide-react";
 import {
 	createGraphEngine,
+	GraphDiffQueue,
 	type GraphData,
+	type GraphDiff,
 	type GraphEngine,
 	type PinMap,
 	type Selection,
@@ -15,7 +17,6 @@ import {
 	getGraphLayout,
 	putGraphLayout,
 	rebuildGraph,
-	type GraphEvent,
 } from "@/lib/api";
 import { buildSelectionPromptPayload, selectionTitle } from "@/lib/graph-selection";
 import { cn } from "@/lib/utils";
@@ -28,6 +29,9 @@ interface Props {
 	onOpenPage?: (path: string) => void;
 	onAskSelection?: (input: { message: string; displayText: string; newConversation: boolean }) => void;
 	focusPath?: string | null;
+	pendingDiff?: GraphDiff | null;
+	refreshToken?: number;
+	onDiffConsumed?: () => void;
 }
 
 type GraphStatus = "idle" | "loading" | "building" | "ready" | "error";
@@ -35,6 +39,11 @@ type GraphStatus = "idle" | "loading" | "building" | "ready" | "error";
 interface ResetNotice {
 	pins: PinMap;
 	count: number;
+}
+
+interface PendingAnimation {
+	token: number;
+	diff: GraphDiff;
 }
 
 export function GraphPanel({
@@ -45,11 +54,18 @@ export function GraphPanel({
 	onOpenPage,
 	onAskSelection,
 	focusPath,
+	pendingDiff,
+	refreshToken = 0,
+	onDiffConsumed,
 }: Props) {
 	const hostRef = useRef<HTMLDivElement | null>(null);
 	const engineRef = useRef<GraphEngine | null>(null);
 	const persistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const resetNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const diffQueueRef = useRef(new GraphDiffQueue({ visible: true }));
+	const lastRefreshTokenRef = useRef(refreshToken);
+	const devGraphTestRef = useRef("");
+	const animationTokenRef = useRef(0);
 	const [data, setData] = useState<GraphData | null>(null);
 	const [layoutPins, setLayoutPins] = useState<PinMap>({});
 	const [resetNotice, setResetNotice] = useState<ResetNotice | null>(null);
@@ -58,6 +74,9 @@ export function GraphPanel({
 	const [buildState, setBuildState] = useState<"none" | "started" | "queued">("none");
 	const [selection, setSelection] = useState<Selection | null>(null);
 	const [selectionText, setSelectionText] = useState("");
+	const [animationState, setAnimationState] = useState<"idle" | "playing" | "queued">("idle");
+	const [pendingAnimation, setPendingAnimation] = useState<PendingAnimation | null>(null);
+	const [animationReadyToken, setAnimationReadyToken] = useState(0);
 
 	const graphTheme: ThemeId = theme === "dark" ? "mo-ye" : "shan-shui";
 
@@ -99,26 +118,6 @@ export function GraphPanel({
 	useEffect(() => {
 		void loadGraph();
 	}, [loadGraph]);
-
-	useEffect(() => {
-		if (!currentKnowledgeBasePath) return;
-		const events = new EventSource("/api/events");
-		events.addEventListener("graph_updated", (message) => {
-			const event = JSON.parse((message as MessageEvent).data) as GraphEvent;
-			if (event.type === "graph_updated" && event.kbPath === currentKnowledgeBasePath) {
-				void loadGraph();
-			}
-		});
-		events.addEventListener("graph_error", (message) => {
-			const event = JSON.parse((message as MessageEvent).data) as GraphEvent;
-			if (event.type === "graph_error" && event.kbPath === currentKnowledgeBasePath) {
-				setStatus("error");
-				setError(event.message);
-				setBuildState("none");
-			}
-		});
-		return () => events.close();
-	}, [currentKnowledgeBasePath, loadGraph]);
 
 	useEffect(() => {
 		return () => {
@@ -176,6 +175,35 @@ export function GraphPanel({
 		void writePinsImmediately(notice.pins);
 	}, [resetNotice, writePinsImmediately]);
 
+	const playDiff = useCallback(async (diff: GraphDiff) => {
+		const engine = engineRef.current;
+		if (!engine) {
+			setAnimationState("queued");
+			return;
+		}
+		setAnimationState("playing");
+		await engine.applyDiff(diff);
+		const decision = diffQueueRef.current.finishAnimation();
+		if (decision.action === "consume" && decision.diff) {
+			void playDiff(decision.diff);
+			return;
+		}
+		setAnimationState("idle");
+	}, []);
+
+	const enqueueDiff = useCallback(async (diff: GraphDiff) => {
+		const queue = diffQueueRef.current;
+		const engine = engineRef.current;
+		queue.setVisible(status === "ready");
+		if (engine?.isDragging()) queue.setDragging(true);
+		const decision = queue.push(diff);
+		if (decision.action === "consume" && decision.diff) {
+			await playDiff(decision.diff);
+		} else if (decision.snapshot.pending) {
+			setAnimationState("queued");
+		}
+	}, [playDiff, status]);
+
 	useEffect(() => {
 		if (!hostRef.current || !data) {
 			engineRef.current?.destroy();
@@ -191,6 +219,12 @@ export function GraphPanel({
 				onOpenPage,
 				onAsk: setSelection,
 				persistPins,
+				onDragStateChange: (dragging) => {
+					const decision = diffQueueRef.current.setDragging(dragging);
+					if (!dragging && decision.action === "consume" && decision.diff) {
+						void playDiff(decision.diff);
+					}
+				},
 			},
 		});
 		if (focusPath) engineRef.current.focusNode(focusPath);
@@ -198,12 +232,71 @@ export function GraphPanel({
 			engineRef.current?.destroy();
 			engineRef.current = null;
 		};
-	}, [data, focusPath, graphTheme, layoutPins, onOpenPage, persistPins]);
+	}, [data, focusPath, graphTheme, layoutPins, onOpenPage, persistPins, playDiff]);
+
+	useEffect(() => {
+		if (
+			!data
+			|| status !== "ready"
+			|| !engineRef.current
+			|| !pendingAnimation
+			|| animationReadyToken !== pendingAnimation.token
+		) return;
+		const diff = pendingAnimation.diff;
+		setPendingAnimation(null);
+		void enqueueDiff(diff);
+	}, [animationReadyToken, data, enqueueDiff, pendingAnimation, status]);
+
+	useEffect(() => {
+		const decision = diffQueueRef.current.setVisible(status === "ready");
+		if (decision.action === "consume" && decision.diff) {
+			void playDiff(decision.diff);
+		} else if (decision.snapshot.pending) {
+			setAnimationState("queued");
+		}
+	}, [playDiff, status]);
+
+	useEffect(() => {
+		if (!pendingDiff) return;
+		const token = ++animationTokenRef.current;
+		lastRefreshTokenRef.current = refreshToken;
+		setAnimationState("queued");
+		setPendingAnimation({
+			token,
+			diff: pendingDiff,
+		});
+		void loadGraph().then(() => {
+			setAnimationReadyToken(token);
+			onDiffConsumed?.();
+		});
+	}, [loadGraph, onDiffConsumed, pendingDiff, refreshToken]);
+
+	useEffect(() => {
+		if (pendingDiff) return;
+		if (lastRefreshTokenRef.current === refreshToken) return;
+		lastRefreshTokenRef.current = refreshToken;
+		void loadGraph();
+	}, [loadGraph, pendingDiff, refreshToken]);
 
 	useEffect(() => {
 		if (!focusPath || !engineRef.current || status !== "ready") return;
 		engineRef.current.focusNode(focusPath);
 	}, [data, focusPath, status]);
+
+	useEffect(() => {
+		if (!import.meta.env.DEV || !data || !engineRef.current || status !== "ready") return;
+		const params = new URLSearchParams(window.location.search);
+		const mode = params.get("graphTest");
+		if (mode !== "reduced" && mode !== "motion") return;
+		const key = `${mode}:${data.meta.build_date}:${data.nodes.length}:${data.edges.length}`;
+		if (devGraphTestRef.current === key) return;
+		devGraphTestRef.current = key;
+		const diff = sampleDiffForGraphTest(data);
+		void engineRef.current.applyDiff(diff, {
+			reducedMotion: mode === "reduced",
+			durationMs: mode === "motion" ? 650 : undefined,
+		});
+	}, [data, status]);
 
 	const selectNeighbors = useCallback(() => {
 		if (!selection || selection.nodeIds.length !== 1) return;
@@ -223,7 +316,7 @@ export function GraphPanel({
 	}, [data, onAskSelection, selection, selectionText]);
 
 	return (
-		<div className="graph-screen" data-graph-status={status} data-graph-theme={graphTheme}>
+		<div className="graph-screen" data-graph-status={status} data-graph-theme={graphTheme} data-graph-animation={animationState}>
 			<header className="statusbar">
 				<div className="statusbar-left">
 					<span className={cn("status-dot", status === "building" && "status-dot-warn", status === "error" && "status-dot-error")} />
@@ -287,6 +380,11 @@ export function GraphPanel({
 					<div className="graph-metrics">
 						<span>{data.nodes.length} 节点</span>
 						<span>{data.edges.length} 关联</span>
+					</div>
+				)}
+				{animationState !== "idle" && (
+					<div className="graph-growth-indicator" data-testid="graph-growth-indicator">
+						{animationState === "playing" ? "图谱更新中" : "图谱更新待播放"}
 					</div>
 				)}
 				{resetNotice && (
@@ -439,4 +537,23 @@ function statusCopy(
 	}
 	if (status === "error") return error ?? "请稍后重试。";
 	return "";
+}
+
+function sampleDiffForGraphTest(data: GraphData): GraphDiff {
+	const node = data.nodes[0];
+	const edge = data.edges[0];
+	const community = node?.community ? String(node.community) : null;
+	return {
+		addedNodes: node ? [node.id] : [],
+		removedNodes: [],
+		recoloredNodes: [],
+		addedEdges: edge ? [edge.id] : [],
+		removedEdges: [],
+		newCommunities: community ? [community] : [],
+		stats: {
+			nodeCount: data.nodes.length,
+			edgeCount: data.edges.length,
+			communityCount: new Set(data.nodes.map((item) => item.community).filter(Boolean)).size,
+		},
+	};
 }

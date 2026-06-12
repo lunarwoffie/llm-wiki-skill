@@ -1,4 +1,4 @@
-import type { CommunityId, GraphData, NodeId, PinMap, SelectionInput, ThemeId, WikiPath } from "../types";
+import type { CommunityId, GraphData, GraphDiff, NodeId, PinMap, SelectionInput, ThemeId, WikiPath } from "../types";
 import { createLiveGraphSimulation, PinState, pinsToPositions, type LiveGraphSimulation } from "../sim";
 import { getCommunityColor, getThemeTokens, themeTokensToCssVars } from "../themes";
 import {
@@ -17,6 +17,7 @@ interface StaticRendererOptions {
   onOpenPage?: (path: WikiPath) => void;
   onSelect?: (selection: SelectionInput) => void;
   persistPins?: (pins: PinMap) => Promise<void>;
+  onDragStateChange?: (dragging: boolean) => void;
   live?: boolean;
 }
 
@@ -24,6 +25,8 @@ export interface StaticGraphRenderer {
   root: HTMLElement;
   graph: RenderableGraph;
   render(next?: Partial<StaticRendererOptions> & { selectedNodeId?: string | null; selection?: SelectionInput | null }): void;
+  applyDiff(diff: GraphDiff, options?: { reducedMotion?: boolean; durationMs?: number }): Promise<void>;
+  isDragging(): boolean;
   setTheme(theme: ThemeId): void;
   focusNode(pathOrId: WikiPath): void;
   select(selection: SelectionInput): void;
@@ -53,6 +56,7 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
   let destroyed = false;
   let simulation: LiveGraphSimulation | null = null;
   let dom: PaintedGraphDom = emptyPaintedDom();
+  let activeDiff: GraphDiff | null = null;
   const pathCache = createRenderPathCache();
   const root = document.createElement("div");
   root.className = "llm-wiki-graph-engine";
@@ -95,6 +99,7 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
         simulation.beginDrag(id);
         simulation.dragTo(id, eventToGraphPoint(root, event));
         root.dataset.dragging = id;
+        options.onDragStateChange?.(true);
       },
       onDragMove: (id, event) => {
         if (!simulation || root.dataset.dragging !== id) return;
@@ -112,6 +117,7 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
           void options.persistPins?.(nextState.pins);
         }
         delete root.dataset.dragging;
+        options.onDragStateChange?.(false);
       },
       onNodeDoubleClick: (id) => {
         if (!pinState.isPinned(id)) return false;
@@ -123,6 +129,7 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
         return true;
       }
     });
+    if (activeDiff && root.dataset.diffState === "playing") markDiffElements(activeDiff);
     restartSimulation();
   }
 
@@ -134,6 +141,13 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
       return graph;
     },
     render,
+    applyDiff(diff, animationOptions = {}): Promise<void> {
+      assertActive();
+      return animateDiff(diff, animationOptions);
+    },
+    isDragging(): boolean {
+      return Boolean(root.dataset.dragging);
+    },
     setTheme(nextTheme: ThemeId): void {
       render({ theme: nextTheme });
     },
@@ -225,6 +239,97 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
       element.classList.toggle("is-pinned", pinned.has(id));
       element.dataset.pinned = pinned.has(id) ? "true" : "false";
     }
+  }
+
+  async function animateDiff(diff: GraphDiff, animationOptions: { reducedMotion?: boolean; durationMs?: number }): Promise<void> {
+    if (destroyed) return;
+    const reducedMotion = animationOptions.reducedMotion ?? prefersReducedMotion(root.ownerDocument || document);
+    activeDiff = diff;
+    root.dataset.diffState = reducedMotion ? "settled" : "playing";
+    root.dataset.diffAddedNodes = String(diff.addedNodes.length);
+    root.dataset.diffAddedEdges = String(diff.addedEdges.length);
+    root.dataset.diffRemovedNodes = String(diff.removedNodes.length);
+    root.dataset.diffNewCommunities = String(diff.newCommunities.length);
+    markDiffElements(diff);
+    if (reducedMotion) {
+      root.dataset.diffReducedMotion = "true";
+      settleDiffElements();
+      return;
+    }
+    delete root.dataset.diffReducedMotion;
+    const durationMs = clamp(animationOptions.durationMs ?? animationDurationMs(diff), 420, 3000);
+    await wait(durationMs);
+    if (!destroyed) settleDiffElements();
+  }
+
+  function markDiffElements(diff: GraphDiff): void {
+    const addedNodes = new Set(diff.addedNodes);
+    const removedNodes = new Set(diff.removedNodes);
+    const recoloredNodes = new Set(diff.recoloredNodes.map((item) => item.id));
+    const addedEdges = new Set(diff.addedEdges);
+    const removedEdges = new Set(diff.removedEdges);
+    const newCommunities = new Set(diff.newCommunities);
+    for (const [id, element] of dom.nodeElements) {
+      element.classList.toggle("is-diff-added", addedNodes.has(id));
+      element.classList.toggle("is-diff-removed", removedNodes.has(id));
+      element.classList.toggle("is-diff-recolored", recoloredNodes.has(id));
+      const delay = diff.addedNodes.indexOf(id);
+      element.style.setProperty("--diff-delay", delay >= 0 ? `${Math.min(delay * 55, 550)}ms` : "0ms");
+      const anchor = addedNodes.has(id) ? semanticAnchorForNode(id) : null;
+      if (anchor) {
+        element.style.setProperty("--diff-anchor-dx", `${round(anchor.x - (graph.nodes.find((node) => node.id === id)?.point.x ?? anchor.x))}px`);
+        element.style.setProperty("--diff-anchor-dy", `${round(anchor.y - (graph.nodes.find((node) => node.id === id)?.point.y ?? anchor.y))}px`);
+      } else {
+        element.style.removeProperty("--diff-anchor-dx");
+        element.style.removeProperty("--diff-anchor-dy");
+      }
+    }
+    for (const [id, element] of dom.edgeElements) {
+      element.classList.toggle("is-diff-added", addedEdges.has(id));
+      element.classList.toggle("is-diff-removed", removedEdges.has(id));
+      if (addedEdges.has(id)) {
+        const length = Math.max(1, Math.ceil(typeof element.getTotalLength === "function" ? element.getTotalLength() : 180));
+        element.style.setProperty("--diff-edge-length", String(length));
+      } else {
+        element.style.removeProperty("--diff-edge-length");
+      }
+    }
+    for (const [id, element] of dom.communityWashElements) {
+      element.classList.toggle("is-diff-new-community", newCommunities.has(id));
+    }
+  }
+
+  function settleDiffElements(): void {
+    activeDiff = null;
+    root.dataset.diffState = "settled";
+    for (const element of dom.nodeElements.values()) {
+      element.classList.remove("is-diff-added", "is-diff-removed", "is-diff-recolored");
+      element.style.removeProperty("--diff-anchor-dx");
+      element.style.removeProperty("--diff-anchor-dy");
+      element.style.removeProperty("--diff-delay");
+    }
+    for (const element of dom.edgeElements.values()) {
+      element.classList.remove("is-diff-added", "is-diff-removed");
+      element.style.removeProperty("--diff-edge-length");
+    }
+    for (const element of dom.communityWashElements.values()) {
+      element.classList.remove("is-diff-new-community");
+    }
+  }
+
+  function semanticAnchorForNode(id: NodeId): { x: number; y: number } | null {
+    const node = graph.nodes.find((item) => item.id === id);
+    if (!node) return null;
+    const neighborId = graph.edges
+      .filter((edge) => edge.source === id || edge.target === id)
+      .map((edge) => edge.source === id ? edge.target : edge.source)
+      .find((candidate) => candidate !== id);
+    const neighbor = neighborId ? graph.nodes.find((item) => item.id === neighborId) : null;
+    if (neighbor) return neighbor.point;
+    return {
+      x: node.point.x < WORLD_WIDTH / 2 ? -80 : WORLD_WIDTH + 80,
+      y: clamp(node.point.y, 80, WORLD_HEIGHT - 80)
+    };
   }
 }
 
@@ -499,12 +604,23 @@ const STATIC_RENDERER_CSS = `
   stroke-linecap: round;
   opacity: .74;
 }
+.edge.is-diff-added {
+  stroke-dasharray: var(--diff-edge-length, 180);
+  stroke-dashoffset: var(--diff-edge-length, 180);
+  animation: llm-wiki-edge-draw 1.15s ease forwards;
+}
+.edge.is-diff-removed {
+  animation: llm-wiki-fade-out .72s ease forwards;
+}
 .edge.extracted { stroke: color-mix(in srgb, var(--night) 74%, transparent); }
 .edge.inferred { stroke: color-mix(in srgb, var(--jade) 62%, transparent); stroke-dasharray: 6 8; }
 .edge.ambiguous { stroke: color-mix(in srgb, var(--amber) 66%, transparent); stroke-dasharray: 2 7; }
 .edge.unverified { stroke: color-mix(in srgb, var(--muted) 45%, transparent); stroke-dasharray: 1 8; }
 .community-wash {
   transition: opacity .16s ease, cx .24s ease, cy .24s ease, rx .24s ease, ry .24s ease;
+}
+.community-wash.is-diff-new-community {
+  animation: llm-wiki-community-emerge .85s ease both;
 }
 .llm-wiki-graph-engine[data-dragging] .community-wash {
   opacity: .035;
@@ -677,6 +793,16 @@ const STATIC_RENDERER_CSS = `
   box-shadow: 0 17px 30px color-mix(in srgb, var(--cinnabar) 18%, transparent), 0 0 0 4px color-mix(in srgb, var(--cinnabar) 11%, transparent);
 }
 .node.is-disabled { opacity: .72; }
+.node.is-diff-added {
+  animation: llm-wiki-node-grow .96s cubic-bezier(.18,.82,.22,1) both;
+  animation-delay: var(--diff-delay, 0ms);
+}
+.node.is-diff-removed {
+  animation: llm-wiki-fade-out .72s ease forwards;
+}
+.node.is-diff-recolored {
+  animation: llm-wiki-node-recolor .92s ease both;
+}
 .mini-map {
   position: absolute;
   right: 16px;
@@ -698,4 +824,44 @@ const STATIC_RENDERER_CSS = `
   stroke: var(--cinnabar);
   stroke-width: 1.5;
 }
+@keyframes llm-wiki-node-grow {
+  0% {
+    opacity: 0;
+    translate: calc(-50% + var(--diff-anchor-dx, 0px)) calc(-50% + var(--diff-anchor-dy, 0px));
+    transform: scale(.68);
+  }
+  100% {
+    opacity: 1;
+    translate: -50% -50%;
+    transform: scale(1);
+  }
+}
+@keyframes llm-wiki-edge-draw {
+  to { stroke-dashoffset: 0; }
+}
+@keyframes llm-wiki-fade-out {
+  to { opacity: 0; transform: scale(.82); }
+}
+@keyframes llm-wiki-node-recolor {
+  0% { filter: saturate(.55) brightness(1.18); }
+  100% { filter: saturate(1) brightness(1); }
+}
+@keyframes llm-wiki-community-emerge {
+  0% { opacity: 0; transform: scale(.82); }
+  100% { transform: scale(1); }
+}
 `;
+
+function animationDurationMs(diff: GraphDiff): number {
+  const stagger = Math.min(diff.addedNodes.length * 55, 550);
+  const complexity = (diff.addedEdges.length + diff.removedEdges.length + diff.recoloredNodes.length + diff.newCommunities.length) * 24;
+  return Math.min(3000, 1120 + stagger + complexity);
+}
+
+function prefersReducedMotion(doc: Document): boolean {
+  return doc.defaultView?.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
+}
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}

@@ -208,6 +208,7 @@
     width: 34px;
     height: 34px;
     display: inline-grid;
+    position: relative;
     place-items: center;
     border-radius: 8px;
     color: var(--app-muted);
@@ -232,6 +233,18 @@
   .sidebar-rail-btn svg {
     width: 15px;
     height: 15px;
+  }
+
+  .sidebar-rail-badge {
+    position: absolute;
+    top: 7px;
+    right: 7px;
+    width: 7px;
+    height: 7px;
+    border: 1px solid var(--app-bg);
+    border-radius: 999px;
+    background: var(--app-accent);
+    box-shadow: 0 0 0 3px color-mix(in oklch, var(--app-accent) 18%, transparent);
   }
 
   .sidebar-rail-separator {
@@ -554,6 +567,7 @@
 
   .main-view-btn {
     display: inline-flex;
+    position: relative;
     min-width: 0;
     align-items: center;
     justify-content: center;
@@ -579,6 +593,14 @@
   .main-view-btn-active {
     color: var(--app-accent);
     background: var(--app-accent-soft);
+  }
+
+  .graph-update-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 999px;
+    background: var(--app-accent);
+    box-shadow: 0 0 0 3px color-mix(in oklch, var(--app-accent) 16%, transparent);
   }
 
   .graph-screen {
@@ -646,6 +668,21 @@
     border-radius: 999px;
     background: color-mix(in oklch, var(--app-raised) 78%, transparent);
     color: var(--app-muted);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    box-shadow: var(--soft-shadow);
+  }
+
+  .graph-growth-indicator {
+    position: absolute;
+    left: 16px;
+    bottom: 52px;
+    z-index: 5;
+    border: 1px solid var(--app-border);
+    border-radius: 999px;
+    background: color-mix(in oklch, var(--app-raised) 82%, transparent);
+    padding: 6px 9px;
+    color: var(--app-accent);
     font-family: var(--font-mono);
     font-size: 11px;
     box-shadow: var(--soft-shadow);
