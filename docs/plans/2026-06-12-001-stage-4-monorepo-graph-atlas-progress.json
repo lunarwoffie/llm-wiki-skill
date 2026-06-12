@@ -3,9 +3,9 @@
   "design": "workbench/docs/stage-4-design.md (before phase-0 completes: ../llm-wiki-agent/docs/stage-4-design.md)",
   "branch": "stage-4",
   "status": {
-    "phase": "phase-7",
-    "work_unit": "7.2",
-    "next_allowed_action": "Execute WU 7.2: collect the seven final acceptance evidence items and backfill PRODUCT.md/design docs."
+    "phase": "complete",
+    "work_unit": null,
+    "next_allowed_action": "Stage 4 execution complete; no remaining work units."
   },
   "execution_rules": {
     "commit_each_completed_work_unit": true,
@@ -66,7 +66,20 @@
     }
   ],
   "final_acceptance": {
-    "1_monorepo_dev_and_skill_tests": null,
+    "1_monorepo_dev_and_skill_tests": {
+      "status": "passed",
+      "evidence": [
+        "commit 0a1279266fac4683740c3193c8fd9ef4ed6580f7",
+        "Existing current-repo npm run dev process chain was active; backend /api/knowledge-bases and frontend root both responded over localhost.",
+        "node --version: v22.22.3",
+        "node --test tests/js/*.test.js: 116 tests passed",
+        "bash tests/regression.sh: All regression checks passed",
+        "npm run typecheck: passed",
+        "npm test -w @llm-wiki/graph-engine: 116 tests passed",
+        "npm run build -w @llm-wiki/graph-engine: passed"
+      ],
+      "summary": "Root dev services from the current repository responded, Skill-side tests and regressions passed, and the workspace plus shared graph engine checks remained green."
+    },
     "2_static_baseline_screenshots": {
       "status": "evidence_recorded_manual_judgment_pending",
       "evidence": [
@@ -908,7 +921,7 @@
     {
       "id": "phase-7",
       "name": "总验收 + 墨夜打磨 + 回填",
-      "status": "pending",
+      "status": "done",
       "work_units": [
         {
           "id": "7.1",
@@ -947,10 +960,46 @@
         {
           "id": "7.2",
           "name": "七条总验收取证 + PRODUCT.md/设计文档回填",
-          "status": "pending",
-          "commit": null,
-          "verification": [],
-          "notes": ""
+          "status": "completed",
+          "commit": "0a1279266fac4683740c3193c8fd9ef4ed6580f7",
+          "verification": [
+            {
+              "command": "current-repo npm run dev smoke via existing process chain and curl",
+              "status": "passed",
+              "summary": "Frontend and backend dev processes were running from the current repository; backend knowledge-bases endpoint and frontend root both responded."
+            },
+            {
+              "command": "node --test tests/js/*.test.js",
+              "status": "passed",
+              "summary": "116 tests passed."
+            },
+            {
+              "command": "bash tests/regression.sh",
+              "status": "passed",
+              "summary": "All regression checks passed."
+            },
+            {
+              "command": "npm run typecheck",
+              "status": "passed",
+              "summary": "server, web, and graph-engine workspace typechecks passed; web pretypecheck rebuilt graph-engine outputs."
+            },
+            {
+              "command": "npm test -w @llm-wiki/graph-engine",
+              "status": "passed",
+              "summary": "116 graph-engine tests passed."
+            },
+            {
+              "command": "npm run build -w @llm-wiki/graph-engine",
+              "status": "passed",
+              "summary": "ESM and IIFE graph-engine builds completed."
+            },
+            {
+              "command": "docs backfill grep self-check",
+              "status": "passed",
+              "summary": "No pending implementation markers remained in PRODUCT.md/stage-4-design; TBD-4.1 and TBD-4.2 are marked as finalized."
+            }
+          ],
+          "notes": "Backfilled PRODUCT.md and stage-4-design.md with Stage 4 completion status, final implementation decisions, resolved TBDs, self-generated watcher exclusions, and final acceptance evidence. Subjective visual and hand-feel items remain in manual_acceptance for reviewer judgment."
         }
       ]
     }
@@ -1244,6 +1293,24 @@
         "pre-commit hard checks passed"
       ],
       "next": "phase-7 work_unit 7.2"
+    },
+    {
+      "timestamp": "2026-06-12T21:35:01+08:00",
+      "phase": "phase-7",
+      "work_unit": "7.2",
+      "action": "completed WU 7.2, marked Phase 7 done, and completed Stage 4",
+      "summary": "Collected the seven final acceptance evidence items, backfilled PRODUCT.md and the Stage 4 design document, kept subjective visual/drag judgments as manual acceptance, and ran the final automation suite successfully.",
+      "commit": "0a1279266fac4683740c3193c8fd9ef4ed6580f7",
+      "verification": [
+        "current-repo npm run dev services responded on localhost",
+        "node --test tests/js/*.test.js passed with 116 tests",
+        "bash tests/regression.sh passed",
+        "npm run typecheck passed",
+        "npm test -w @llm-wiki/graph-engine passed with 116 tests",
+        "npm run build -w @llm-wiki/graph-engine passed",
+        "docs grep self-check passed; TBD-4.1/TBD-4.2 are finalized, not hanging"
+      ],
+      "next": "Stage 4 complete; no remaining work units."
     }
   ]
 }
