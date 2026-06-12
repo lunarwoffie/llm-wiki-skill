@@ -651,6 +651,43 @@
     box-shadow: var(--soft-shadow);
   }
 
+  .graph-toast {
+    position: absolute;
+    right: 16px;
+    bottom: 16px;
+    z-index: 7;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    max-width: min(360px, calc(100% - 32px));
+    padding: 8px 10px;
+    border: 1px solid var(--app-border);
+    border-radius: 8px;
+    background: color-mix(in oklch, var(--app-raised) 94%, transparent);
+    color: var(--app-fg);
+    font-size: 12px;
+    box-shadow: var(--soft-shadow);
+  }
+
+  .graph-toast span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .graph-toast button {
+    flex-shrink: 0;
+    border-radius: 6px;
+    padding: 4px 7px;
+    color: var(--app-accent);
+    font-weight: 650;
+  }
+
+  .graph-toast button:hover {
+    background: var(--app-accent-soft);
+  }
+
   .chat-messages {
     flex: 1;
     overflow-y: auto;

@@ -1,14 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Moon, RefreshCw, Sun } from "lucide-react";
+import { Moon, RefreshCw, RotateCcw, Sun } from "lucide-react";
 import {
 	createGraphEngine,
 	type GraphData,
 	type GraphEngine,
+	type PinMap,
 	type ThemeId,
 } from "@llm-wiki/graph-engine";
 
 import {
 	getGraphData,
+	getGraphLayout,
+	putGraphLayout,
 	rebuildGraph,
 	type GraphEvent,
 } from "@/lib/api";
@@ -24,6 +27,11 @@ interface Props {
 
 type GraphStatus = "idle" | "loading" | "building" | "ready" | "error";
 
+interface ResetNotice {
+	pins: PinMap;
+	count: number;
+}
+
 export function GraphPanel({
 	currentKnowledgeBaseName,
 	currentKnowledgeBasePath,
@@ -33,7 +41,11 @@ export function GraphPanel({
 }: Props) {
 	const hostRef = useRef<HTMLDivElement | null>(null);
 	const engineRef = useRef<GraphEngine | null>(null);
+	const persistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const resetNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const [data, setData] = useState<GraphData | null>(null);
+	const [layoutPins, setLayoutPins] = useState<PinMap>({});
+	const [resetNotice, setResetNotice] = useState<ResetNotice | null>(null);
 	const [status, setStatus] = useState<GraphStatus>("idle");
 	const [error, setError] = useState<string | null>(null);
 	const [buildState, setBuildState] = useState<"none" | "started" | "queued">("none");
@@ -43,6 +55,7 @@ export function GraphPanel({
 	const loadGraph = useCallback(async () => {
 		if (!currentKnowledgeBasePath) {
 			setData(null);
+			setLayoutPins({});
 			setStatus("idle");
 			setError(null);
 			return;
@@ -50,7 +63,8 @@ export function GraphPanel({
 		setStatus((current) => (current === "building" ? "building" : "loading"));
 		setError(null);
 		try {
-			const result = await getGraphData();
+			const [result, layout] = await Promise.all([getGraphData(), getGraphLayout()]);
+			setLayoutPins(layout.layout.pins);
 			if (result.needsBuild) {
 				setData(null);
 				setStatus("building");
@@ -63,6 +77,7 @@ export function GraphPanel({
 			setBuildState("none");
 		} catch (err) {
 			setData(null);
+			setLayoutPins({});
 			setStatus("error");
 			setError(err instanceof Error ? err.message : String(err));
 		}
@@ -93,6 +108,62 @@ export function GraphPanel({
 	}, [currentKnowledgeBasePath, loadGraph]);
 
 	useEffect(() => {
+		return () => {
+			if (persistTimerRef.current) window.clearTimeout(persistTimerRef.current);
+			if (resetNoticeTimerRef.current) window.clearTimeout(resetNoticeTimerRef.current);
+		};
+	}, []);
+
+	const persistPins = useCallback(async (pins: PinMap): Promise<void> => {
+		setLayoutPins(pins);
+		if (persistTimerRef.current) window.clearTimeout(persistTimerRef.current);
+		persistTimerRef.current = window.setTimeout(() => {
+			void putGraphLayout(pins).catch((err) => {
+				setError(err instanceof Error ? err.message : String(err));
+			});
+		}, 280);
+	}, []);
+
+	const writePinsImmediately = useCallback(async (pins: PinMap): Promise<void> => {
+		setLayoutPins(pins);
+		if (persistTimerRef.current) window.clearTimeout(persistTimerRef.current);
+		try {
+			await putGraphLayout(pins);
+		} catch (err) {
+			setError(err instanceof Error ? err.message : String(err));
+		}
+	}, []);
+
+	const dismissResetNoticeLater = useCallback(() => {
+		if (resetNoticeTimerRef.current) window.clearTimeout(resetNoticeTimerRef.current);
+		resetNoticeTimerRef.current = window.setTimeout(() => {
+			setResetNotice(null);
+			resetNoticeTimerRef.current = null;
+		}, 8000);
+	}, []);
+
+	const resetLayout = useCallback(() => {
+		const previousPins = layoutPins;
+		const previousCount = Object.keys(previousPins).length;
+		engineRef.current?.resetLayout();
+		if (previousCount === 0) {
+			setResetNotice(null);
+			return;
+		}
+		setResetNotice({ pins: previousPins, count: previousCount });
+		dismissResetNoticeLater();
+	}, [dismissResetNoticeLater, layoutPins]);
+
+	const undoResetLayout = useCallback(() => {
+		const notice = resetNotice;
+		if (!notice) return;
+		if (resetNoticeTimerRef.current) window.clearTimeout(resetNoticeTimerRef.current);
+		resetNoticeTimerRef.current = null;
+		setResetNotice(null);
+		void writePinsImmediately(notice.pins);
+	}, [resetNotice, writePinsImmediately]);
+
+	useEffect(() => {
 		if (!hostRef.current || !data) {
 			engineRef.current?.destroy();
 			engineRef.current = null;
@@ -101,16 +172,18 @@ export function GraphPanel({
 		engineRef.current?.destroy();
 		engineRef.current = createGraphEngine(hostRef.current, {
 			data,
+			pins: layoutPins,
 			theme: graphTheme,
 			capabilities: {
 				onOpenPage,
+				persistPins,
 			},
 		});
 		return () => {
 			engineRef.current?.destroy();
 			engineRef.current = null;
 		};
-	}, [data, graphTheme, onOpenPage]);
+	}, [data, graphTheme, layoutPins, onOpenPage, persistPins]);
 
 	return (
 		<div className="graph-screen" data-graph-status={status} data-graph-theme={graphTheme}>
@@ -131,6 +204,16 @@ export function GraphPanel({
 						aria-label={theme === "dark" ? "切换浅色主题" : "切换暗色主题"}
 					>
 						{theme === "dark" ? <Moon /> : <Sun />}
+					</button>
+					<button
+						type="button"
+						className="status-pill status-pill-button"
+						onClick={resetLayout}
+						disabled={!currentKnowledgeBasePath || status !== "ready"}
+						title="重置布局"
+					>
+						<RotateCcw />
+						重置布局
 					</button>
 					<button
 						type="button"
@@ -167,6 +250,14 @@ export function GraphPanel({
 					<div className="graph-metrics">
 						<span>{data.nodes.length} 节点</span>
 						<span>{data.edges.length} 关联</span>
+					</div>
+				)}
+				{resetNotice && (
+					<div className="graph-toast" role="status">
+						<span>已重置 {resetNotice.count} 个钉位</span>
+						<button type="button" onClick={undoResetLayout}>
+							撤销
+						</button>
 					</div>
 				)}
 			</div>

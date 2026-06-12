@@ -12,6 +12,8 @@ import {
 
 import type { NodeId } from "../types";
 import type { RenderPositionMap, RenderableGraph, RenderableNode } from "../render";
+export { PinState, pinsToPositions } from "./pins";
+export type { PinStateSnapshot } from "./pins";
 
 export interface LiveSimulationNode extends SimulationNodeDatum {
   id: NodeId;
@@ -157,6 +159,21 @@ export class LiveGraphSimulation {
     return node;
   }
 
+  setFixed(id: NodeId, position: { x: number; y: number } | null): LiveSimulationNode {
+    this.assertActive();
+    const node = this.requireNode(id);
+    if (position === null) {
+      node.fx = null;
+      node.fy = null;
+      return node;
+    }
+    node.fx = finiteNumber(position.x, node.baseX);
+    node.fy = finiteNumber(position.y, node.baseY);
+    node.x = node.fx;
+    node.y = node.fy;
+    return node;
+  }
+
   endDrag(options: DragEndOptions = {}): LiveGraphSimulationSnapshot {
     this.assertActive();
     const node = this.draggedNodeId ? this.nodeById.get(this.draggedNodeId) : null;
@@ -269,6 +286,11 @@ function clampNumber(value: unknown, fallback: number, min: number, max: number)
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return fallback;
   return Math.max(min, Math.min(max, numeric));
+}
+
+function finiteNumber(value: unknown, fallback: number): number {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : fallback;
 }
 
 function round(value: number): number {

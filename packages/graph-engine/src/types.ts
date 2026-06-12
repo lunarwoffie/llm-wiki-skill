@@ -244,5 +244,6 @@ export interface GraphEngine {
   focusNode(path: WikiPath): void;
   select(selector: SelectionInput): void;
   setTheme(theme: ThemeId): void;
+  resetLayout(): void;
   destroy(): void;
 }

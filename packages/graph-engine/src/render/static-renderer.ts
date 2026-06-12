@@ -1,5 +1,5 @@
 import type { GraphData, PinMap, SelectionInput, ThemeId, WikiPath } from "../types";
-import { createLiveGraphSimulation, type LiveGraphSimulation } from "../sim";
+import { createLiveGraphSimulation, PinState, pinsToPositions, type LiveGraphSimulation } from "../sim";
 import { getCommunityColor, getThemeTokens, themeTokensToCssVars } from "../themes";
 import {
   buildRenderableGraph,
@@ -15,6 +15,7 @@ interface StaticRendererOptions {
   pins?: PinMap;
   theme: ThemeId;
   onOpenPage?: (path: WikiPath) => void;
+  persistPins?: (pins: PinMap) => Promise<void>;
   live?: boolean;
 }
 
@@ -25,6 +26,7 @@ export interface StaticGraphRenderer {
   setTheme(theme: ThemeId): void;
   focusNode(pathOrId: WikiPath): void;
   select(selection: SelectionInput): void;
+  resetLayout(): void;
   destroy(): void;
 }
 
@@ -56,6 +58,7 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
   ensureStaticRendererStyles(container.ownerDocument || document);
 
   let graph = buildRenderableGraph(data, { pins, theme, selectedNodeId, selection, pathCache });
+  let pinState = new PinState(graph, pins);
 
   function render(next: Partial<StaticRendererOptions> & { selectedNodeId?: string | null; selection?: SelectionInput | null } = {}): void {
     assertActive();
@@ -65,6 +68,7 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
     if (Object.hasOwn(next, "selectedNodeId")) selectedNodeId = next.selectedNodeId || null;
     if (Object.hasOwn(next, "selection")) selection = next.selection || null;
     graph = buildRenderableGraph(data, { pins, theme, selectedNodeId, selection, pathCache });
+    pinState = new PinState(graph, pins);
     applyTheme(root, theme);
     dom = paint(root, graph, theme, options.onOpenPage, {
       onDragStart: (id, event) => {
@@ -79,8 +83,24 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
       },
       onDragEnd: (id) => {
         if (!simulation || root.dataset.dragging !== id) return;
-        simulation.endDrag();
+        const snapshot = simulation.endDrag({ keepFixed: true });
+        const position = snapshot.positions[id];
+        if (position) {
+          const nextState = pinState.pin(id, position);
+          pins = nextState.pins;
+          markPinnedNodes(nextState.pinnedNodeIds);
+          void options.persistPins?.(nextState.pins);
+        }
         delete root.dataset.dragging;
+      },
+      onNodeDoubleClick: (id) => {
+        if (!pinState.isPinned(id)) return false;
+        const nextState = pinState.unpin(id);
+        pins = nextState.pins;
+        simulation?.setFixed(id, null);
+        markPinnedNodes(nextState.pinnedNodeIds);
+        void options.persistPins?.(nextState.pins);
+        return true;
       }
     });
     restartSimulation();
@@ -105,6 +125,12 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
     select(nextSelection: SelectionInput): void {
       render({ selection: nextSelection });
     },
+    resetLayout(): void {
+      const nextState = pinState.reset();
+      pins = nextState.pins;
+      render({ pins });
+      void options.persistPins?.(nextState.pins);
+    },
     destroy(): void {
       if (destroyed) return;
       destroyed = true;
@@ -126,7 +152,11 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
     simulation = createLiveGraphSimulation(graph, {
       onTick: (snapshot) => applyMotionFrame(snapshot.positions)
     });
+    for (const [id, position] of Object.entries(pinsToPositions(graph, pins))) {
+      simulation.setFixed(id, position);
+    }
     simulation.startCold();
+    markPinnedNodes(pinState.snapshot().pinnedNodeIds);
   }
 
   function applyMotionFrame(positions: RenderPositionMap): void {
@@ -157,12 +187,22 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
       element.setAttribute("cy", String(miniNode.y));
     }
   }
+
+  function markPinnedNodes(pinnedNodeIds: string[]): void {
+    const pinned = new Set(pinnedNodeIds);
+    root.dataset.pinnedCount = String(pinned.size);
+    for (const [id, element] of dom.nodeElements) {
+      element.classList.toggle("is-pinned", pinned.has(id));
+      element.dataset.pinned = pinned.has(id) ? "true" : "false";
+    }
+  }
 }
 
 interface DragHandlers {
   onDragStart: (id: string, event: PointerEvent) => void;
   onDragMove: (id: string, event: PointerEvent) => void;
   onDragEnd: (id: string, event: PointerEvent) => void;
+  onNodeDoubleClick: (id: string) => boolean;
 }
 
 function paint(
@@ -273,9 +313,10 @@ function createNodeButton(node: RenderableNode, onOpenPage: ((path: WikiPath) =>
   button.style.top = `${node.y}%`;
   button.title = node.label;
   button.setAttribute("aria-pressed", node.selected ? "true" : "false");
-  if (node.sourcePath && onOpenPage) {
-    button.addEventListener("dblclick", () => onOpenPage(node.sourcePath));
-  }
+  button.addEventListener("dblclick", () => {
+    if (dragHandlers.onNodeDoubleClick(node.id)) return;
+    if (node.sourcePath && onOpenPage) onOpenPage(node.sourcePath);
+  });
   bindDragHandlers(button, node.id, dragHandlers);
 
   const kind = document.createElement("span");
@@ -435,6 +476,18 @@ const STATIC_RENDERER_CSS = `
   cursor: grabbing;
   z-index: 8;
   box-shadow: 0 18px 34px color-mix(in srgb, var(--cinnabar) 18%, transparent), 0 0 0 4px color-mix(in srgb, var(--cinnabar) 10%, transparent);
+}
+.node.is-pinned::after {
+  content: "";
+  position: absolute;
+  right: -5px;
+  top: -5px;
+  width: 10px;
+  height: 10px;
+  border: 2px solid color-mix(in srgb, var(--surface) 92%, transparent);
+  border-radius: 99px;
+  background: var(--cinnabar);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--cinnabar) 13%, transparent);
 }
 .node-kind {
   display: block;

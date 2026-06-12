@@ -2,7 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
 import { buildRenderableGraph } from "../src/render";
-import { createLiveGraphSimulation } from "../src/sim";
+import { createLiveGraphSimulation, pinsToPositions, PinState } from "../src/sim";
 import type { GraphData } from "../src/types";
 
 describe("LiveGraphSimulation", () => {
@@ -50,6 +50,43 @@ describe("LiveGraphSimulation", () => {
     const settled = simulation.settle();
     assert.equal(settled.alpha, 0);
     simulation.destroy();
+  });
+});
+
+describe("PinState", () => {
+  it("pins, unpins, and resets by wiki-relative node path", () => {
+    const graph = buildRenderableGraph(sampleGraph(), { theme: "shan-shui" });
+    const pins = new PinState(graph);
+
+    const pinned = pins.pin("drag", { x: 412.5, y: -88.2 });
+    assert.equal(pins.isPinned("drag"), true);
+    assert.deepEqual(pinned.pins, {
+      "wiki/drag.md": { x: 412.5, y: -88.2 }
+    });
+    assert.deepEqual(pinned.pinnedNodeIds, ["drag"]);
+
+    const unpinned = pins.unpin("drag");
+    assert.equal(pins.isPinned("drag"), false);
+    assert.deepEqual(unpinned.pins, {});
+
+    pins.pin("near", { x: 130, y: 245.7 });
+    assert.deepEqual(pins.reset().pins, {});
+  });
+
+  it("normalizes initial pins and exposes render positions for known graph nodes only", () => {
+    const graph = buildRenderableGraph(sampleGraph(), { theme: "shan-shui" });
+    const pins = {
+      "wiki/near.md": { x: 130, y: 245.7 },
+      "wiki/missing.md": { x: 999, y: 999 }
+    };
+    const state = new PinState(graph, pins).snapshot();
+
+    assert.deepEqual(state.pins, {
+      "wiki/near.md": { x: 130, y: 245.7 }
+    });
+    assert.deepEqual(pinsToPositions(graph, state.pins), {
+      near: { x: 130, y: 245.7 }
+    });
   });
 });
 

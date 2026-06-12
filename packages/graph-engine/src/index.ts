@@ -24,7 +24,8 @@ export function createGraphEngine(container: HTMLElement, options: GraphEngineOp
     data: options.data,
     pins: options.pins || {},
     theme: currentTheme,
-    onOpenPage: options.capabilities?.onOpenPage
+    onOpenPage: options.capabilities?.onOpenPage,
+    persistPins: options.capabilities?.persistPins
   });
 
   container.dataset.llmWikiGraphEngine = "mounted";
@@ -51,6 +52,11 @@ export function createGraphEngine(container: HTMLElement, options: GraphEngineOp
       currentTheme = theme;
       container.dataset.llmWikiGraphTheme = currentTheme;
       renderer.setTheme(theme);
+    },
+
+    resetLayout(): void {
+      assertActive();
+      renderer.resetLayout();
     },
 
     destroy(): void {

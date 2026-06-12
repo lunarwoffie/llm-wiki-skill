@@ -70,6 +70,22 @@ describe("buildRenderableGraph", () => {
     assert.deepEqual(pinned.point, { x: 800, y: 340 });
   });
 
+  it("infers wiki-relative source paths for graph data without source_path", () => {
+    const data = sampleGraph();
+    data.nodes = data.nodes.map(({ source_path: _sourcePath, ...node }) => node);
+    const graph = buildRenderableGraph(data, {
+      theme: "shan-shui",
+      pins: {
+        "wiki/topics/topic.md": { x: 900, y: 408 }
+      }
+    });
+
+    const topic = graph.nodes.find((node) => node.id === "topic");
+    assert.ok(topic);
+    assert.equal(topic.sourcePath, "wiki/topics/topic.md");
+    assert.deepEqual(topic.point, { x: 900, y: 408 });
+  });
+
   it("marks selected nodes and preserves cinnabar visual role", () => {
     const graph = buildRenderableGraph(sampleGraph(), {
       theme: "mo-ye",

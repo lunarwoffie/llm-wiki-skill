@@ -5,7 +5,7 @@
  */
 
 import { parseSSE, type SSEMessage } from "./sse";
-import type { GraphData } from "@llm-wiki/graph-engine";
+import type { GraphData, GraphLayoutFile, PinMap } from "@llm-wiki/graph-engine";
 
 // ============= 类型 =============
 
@@ -148,6 +148,8 @@ export type BatchDigestEvent =
 export type GraphApiResult =
 	| { ok: true; needsBuild: true; graphPath: string }
 	| { ok: true; needsBuild: false; graphPath: string; data: GraphData };
+
+export type GraphLayoutApiResult = { ok: true; layoutPath: string; layout: GraphLayoutFile };
 
 export type GraphEvent =
 	| {
@@ -468,6 +470,24 @@ export async function rebuildGraph(): Promise<"started" | "queued"> {
 	const json = (await res.json()) as { ok: true; status: "started" | "queued" } | { ok: false; error?: string };
 	if (!res.ok || !json.ok) throw new Error(("error" in json && json.error) || `HTTP ${res.status}`);
 	return json.status;
+}
+
+export async function getGraphLayout(): Promise<GraphLayoutApiResult> {
+	const res = await fetch("/api/graph/layout");
+	const json = (await res.json()) as GraphLayoutApiResult | { ok: false; error?: string };
+	if (!res.ok || !json.ok) throw new Error(("error" in json && json.error) || `HTTP ${res.status}`);
+	return json;
+}
+
+export async function putGraphLayout(pins: PinMap): Promise<GraphLayoutApiResult> {
+	const res = await fetch("/api/graph/layout", {
+		method: "PUT",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({ version: 1, pins }),
+	});
+	const json = (await res.json()) as GraphLayoutApiResult | { ok: false; error?: string };
+	if (!res.ok || !json.ok) throw new Error(("error" in json && json.error) || `HTTP ${res.status}`);
+	return json;
 }
 
 export async function listArtifacts(conversationId?: string): Promise<ArtifactManifest[]> {

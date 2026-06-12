@@ -11,6 +11,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
+    "pretypecheck": "npm run build -w @llm-wiki/graph-engine",
     "typecheck": "tsc -b --noEmit"
   },
   "dependencies": {

@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { EventEmitter } from "node:events";
-import { access, readFile, stat } from "node:fs/promises";
+import { access, mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
@@ -22,6 +22,12 @@ type GraphData = {
 export type GraphReadResult =
 	| { ok: true; needsBuild: true; graphPath: string }
 	| { ok: true; needsBuild: false; graphPath: string; data: GraphData };
+
+export type GraphLayoutFile = {
+	version: 1;
+	pins: Record<string, { x: number; y: number }>;
+	updatedAt: string;
+};
 
 export type GraphBuildStatus = "started" | "queued";
 
@@ -52,6 +58,10 @@ export function graphDataPath(kbPath: string): string {
 	return path.join(kbPath, "wiki", "graph-data.json");
 }
 
+export function graphLayoutPath(kbPath: string): string {
+	return path.join(kbPath, ".wiki-graph-layout.json");
+}
+
 export async function readGraphData(kbPath: string): Promise<GraphReadResult> {
 	const graphPath = graphDataPath(kbPath);
 	const content = await readFile(graphPath, "utf8").catch((err: NodeJS.ErrnoException) => {
@@ -78,6 +88,29 @@ export function triggerGraphRebuild(kbPath: string): { ok: true; status: GraphBu
 	state.running = true;
 	void runRebuildLoop(kbPath, state);
 	return { ok: true, status: "started" };
+}
+
+export async function readGraphLayout(kbPath: string): Promise<{ ok: true; layoutPath: string; layout: GraphLayoutFile }> {
+	const layoutPath = graphLayoutPath(kbPath);
+	const content = await readFile(layoutPath, "utf8").catch((err: NodeJS.ErrnoException) => {
+		if (err.code === "ENOENT") return null;
+		throw err;
+	});
+	if (content === null) return { ok: true, layoutPath, layout: emptyGraphLayout() };
+	try {
+		return { ok: true, layoutPath, layout: normalizeGraphLayout(JSON.parse(content)) };
+	} catch {
+		return { ok: true, layoutPath, layout: emptyGraphLayout() };
+	}
+}
+
+export async function writeGraphLayout(kbPath: string, input: unknown): Promise<{ ok: true; layoutPath: string; layout: GraphLayoutFile }> {
+	const layoutPath = graphLayoutPath(kbPath);
+	const layout = normalizeGraphLayout(input);
+	layout.updatedAt = new Date().toISOString();
+	await mkdir(path.dirname(layoutPath), { recursive: true });
+	await writeFile(layoutPath, `${JSON.stringify(layout, null, 2)}\n`, "utf8");
+	return { ok: true, layoutPath, layout };
 }
 
 export function subscribeGraphEvents(listener: (event: GraphEvent) => void): () => void {
@@ -148,4 +181,34 @@ async function findRepoRoot(): Promise<string> {
 
 function emitGraphEvent(event: GraphEvent): void {
 	eventBus.emit("graph", event);
+}
+
+function emptyGraphLayout(): GraphLayoutFile {
+	return { version: 1, pins: {}, updatedAt: "" };
+}
+
+function normalizeGraphLayout(input: unknown): GraphLayoutFile {
+	const raw = input && typeof input === "object" ? input as { pins?: unknown } : {};
+	const pins = raw.pins && typeof raw.pins === "object" ? raw.pins as Record<string, unknown> : {};
+	const normalized: GraphLayoutFile["pins"] = {};
+	for (const [key, value] of Object.entries(pins)) {
+		if (!isSafeLayoutKey(key)) continue;
+		if (!value || typeof value !== "object") continue;
+		const point = value as { x?: unknown; y?: unknown };
+		const x = Number(point.x);
+		const y = Number(point.y);
+		if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+		normalized[key] = { x, y };
+	}
+	return {
+		version: 1,
+		pins: normalized,
+		updatedAt: typeof (input as { updatedAt?: unknown } | null)?.updatedAt === "string"
+			? String((input as { updatedAt?: unknown }).updatedAt)
+			: "",
+	};
+}
+
+function isSafeLayoutKey(key: string): boolean {
+	return key.startsWith("wiki/") && !key.includes("..") && !path.isAbsolute(key);
 }

@@ -58,8 +58,10 @@ import {
 } from "./extensions/knowledge-base.js";
 import {
 	readGraphData,
+	readGraphLayout,
 	subscribeGraphEvents,
 	triggerGraphRebuild,
+	writeGraphLayout,
 } from "./graph.js";
 import {
 	inspectPath,
@@ -372,6 +374,38 @@ app.post("/api/graph/rebuild", async (c) => {
 	const ctx = getActive();
 	if (!ctx) return c.json({ ok: false, error: "请先选择一个知识库" }, 400);
 	return c.json(triggerGraphRebuild(ctx.kb.path));
+});
+
+app.get("/api/graph/layout", async (c) => {
+	const ctx = getActive();
+	if (!ctx) return c.json({ ok: false, error: "请先选择一个知识库" }, 400);
+	try {
+		return c.json(await readGraphLayout(ctx.kb.path));
+	} catch (err) {
+		return c.json(
+			{ ok: false, error: err instanceof Error ? err.message : String(err) },
+			500,
+		);
+	}
+});
+
+app.put("/api/graph/layout", async (c) => {
+	const ctx = getActive();
+	if (!ctx) return c.json({ ok: false, error: "请先选择一个知识库" }, 400);
+	let body: unknown;
+	try {
+		body = await c.req.json();
+	} catch {
+		return c.json({ ok: false, error: "Invalid JSON body" }, 400);
+	}
+	try {
+		return c.json(await writeGraphLayout(ctx.kb.path, body));
+	} catch (err) {
+		return c.json(
+			{ ok: false, error: err instanceof Error ? err.message : String(err) },
+			500,
+		);
+	}
 });
 
 // ============= Wiki 页面引用候选 =============
