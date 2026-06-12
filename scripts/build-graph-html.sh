@@ -55,6 +55,10 @@ script_for_inline() {
   perl -pe 's|//# sourceMappingURL=.*$||' "$1"
 }
 
+html_escape_text() {
+  printf '%s' "$1" | perl -pe 's/&/&amp;/g; s/</&lt;/g; s/>/&gt;/g; s/"/&quot;/g; s/'"'"'/&#39;/g'
+}
+
 while [ "$#" -gt 0 ]; do
   case "$1" in
     -h|--help)
@@ -110,6 +114,10 @@ EDGE_COUNT=$(jq -r '.meta.total_edges // 0' "$DATA")
 BUILD_DATE=$(jq -r '.meta.build_date // ""' "$DATA")
 BUILD_DATE_SHORT="${BUILD_DATE:0:10}"
 [ -n "$BUILD_DATE_SHORT" ] || BUILD_DATE_SHORT="未知"
+WIKI_TITLE_HTML=$(html_escape_text "$WIKI_TITLE")
+NODE_COUNT_HTML=$(html_escape_text "$NODE_COUNT")
+EDGE_COUNT_HTML=$(html_escape_text "$EDGE_COUNT")
+BUILD_DATE_SHORT_HTML=$(html_escape_text "$BUILD_DATE_SHORT")
 
 layout_json='{"version":1,"pins":{},"updatedAt":""}'
 if [ -f "$LAYOUT" ]; then
@@ -132,7 +140,7 @@ cat > "$output_tmp" <<HTML_HEAD
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>知识图谱 · ${WIKI_TITLE}</title>
+  <title>知识图谱 · ${WIKI_TITLE_HTML}</title>
   <style>
     :root {
       color-scheme: light;
@@ -230,13 +238,13 @@ cat > "$output_tmp" <<HTML_HEAD
   <div class="offline-shell" data-llm-wiki-offline-graph="engine">
     <header class="offline-header">
       <div class="offline-title">
-        <h1>${WIKI_TITLE} 知识舆图</h1>
+        <h1>${WIKI_TITLE_HTML} 知识舆图</h1>
         <p>国风知识库·数字山水图</p>
       </div>
       <div class="offline-badges" aria-label="图谱统计">
-        <span>${NODE_COUNT} 节点</span>
-        <span>${EDGE_COUNT} 关联</span>
-        <span>${BUILD_DATE_SHORT}</span>
+        <span>${NODE_COUNT_HTML} 节点</span>
+        <span>${EDGE_COUNT_HTML} 关联</span>
+        <span>${BUILD_DATE_SHORT_HTML}</span>
       </div>
     </header>
     <main class="offline-main">

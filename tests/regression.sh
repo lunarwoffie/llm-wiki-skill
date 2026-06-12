@@ -1592,6 +1592,27 @@ test_graph_html_escapes_script_tag_in_content() {
     assert_text_contains "$html" '<\/script> 标签'
 }
 
+test_graph_html_escapes_title_text() {
+    local tmp_dir output_dir html
+    tmp_dir="$(mktemp -d)"
+    trap 'rm -rf "$tmp_dir"' RETURN
+
+    output_dir="$tmp_dir/wiki"
+    mkdir -p "$output_dir"
+    jq '.meta.wiki_title = "<img src=x onerror=alert(1)>"' \
+        "$REPO_ROOT/$GRAPH_HTML_BASIC/wiki/graph-data.json" \
+        > "$output_dir/graph-data.json"
+
+    bash "$REPO_ROOT/scripts/build-graph-html.sh" \
+        "$tmp_dir" > /dev/null 2>&1 \
+        || fail "build-graph-html.sh should succeed with HTML-like title text"
+
+    html=$(cat "$output_dir/knowledge-graph.html")
+    assert_text_contains "$html" '<title>知识图谱 · &lt;img src=x onerror=alert(1)&gt;</title>'
+    assert_text_contains "$html" '<h1>&lt;img src=x onerror=alert(1)&gt; 知识舆图</h1>'
+    assert_text_not_contains "$html" '<h1><img src=x onerror=alert(1)> 知识舆图</h1>'
+}
+
 test_graph_html_missing_data_exits_with_error() {
     local tmp_dir
     tmp_dir="$(mktemp -d)"

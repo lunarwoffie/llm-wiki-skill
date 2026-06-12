@@ -28,6 +28,7 @@ export interface StaticGraphRenderer {
   applyDiff(diff: GraphDiff, options?: { reducedMotion?: boolean; durationMs?: number }): Promise<void>;
   isDragging(): boolean;
   setTheme(theme: ThemeId): void;
+  setPins(pins: PinMap): void;
   focusNode(pathOrId: WikiPath): void;
   select(selection: SelectionInput): void;
   resetLayout(): void;
@@ -152,6 +153,10 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
     },
     setTheme(nextTheme: ThemeId): void {
       render({ theme: nextTheme });
+    },
+    setPins(nextPins: PinMap): void {
+      pins = nextPins;
+      render({ pins });
     },
     focusNode(pathOrId: WikiPath): void {
       const node = graph.nodes.find((item) => item.id === pathOrId || item.sourcePath === pathOrId);

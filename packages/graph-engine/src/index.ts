@@ -71,6 +71,11 @@ export function createGraphEngine(container: HTMLElement, options: GraphEngineOp
       renderer.setTheme(theme);
     },
 
+    setPins(pins): void {
+      assertActive();
+      renderer.setPins(pins);
+    },
+
     resetLayout(): void {
       assertActive();
       renderer.resetLayout();

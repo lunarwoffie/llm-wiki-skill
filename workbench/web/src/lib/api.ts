@@ -458,29 +458,33 @@ export async function readPage(kbPath: string, relPath: string): Promise<string>
 	return json.content ?? "";
 }
 
-export async function getGraphData(): Promise<GraphApiResult> {
-	const res = await fetch("/api/graph");
+function kbQuery(kbPath: string): string {
+	return `kb=${encodeURIComponent(kbPath)}`;
+}
+
+export async function getGraphData(kbPath: string): Promise<GraphApiResult> {
+	const res = await fetch(`/api/graph?${kbQuery(kbPath)}`);
 	const json = (await res.json()) as GraphApiResult | { ok: false; error?: string };
 	if (!res.ok || !json.ok) throw new Error(("error" in json && json.error) || `HTTP ${res.status}`);
 	return json;
 }
 
-export async function rebuildGraph(): Promise<"started" | "queued"> {
-	const res = await fetch("/api/graph/rebuild", { method: "POST" });
+export async function rebuildGraph(kbPath: string): Promise<"started" | "queued"> {
+	const res = await fetch(`/api/graph/rebuild?${kbQuery(kbPath)}`, { method: "POST" });
 	const json = (await res.json()) as { ok: true; status: "started" | "queued" } | { ok: false; error?: string };
 	if (!res.ok || !json.ok) throw new Error(("error" in json && json.error) || `HTTP ${res.status}`);
 	return json.status;
 }
 
-export async function getGraphLayout(): Promise<GraphLayoutApiResult> {
-	const res = await fetch("/api/graph/layout");
+export async function getGraphLayout(kbPath: string): Promise<GraphLayoutApiResult> {
+	const res = await fetch(`/api/graph/layout?${kbQuery(kbPath)}`);
 	const json = (await res.json()) as GraphLayoutApiResult | { ok: false; error?: string };
 	if (!res.ok || !json.ok) throw new Error(("error" in json && json.error) || `HTTP ${res.status}`);
 	return json;
 }
 
-export async function putGraphLayout(pins: PinMap): Promise<GraphLayoutApiResult> {
-	const res = await fetch("/api/graph/layout", {
+export async function putGraphLayout(kbPath: string, pins: PinMap): Promise<GraphLayoutApiResult> {
+	const res = await fetch(`/api/graph/layout?${kbQuery(kbPath)}`, {
 		method: "PUT",
 		headers: { "Content-Type": "application/json" },
 		body: JSON.stringify({ version: 1, pins }),

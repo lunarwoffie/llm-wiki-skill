@@ -126,6 +126,15 @@ function sameModelRef(a: unknown, b: unknown): boolean {
 	return left.provider === right.provider && left.modelId === right.modelId;
 }
 
+function requestedKnowledgeBasePath(queryValue: string | undefined, body?: unknown): string | null {
+	if (queryValue?.trim()) return queryValue.trim();
+	if (body && typeof body === "object") {
+		const bodyPath = (body as { kbPath?: unknown }).kbPath;
+		if (typeof bodyPath === "string" && bodyPath.trim()) return bodyPath.trim();
+	}
+	return getActive()?.kb.path ?? null;
+}
+
 const app = new Hono();
 
 app.get("/api/health", (c) => {
@@ -361,13 +370,13 @@ app.delete("/api/knowledge-base", async (c) => {
 	return c.json({ ok: true });
 });
 
-// ============= 图谱（当前知识库） =============
+// ============= 图谱（指定知识库；未传时回退当前知识库） =============
 
 app.get("/api/graph", async (c) => {
-	const ctx = getActive();
-	if (!ctx) return c.json({ ok: false, error: "请先选择一个知识库" }, 400);
+	const kbPath = requestedKnowledgeBasePath(c.req.query("kb"));
+	if (!kbPath) return c.json({ ok: false, error: "请先选择一个知识库" }, 400);
 	try {
-		return c.json(await readGraphData(ctx.kb.path));
+		return c.json(await readGraphData(kbPath));
 	} catch (err) {
 		return c.json(
 			{ ok: false, error: err instanceof Error ? err.message : String(err) },
@@ -377,16 +386,16 @@ app.get("/api/graph", async (c) => {
 });
 
 app.post("/api/graph/rebuild", async (c) => {
-	const ctx = getActive();
-	if (!ctx) return c.json({ ok: false, error: "请先选择一个知识库" }, 400);
-	return c.json(triggerGraphRebuild(ctx.kb.path));
+	const kbPath = requestedKnowledgeBasePath(c.req.query("kb"));
+	if (!kbPath) return c.json({ ok: false, error: "请先选择一个知识库" }, 400);
+	return c.json(triggerGraphRebuild(kbPath));
 });
 
 app.get("/api/graph/layout", async (c) => {
-	const ctx = getActive();
-	if (!ctx) return c.json({ ok: false, error: "请先选择一个知识库" }, 400);
+	const kbPath = requestedKnowledgeBasePath(c.req.query("kb"));
+	if (!kbPath) return c.json({ ok: false, error: "请先选择一个知识库" }, 400);
 	try {
-		return c.json(await readGraphLayout(ctx.kb.path));
+		return c.json(await readGraphLayout(kbPath));
 	} catch (err) {
 		return c.json(
 			{ ok: false, error: err instanceof Error ? err.message : String(err) },
@@ -396,16 +405,16 @@ app.get("/api/graph/layout", async (c) => {
 });
 
 app.put("/api/graph/layout", async (c) => {
-	const ctx = getActive();
-	if (!ctx) return c.json({ ok: false, error: "请先选择一个知识库" }, 400);
 	let body: unknown;
 	try {
 		body = await c.req.json();
 	} catch {
 		return c.json({ ok: false, error: "Invalid JSON body" }, 400);
 	}
+	const kbPath = requestedKnowledgeBasePath(c.req.query("kb"), body);
+	if (!kbPath) return c.json({ ok: false, error: "请先选择一个知识库" }, 400);
 	try {
-		return c.json(await writeGraphLayout(ctx.kb.path, body));
+		return c.json(await writeGraphLayout(kbPath, body));
 	} catch (err) {
 		return c.json(
 			{ ok: false, error: err instanceof Error ? err.message : String(err) },

@@ -260,6 +260,9 @@ function App() {
 		setDrawerMode("closed");
 		setActiveArtifactId(null);
 		setArtifacts([]);
+		setPendingGraphDiff(null);
+		setGraphHasPendingUpdate(false);
+		setGraphFocusPath(null);
 	};
 
 	const handleSelectKb = async (item: KnowledgeBaseInfo) => {

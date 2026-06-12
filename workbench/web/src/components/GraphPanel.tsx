@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { MessageSquarePlus, Moon, Plus, RefreshCw, RotateCcw, Send, Sun, X } from "lucide-react";
 import {
 	createGraphEngine,
@@ -62,12 +62,16 @@ export function GraphPanel({
 	const engineRef = useRef<GraphEngine | null>(null);
 	const persistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const resetNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const activeKbPathRef = useRef<string | null>(currentKnowledgeBasePath);
+	const graphThemeRef = useRef<ThemeId>(theme === "dark" ? "mo-ye" : "shan-shui");
+	const layoutPinsRef = useRef<PinMap>({});
+	const loadRequestRef = useRef(0);
+	const onOpenPageRef = useRef(onOpenPage);
 	const diffQueueRef = useRef(new GraphDiffQueue({ visible: true }));
 	const lastRefreshTokenRef = useRef(refreshToken);
 	const devGraphTestRef = useRef("");
 	const animationTokenRef = useRef(0);
 	const [data, setData] = useState<GraphData | null>(null);
-	const [layoutPins, setLayoutPins] = useState<PinMap>({});
 	const [resetNotice, setResetNotice] = useState<ResetNotice | null>(null);
 	const [status, setStatus] = useState<GraphStatus>("idle");
 	const [error, setError] = useState<string | null>(null);
@@ -80,40 +84,63 @@ export function GraphPanel({
 
 	const graphTheme: ThemeId = theme === "dark" ? "mo-ye" : "shan-shui";
 
+	useLayoutEffect(() => {
+		activeKbPathRef.current = currentKnowledgeBasePath;
+	}, [currentKnowledgeBasePath]);
+
+	useLayoutEffect(() => {
+		graphThemeRef.current = graphTheme;
+	}, [graphTheme]);
+
+	useLayoutEffect(() => {
+		onOpenPageRef.current = onOpenPage;
+	}, [onOpenPage]);
+
+	const applyLayoutPins = useCallback((pins: PinMap): void => {
+		layoutPinsRef.current = pins;
+	}, []);
+
 	const loadGraph = useCallback(async () => {
-		if (!currentKnowledgeBasePath) {
+		const requestId = ++loadRequestRef.current;
+		const kbPath = currentKnowledgeBasePath;
+		if (!kbPath) {
 			setData(null);
-			setLayoutPins({});
+			applyLayoutPins({});
 			setSelection(null);
 			setStatus("idle");
 			setError(null);
-			return;
+			return true;
 		}
 		setStatus((current) => (current === "building" ? "building" : "loading"));
 		setError(null);
 		try {
-			const [result, layout] = await Promise.all([getGraphData(), getGraphLayout()]);
-			setLayoutPins(layout.layout.pins);
+			const [result, layout] = await Promise.all([getGraphData(kbPath), getGraphLayout(kbPath)]);
+			if (loadRequestRef.current !== requestId || activeKbPathRef.current !== kbPath) return false;
+			applyLayoutPins(layout.layout.pins);
 			if (result.needsBuild) {
 				setData(null);
 				setSelection(null);
 				setStatus("building");
-				const nextBuildState = await rebuildGraph();
+				const nextBuildState = await rebuildGraph(kbPath);
+				if (loadRequestRef.current !== requestId || activeKbPathRef.current !== kbPath) return false;
 				setBuildState(nextBuildState);
-				return;
+				return true;
 			}
 			setData(result.data);
 			setSelection(null);
 			setStatus("ready");
 			setBuildState("none");
+			return true;
 		} catch (err) {
+			if (loadRequestRef.current !== requestId || activeKbPathRef.current !== kbPath) return false;
 			setData(null);
-			setLayoutPins({});
+			applyLayoutPins({});
 			setSelection(null);
 			setStatus("error");
 			setError(err instanceof Error ? err.message : String(err));
+			return false;
 		}
-	}, [currentKnowledgeBasePath]);
+	}, [applyLayoutPins, currentKnowledgeBasePath]);
 
 	useEffect(() => {
 		void loadGraph();
@@ -126,25 +153,44 @@ export function GraphPanel({
 		};
 	}, []);
 
+	useEffect(() => {
+		if (persistTimerRef.current) {
+			window.clearTimeout(persistTimerRef.current);
+			persistTimerRef.current = null;
+		}
+		diffQueueRef.current = new GraphDiffQueue({ visible: true });
+		setResetNotice(null);
+		setPendingAnimation(null);
+		setAnimationState("idle");
+	}, [currentKnowledgeBasePath]);
+
 	const persistPins = useCallback(async (pins: PinMap): Promise<void> => {
-		setLayoutPins(pins);
+		const kbPath = activeKbPathRef.current;
+		applyLayoutPins(pins);
+		if (!kbPath) return;
 		if (persistTimerRef.current) window.clearTimeout(persistTimerRef.current);
 		persistTimerRef.current = window.setTimeout(() => {
-			void putGraphLayout(pins).catch((err) => {
+			if (activeKbPathRef.current !== kbPath) return;
+			void putGraphLayout(kbPath, pins).catch((err) => {
+				if (activeKbPathRef.current !== kbPath) return;
 				setError(err instanceof Error ? err.message : String(err));
 			});
 		}, 280);
-	}, []);
+	}, [applyLayoutPins]);
 
 	const writePinsImmediately = useCallback(async (pins: PinMap): Promise<void> => {
-		setLayoutPins(pins);
+		const kbPath = activeKbPathRef.current;
+		applyLayoutPins(pins);
+		engineRef.current?.setPins(pins);
+		if (!kbPath) return;
 		if (persistTimerRef.current) window.clearTimeout(persistTimerRef.current);
 		try {
-			await putGraphLayout(pins);
+			await putGraphLayout(kbPath, pins);
 		} catch (err) {
+			if (activeKbPathRef.current !== kbPath) return;
 			setError(err instanceof Error ? err.message : String(err));
 		}
-	}, []);
+	}, [applyLayoutPins]);
 
 	const dismissResetNoticeLater = useCallback(() => {
 		if (resetNoticeTimerRef.current) window.clearTimeout(resetNoticeTimerRef.current);
@@ -155,7 +201,7 @@ export function GraphPanel({
 	}, []);
 
 	const resetLayout = useCallback(() => {
-		const previousPins = layoutPins;
+		const previousPins = layoutPinsRef.current;
 		const previousCount = Object.keys(previousPins).length;
 		engineRef.current?.resetLayout();
 		if (previousCount === 0) {
@@ -164,7 +210,7 @@ export function GraphPanel({
 		}
 		setResetNotice({ pins: previousPins, count: previousCount });
 		dismissResetNoticeLater();
-	}, [dismissResetNoticeLater, layoutPins]);
+	}, [dismissResetNoticeLater]);
 
 	const undoResetLayout = useCallback(() => {
 		const notice = resetNotice;
@@ -175,7 +221,7 @@ export function GraphPanel({
 		void writePinsImmediately(notice.pins);
 	}, [resetNotice, writePinsImmediately]);
 
-	const playDiff = useCallback(async (diff: GraphDiff) => {
+	const playDiff = useCallback(async function run(diff: GraphDiff): Promise<void> {
 		const engine = engineRef.current;
 		if (!engine) {
 			setAnimationState("queued");
@@ -185,7 +231,7 @@ export function GraphPanel({
 		await engine.applyDiff(diff);
 		const decision = diffQueueRef.current.finishAnimation();
 		if (decision.action === "consume" && decision.diff) {
-			void playDiff(decision.diff);
+			void run(decision.diff);
 			return;
 		}
 		setAnimationState("idle");
@@ -213,10 +259,10 @@ export function GraphPanel({
 		engineRef.current?.destroy();
 		engineRef.current = createGraphEngine(hostRef.current, {
 			data,
-			pins: layoutPins,
-			theme: graphTheme,
+			pins: layoutPinsRef.current,
+			theme: graphThemeRef.current,
 			capabilities: {
-				onOpenPage,
+				onOpenPage: (path) => onOpenPageRef.current?.(path),
 				onAsk: setSelection,
 				persistPins,
 				onDragStateChange: (dragging) => {
@@ -227,12 +273,15 @@ export function GraphPanel({
 				},
 			},
 		});
-		if (focusPath) engineRef.current.focusNode(focusPath);
 		return () => {
 			engineRef.current?.destroy();
 			engineRef.current = null;
 		};
-	}, [data, focusPath, graphTheme, layoutPins, onOpenPage, persistPins, playDiff]);
+	}, [data, persistPins, playDiff]);
+
+	useEffect(() => {
+		engineRef.current?.setTheme(graphTheme);
+	}, [graphTheme]);
 
 	useEffect(() => {
 		if (
@@ -265,7 +314,8 @@ export function GraphPanel({
 			token,
 			diff: pendingDiff,
 		});
-		void loadGraph().then(() => {
+		void loadGraph().then((loaded) => {
+			if (!loaded) return;
 			setAnimationReadyToken(token);
 			onDiffConsumed?.();
 		});
@@ -348,14 +398,19 @@ export function GraphPanel({
 					<button
 						type="button"
 						className="status-pill status-pill-button"
-						onClick={() => {
-							setStatus("building");
-							void rebuildGraph()
-								.then((next) => setBuildState(next))
-								.catch((err) => {
-									setStatus("error");
-									setError(err instanceof Error ? err.message : String(err));
-								});
+							onClick={() => {
+								const kbPath = activeKbPathRef.current;
+								if (!kbPath) return;
+								setStatus("building");
+								void rebuildGraph(kbPath)
+									.then((next) => {
+										if (activeKbPathRef.current === kbPath) setBuildState(next);
+									})
+									.catch((err) => {
+										if (activeKbPathRef.current !== kbPath) return;
+										setStatus("error");
+										setError(err instanceof Error ? err.message : String(err));
+									});
 						}}
 						disabled={!currentKnowledgeBasePath || status === "building"}
 						title="重新构建图谱"
