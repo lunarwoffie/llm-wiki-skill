@@ -44,6 +44,7 @@ interface PaintedGraphDom {
   nodeElements: Map<string, HTMLButtonElement>;
   miniNodeElements: Map<string, SVGCircleElement>;
   basePoints: Map<string, { x: number; y: number }>;
+  readerElement: HTMLElement | null;
 }
 
 export function createStaticGraphRenderer(container: HTMLElement, options: StaticRendererOptions): StaticGraphRenderer {
@@ -130,6 +131,7 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
       }
     });
     if (activeDiff && root.dataset.diffState === "playing") markDiffElements(activeDiff);
+    renderReader();
     restartSimulation();
   }
 
@@ -230,6 +232,7 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
       element.setAttribute("cx", String(miniNode.x));
       element.setAttribute("cy", String(miniNode.y));
     }
+    renderReader();
   }
 
   function markPinnedNodes(pinnedNodeIds: string[]): void {
@@ -330,6 +333,54 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
       x: node.point.x < WORLD_WIDTH / 2 ? -80 : WORLD_WIDTH + 80,
       y: clamp(node.point.y, 80, WORLD_HEIGHT - 80)
     };
+  }
+
+  function renderReader(): void {
+    const reader = dom.readerElement;
+    if (!reader) return;
+    const selected = graph.selectedNodeId ? graph.nodes.find((node) => node.id === graph.selectedNodeId) : null;
+    const rawNode = selected ? data.nodes.find((node) => node.id === selected.id) : null;
+    reader.dataset.state = selected ? "open" : "closed";
+    reader.replaceChildren();
+    if (!selected || !rawNode) {
+      const empty = document.createElement("p");
+      empty.className = "graph-reader-empty";
+      empty.textContent = "选择一个节点查看内容";
+      reader.appendChild(empty);
+      return;
+    }
+
+    const header = document.createElement("div");
+    header.className = "graph-reader-header";
+    const title = document.createElement("div");
+    title.className = "graph-reader-title";
+    title.textContent = selected.label;
+    const meta = document.createElement("div");
+    meta.className = "graph-reader-meta";
+    meta.textContent = `${selected.kind} · ${selected.sourcePath}`;
+    const close = document.createElement("button");
+    close.type = "button";
+    close.className = "graph-reader-close";
+    close.setAttribute("aria-label", "关闭阅读面板");
+    close.textContent = "×";
+    close.addEventListener("click", () => render({ selectedNodeId: null, selection: null }));
+    header.append(title, meta, close);
+
+    const body = document.createElement("div");
+    body.className = "graph-reader-body";
+    const content = String(rawNode.content || rawNode.summary || selected.label);
+    const rendered = renderMarkdown(content);
+    if (rendered) {
+      const article = document.createElement("article");
+      article.className = "graph-reader-markdown";
+      article.innerHTML = rendered;
+      body.appendChild(article);
+    } else {
+      const pre = document.createElement("pre");
+      pre.textContent = content;
+      body.appendChild(pre);
+    }
+    reader.append(header, body);
   }
 }
 
@@ -433,6 +484,13 @@ function paint(
   }
   minimap.appendChild(miniSvg);
   root.appendChild(minimap);
+  if (!onOpenPage) {
+    const reader = document.createElement("aside");
+    reader.className = "graph-reader";
+    reader.dataset.state = graph.selectedNodeId ? "open" : "closed";
+    root.appendChild(reader);
+    painted.readerElement = reader;
+  }
   return painted;
 }
 
@@ -549,7 +607,8 @@ function emptyPaintedDom(): PaintedGraphDom {
     communityWashElements: new Map(),
     nodeElements: new Map(),
     miniNodeElements: new Map(),
-    basePoints: new Map()
+    basePoints: new Map(),
+    readerElement: null
   };
 }
 
@@ -824,6 +883,80 @@ const STATIC_RENDERER_CSS = `
   stroke: var(--cinnabar);
   stroke-width: 1.5;
 }
+.graph-reader {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  width: min(360px, calc(100% - 32px));
+  max-height: calc(100% - 100px);
+  border: 1px solid color-mix(in srgb, var(--rule) 82%, transparent);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  box-shadow: var(--soft-shadow);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-4px);
+  transition: opacity .18s ease, transform .18s ease;
+}
+.graph-reader[data-state="open"] {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+.graph-reader-header {
+  position: relative;
+  padding: 14px 42px 10px 14px;
+  border-bottom: 1px solid color-mix(in srgb, var(--rule) 72%, transparent);
+}
+.graph-reader-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-serif);
+  font-size: 16px;
+  font-weight: 700;
+}
+.graph-reader-meta {
+  margin-top: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 11px;
+}
+.graph-reader-close {
+  position: absolute;
+  top: 9px;
+  right: 10px;
+  width: 26px;
+  height: 26px;
+  border: 1px solid color-mix(in srgb, var(--rule) 78%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bg) 72%, transparent);
+  color: var(--ink);
+}
+.graph-reader-body {
+  min-height: 0;
+  overflow: auto;
+  padding: 12px 14px 14px;
+}
+.graph-reader-body pre {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: var(--font-serif);
+  font-size: 13px;
+  line-height: 1.65;
+}
+.graph-reader-empty {
+  margin: 0;
+  padding: 12px 14px;
+  color: var(--muted);
+  font-size: 13px;
+}
 @keyframes llm-wiki-node-grow {
   0% {
     opacity: 0;
@@ -864,4 +997,14 @@ function prefersReducedMotion(doc: Document): boolean {
 
 function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function renderMarkdown(markdown: string): string | null {
+  const runtime = globalThis as unknown as {
+    marked?: { parse?: (input: string, options?: Record<string, unknown>) => string };
+    DOMPurify?: { sanitize?: (input: string, options?: Record<string, unknown>) => string };
+  };
+  if (typeof runtime.marked?.parse !== "function" || typeof runtime.DOMPurify?.sanitize !== "function") return null;
+  const html = runtime.marked.parse(markdown, { breaks: false, gfm: true });
+  return runtime.DOMPurify.sanitize(html, { ADD_ATTR: ["target", "data-target", "tabindex"] });
 }

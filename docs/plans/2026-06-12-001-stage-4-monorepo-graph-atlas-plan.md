@@ -177,7 +177,7 @@ KB文件变化(消化/结晶/agent补链/Obsidian手改)
 
 | WU | 内容 | 验证 | Commit |
 |---|---|---|---|
-| 6.1 | 改造 `scripts/build-graph-html.sh`：拼装 `packages/graph-engine/dist/engine.iife.js` + 主题 CSS + graph-data + 启动脚本（capabilities：persistPins→localStorage 适配器【沿用现有 per-wiki 命名空间】、不传 onAsk、onOpenPage 不传→引擎内置阅读态）；生成时读 `.wiki-graph-layout.json` 烤入钉位；打包清单调整：移除旧 `graph-wash*.js`，`d3.min.js`/`rough.min.js` 是否移除**以 Phase 2.1 核查结论为准**，marked/purify 保留 | 对演示 KB 构建 → 产物单文件 HTML 以 `file://` 打开（Playwright）：图渲染、可拖动、刷新钉位仍在（localStorage）、**无**提问按钮；截图存 `docs/plans/stage-4-artifacts/p6-offline-html.png` | `feat(graph): offline html powered by shared engine` |
+| 6.1 | 改造 `scripts/build-graph-html.sh`：拼装 `packages/graph-engine/dist/engine.iife.js` + 主题 CSS + graph-data + 启动脚本（capabilities：persistPins→localStorage 适配器【沿用现有 per-wiki 命名空间】、不传 onAsk、onOpenPage 不传→引擎内置阅读态）；生成时读 `.wiki-graph-layout.json` 烤入钉位；打包清单调整：移除旧 `graph-wash*.js`，`d3.min.js`/`rough.min.js` 是否移除**以 Phase 2.1 核查结论为准**，marked/purify 保留 | 对演示 KB 构建 → 产物单文件 HTML 以 `file://` 打开（Playwright）；若 Browser 安全策略阻止 `file://`，允许用只服务生成目录的本地临时 HTTP 地址做自动浏览器验收：图渲染、可拖动、刷新钉位仍在（localStorage）、**无**提问按钮；截图存 `docs/plans/stage-4-artifacts/p6-offline-html.png` | `feat(graph): offline html powered by shared engine` |
 | 6.2 | `tests/` 回归断言**按新产物结构重写**——现有断言绑死旧产物（graph-wash 文件名、脚本拼接顺序、内部函数名），工作量按"重写文件级断言"预估而非"小修选择器"；❗ 东方设计合同的语义级断言——节点分层/索引签条/朱砂批注存在性——保留意图、按新 DOM 重写选择器，**不许删**；`templates/graph-styles/wash/` 加 DEPRECATED 注释头（不删，留一个版本周期）；`tests/js/` 中仅覆盖旧 helpers 的测试同批标注"随模板退役同周期删除"，保留的回归测试清单写 progress notes | `bash tests/regression.sh` 全绿；`node --test tests/js/*.test.js` 全绿 | `test(graph): migrate regression suite to engine output` |
 
 **Phase 验收**：regression 全绿 + 离线产物四项断言通过 + 工作台侧 `npm run typecheck` 与引擎测试仍全绿（确认无回带破坏）。
