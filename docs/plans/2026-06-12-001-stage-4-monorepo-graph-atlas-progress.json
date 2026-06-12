@@ -4,8 +4,8 @@
   "branch": "stage-4",
   "status": {
     "phase": "phase-5",
-    "work_unit": "5.1",
-    "next_allowed_action": "Execute WU 5.1: implement fs watcher evidence, exclusions, and rebuild queue."
+    "work_unit": "5.2",
+    "next_allowed_action": "Execute WU 5.2: implement graph diff with community alignment and upgrade graph_updated payload."
   },
   "execution_rules": {
     "commit_each_completed_work_unit": true,
@@ -38,6 +38,14 @@
       "decision": "init-wiki .gitignore alignment checked for .wiki-cache.json and .wiki-graph-layout.json.",
       "evidence": "scripts/init-wiki.sh writes a knowledge-base .gitignore containing only .wiki-tmp/; it creates .wiki-cache.json but does not ignore it.",
       "consequence": ".wiki-graph-layout.json should align with .wiki-cache.json as a knowledge-base asset and remain not ignored; no init-wiki.sh code change was made in WU 3.3."
+    },
+    {
+      "timestamp": "2026-06-12T18:44:19+08:00",
+      "phase": "phase-5",
+      "work_unit": "5.1",
+      "decision": "Native Node fs.watch recursive was kept; chokidar was not introduced.",
+      "evidence": "Two temporary-directory probes on darwin received recursive events for nested directory creation and nested markdown file create/modify/delete. The second probe showed nested file modifications may arrive as rename events rather than change, so the implementation treats any non-excluded event as a rebuild signal and does not depend on event type.",
+      "consequence": "WU 5.1 uses Node native fs.watch recursive with debounce and explicit path exclusions; no new dependency was added."
     }
   ],
   "final_acceptance": {
@@ -627,10 +635,31 @@
         {
           "id": "5.1",
           "name": "fs 监听（实测先行）+ 排除清单 + 重算队列",
-          "status": "pending",
-          "commit": null,
-          "verification": [],
-          "notes": ""
+          "status": "completed",
+          "commit": "89e121e240b4b7a2b56c5a23c063e7c3078a9cf4",
+          "verification": [
+            {
+              "command": "Node fs.watch recursive temporary-directory probe on darwin",
+              "status": "passed",
+              "summary": "Recursive fs.watch observed nested directory and nested markdown file create/modify/delete activity; modifications may be reported as rename, so watcher logic treats any non-excluded event as significant."
+            },
+            {
+              "command": "node --import tsx --test workbench/server/src/*.test.ts workbench/server/src/digest/*.test.ts",
+              "status": "passed",
+              "summary": "19 server tests passed, including debounce merging, generated-artifact exclusions, batch suspend/resume, single-flight pending merge, graph layout, retrieval, and digest concurrency coverage."
+            },
+            {
+              "command": "npm run typecheck",
+              "status": "passed",
+              "summary": "server, web, and graph-engine workspace typechecks passed."
+            },
+            {
+              "command": "git diff --cached --check; staged local-path scan; root package type check; scripts/build-graph-data.sh diff check",
+              "status": "passed",
+              "summary": "Staged whitespace check passed, no staged local absolute paths were present, root package.json still has no type: module, and scripts/build-graph-data.sh was unchanged."
+            }
+          ],
+          "notes": "Added a native fs.watch-backed active-KB graph watcher with 5s debounce, external noise exclusions, generated graph/layout exclusions, batch digest suspend/resume, and current-KB lifecycle wiring. Rebuild scheduling now uses a testable single-flight queue that coalesces pending triggers."
         },
         {
           "id": "5.2",
@@ -839,6 +868,21 @@
         "pre-commit scans passed"
       ],
       "next": "Phase 4 done; phase-5 work_unit 5.1"
+    },
+    {
+      "timestamp": "2026-06-12T18:44:19+08:00",
+      "phase": "phase-5",
+      "work_unit": "5.1",
+      "action": "completed",
+      "summary": "Implemented active knowledge-base file watching, generated-artifact exclusions, batch digest suspend/resume, and a single-flight rebuild queue.",
+      "commit": "89e121e240b4b7a2b56c5a23c063e7c3078a9cf4",
+      "verification": [
+        "native fs.watch recursive probe passed on darwin without adding chokidar",
+        "server tests passed with 19 tests",
+        "typecheck passed",
+        "pre-commit scans passed"
+      ],
+      "next": "phase-5 work_unit 5.2"
     }
   ]
 }
