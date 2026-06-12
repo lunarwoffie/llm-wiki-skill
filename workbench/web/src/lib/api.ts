@@ -5,7 +5,7 @@
  */
 
 import { parseSSE, type SSEMessage } from "./sse";
-import type { GraphData, GraphLayoutFile, PinMap } from "@llm-wiki/graph-engine";
+import type { GraphData, GraphDiff, GraphLayoutFile, PinMap } from "@llm-wiki/graph-engine";
 
 // ============= 类型 =============
 
@@ -155,7 +155,7 @@ export type GraphEvent =
 	| {
 			type: "graph_updated";
 			kbPath: string;
-			diff: null;
+			diff: GraphDiff | null;
 			rebuiltAt: string;
 			stats: { nodeCount: number; edgeCount: number };
 	  }

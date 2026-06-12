@@ -97,14 +97,11 @@ test("graph rebuild queue merges triggers into one pending rebuild while running
 	const calls: string[] = [];
 	let rebuildIndex = 0;
 	const queue = new GraphRebuildQueue({
-		rebuild: async () => {
+		run: async () => {
 			const gate = gates[rebuildIndex++];
 			assert.ok(gate);
-			calls.push("rebuild");
+			calls.push("run");
 			await gate.promise;
-		},
-		afterRebuild: async () => {
-			calls.push("after");
 		},
 		onError: (err) => {
 			throw err;
@@ -115,13 +112,13 @@ test("graph rebuild queue merges triggers into one pending rebuild while running
 	assert.equal(queue.trigger().status, "queued");
 	assert.equal(queue.trigger().status, "queued");
 	await Promise.resolve();
-	assert.deepEqual(calls, ["rebuild"]);
+	assert.deepEqual(calls, ["run"]);
 	gates[0]?.resolve();
-	await waitFor(() => calls.length >= 3);
-	assert.deepEqual(calls, ["rebuild", "after", "rebuild"]);
+	await waitFor(() => calls.length >= 2);
+	assert.deepEqual(calls, ["run", "run"]);
 	gates[1]?.resolve();
 	await queue.waitForIdle();
-	assert.deepEqual(calls, ["rebuild", "after", "rebuild", "after"]);
+	assert.deepEqual(calls, ["run", "run"]);
 });
 
 class FakeWatchSource {

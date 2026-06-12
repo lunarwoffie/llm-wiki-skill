@@ -16,6 +16,7 @@
     "@earendil-works/pi-agent-core": "^0.75.5",
     "@earendil-works/pi-coding-agent": "^0.75.5",
     "@hono/node-server": "^1.13.0",
+    "@llm-wiki/graph-engine": "0.0.0",
     "hono": "^4.6.0",
     "typebox": "^1.1.38"
   },

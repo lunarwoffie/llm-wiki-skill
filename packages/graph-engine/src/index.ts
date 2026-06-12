@@ -4,6 +4,7 @@ export * from "./render";
 export * from "./select";
 export * from "./sim";
 export * from "./themes";
+export * from "./diff";
 
 import type {
   GraphDiff,

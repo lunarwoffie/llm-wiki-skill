@@ -6,19 +6,9 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
-const execFileAsync = promisify(execFile);
+import { diffGraphData, type GraphData, type GraphDiff } from "@llm-wiki/graph-engine";
 
-type GraphData = {
-	meta?: {
-		total_nodes?: unknown;
-		total_edges?: unknown;
-		build_date?: unknown;
-		[key: string]: unknown;
-	};
-	nodes?: unknown[];
-	edges?: unknown[];
-	[key: string]: unknown;
-};
+const execFileAsync = promisify(execFile);
 
 export type GraphReadResult =
 	| { ok: true; needsBuild: true; graphPath: string }
@@ -36,7 +26,7 @@ export type GraphEvent =
 	| {
 			type: "graph_updated";
 			kbPath: string;
-			diff: null;
+			diff: GraphDiff | null;
 			rebuiltAt: string;
 			stats: { nodeCount: number; edgeCount: number };
 	  }
@@ -48,8 +38,7 @@ export type GraphEvent =
 	  };
 
 type RebuildQueueOptions = {
-	rebuild: () => Promise<void>;
-	afterRebuild: () => Promise<void>;
+	run: () => Promise<void>;
 	onError: (err: unknown) => void;
 	onIdle?: () => void;
 };
@@ -190,8 +179,7 @@ export class GraphRebuildQueue {
 			do {
 				this.pending = false;
 				try {
-					await this.options.rebuild();
-					await this.options.afterRebuild();
+					await this.options.run();
 				} catch (err) {
 					this.options.onError(err);
 				}
@@ -302,14 +290,15 @@ function emitGraphEvent(event: GraphEvent): void {
 
 function createDefaultRebuildQueue(kbPath: string): GraphRebuildQueue {
 	return new GraphRebuildQueue({
-		rebuild: () => rebuildGraph(kbPath),
-		afterRebuild: async () => {
+		run: async () => {
+			const previous = await readGraphData(kbPath).catch(() => null);
+			await rebuildGraph(kbPath);
 			const graph = await readGraphData(kbPath);
 			if (graph.needsBuild) return;
 			emitGraphEvent({
 				type: "graph_updated",
 				kbPath,
-				diff: null,
+				diff: previous && !previous.needsBuild ? diffGraphData(previous.data, graph.data) : null,
 				rebuiltAt: new Date().toISOString(),
 				stats: {
 					nodeCount: Number(graph.data.meta?.total_nodes ?? graph.data.nodes?.length ?? 0),
