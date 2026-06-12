@@ -3,9 +3,9 @@
   "design": "workbench/docs/stage-4-design.md (before phase-0 completes: ../llm-wiki-agent/docs/stage-4-design.md)",
   "branch": "stage-4",
   "status": {
-    "phase": "phase-6",
-    "work_unit": "6.2",
-    "next_allowed_action": "Execute WU 6.2: migrate regression assertions to the new engine output and mark deprecated legacy template/helper tests."
+    "phase": "phase-7",
+    "work_unit": "7.1",
+    "next_allowed_action": "Execute WU 7.1: polish the mo-ye theme and finalize interaction feel parameters."
   },
   "execution_rules": {
     "commit_each_completed_work_unit": true,
@@ -93,7 +93,20 @@
       ],
       "summary": "Phase 5 watcher, diff, queue, and growth-animation path passed automated tests and Browser DOM verification. Batch rebuild suspension is covered by server tests; no chokidar was added."
     },
-    "6_offline_html": null,
+    "6_offline_html": {
+      "status": "passed",
+      "evidence": [
+        "commit 1ee4dc1448e7e3ccf1bcd9da2eeb3b3911890a14",
+        "commit b98db4abf56c59b19df1a5db677c7fa6ebec317b",
+        "docs/plans/stage-4-artifacts/p6-offline-html.png",
+        "Real Chromium Playwright local HTTP check passed for render, baked pin, reader, drag, localStorage persistence after reload, and zero ask buttons",
+        "bash tests/regression.sh: All regression checks passed",
+        "node --test tests/js/*.test.js: 116 tests passed",
+        "npm run typecheck: passed",
+        "npm test -w @llm-wiki/graph-engine: 116 tests passed"
+      ],
+      "summary": "Offline HTML now uses the shared graph engine single-file output; automated render, pinning, localStorage persistence, no-ask capability, migrated regression suite, typecheck, and graph-engine tests all passed."
+    },
     "7_theme_follow": null
   },
   "manual_acceptance": [
@@ -756,7 +769,7 @@
     {
       "id": "phase-6",
       "name": "Skill 离线 HTML 切换引擎产物",
-      "status": "pending",
+      "status": "done",
       "work_units": [
         {
           "id": "6.1",
@@ -810,10 +823,46 @@
         {
           "id": "6.2",
           "name": "回归断言重写（语义断言保留）+ 旧模板与旧 helpers 测试 deprecated",
-          "status": "pending",
-          "commit": null,
-          "verification": [],
-          "notes": ""
+          "status": "completed",
+          "commit": "b98db4abf56c59b19df1a5db677c7fa6ebec317b",
+          "verification": [
+            {
+              "command": "for script in tests/graph-html-*.regression-1.sh; do bash \"$script\"; done",
+              "status": "passed",
+              "summary": "All graph HTML focused regressions passed against the new single-file engine output, including the oriental atlas and oriental design contracts."
+            },
+            {
+              "command": "bash tests/graph-build-failures.regression-1.sh",
+              "status": "passed",
+              "summary": "Failure coverage now checks missing graph-engine IIFE output and preserves an existing HTML file on failure."
+            },
+            {
+              "command": "bash tests/regression.sh",
+              "status": "passed",
+              "summary": "All regression checks passed, including migrated graph HTML assertions and old helper tests."
+            },
+            {
+              "command": "node --test tests/js/*.test.js",
+              "status": "passed",
+              "summary": "116 tests passed; legacy graph-wash helper/template tests remain green and are marked deprecated."
+            },
+            {
+              "command": "npm run typecheck",
+              "status": "passed",
+              "summary": "Workspace typecheck passed across server, web, and graph-engine; web pretypecheck rebuilt graph-engine outputs."
+            },
+            {
+              "command": "npm test -w @llm-wiki/graph-engine",
+              "status": "passed",
+              "summary": "116 graph-engine tests passed."
+            },
+            {
+              "command": "git diff --check; staged local-path scan; root package type check; scripts/build-graph-data.sh diff check",
+              "status": "passed",
+              "summary": "Whitespace check passed; staged diff contained no local absolute paths; root package.json still has no type field; scripts/build-graph-data.sh was unchanged."
+            }
+          ],
+          "notes": "Regression assertions retained for engine single-file output: tests/graph-build-failures.regression-1.sh plus all tests/graph-html-*.regression-1.sh scripts. Oriental design contract intent is preserved with new engine assertions for node layering, index-slip, and cinnabar-note visual-role hooks. templates/graph-styles/wash/{header.html,footer.html,graph-wash.js,graph-wash-helpers.js} are marked DEPRECATED and retained for one release cycle. Legacy JS tests marked for same-cycle retirement: graph-wash-bootstrap, graph-wash-helpers, graph-wash-learning, graph-wash-queue, and graph-wash-runtime-state. Old external asset/file assertions for graph-wash, d3, rough, marked, and purify were migrated to the new embedded engine output structure."
         }
       ]
     },
@@ -1080,6 +1129,24 @@
         "pre-commit hard checks passed"
       ],
       "next": "phase-6 work_unit 6.2"
+    },
+    {
+      "timestamp": "2026-06-12T20:57:22+08:00",
+      "phase": "phase-6",
+      "work_unit": "6.2",
+      "action": "completed WU 6.2, marked Phase 6 done, and advanced to Phase 7 WU 7.1",
+      "summary": "Migrated Skill-side graph HTML regressions to the new engine output, preserved oriental design semantic assertions, deprecated the legacy wash template and old helper tests, and kept unrelated untracked files untouched.",
+      "commit": "b98db4abf56c59b19df1a5db677c7fa6ebec317b",
+      "verification": [
+        "all graph-html focused regressions passed",
+        "graph-build failure regression passed",
+        "bash tests/regression.sh passed",
+        "node --test tests/js/*.test.js passed with 116 tests",
+        "npm run typecheck passed",
+        "npm test -w @llm-wiki/graph-engine passed with 116 tests",
+        "pre-commit hard checks passed"
+      ],
+      "next": "phase-7 work_unit 7.1"
     }
   ]
 }
