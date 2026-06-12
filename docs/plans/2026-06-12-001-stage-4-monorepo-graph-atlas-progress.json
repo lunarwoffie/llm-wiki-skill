@@ -3,9 +3,9 @@
   "design": "workbench/docs/stage-4-design.md (before phase-0 completes: ../llm-wiki-agent/docs/stage-4-design.md)",
   "branch": "stage-4",
   "status": {
-    "phase": "phase-2",
-    "work_unit": "2.2",
-    "next_allowed_action": "Execute WU 2.2: add workbench graph view shell, /api/graph and rebuild flow, prepare demo KB evidence, and record static baseline screenshots or manual-acceptance fallback."
+    "phase": "phase-3",
+    "work_unit": "3.1",
+    "next_allowed_action": "Execute WU 3.1: add d3-force low-heat simulation, hybrid cold-start layout, and cached hand-drawn paths; verify with graph-engine simulation state tests."
   },
   "execution_rules": {
     "commit_each_completed_work_unit": true,
@@ -31,14 +31,36 @@
   ],
   "final_acceptance": {
     "1_monorepo_dev_and_skill_tests": null,
-    "2_static_baseline_screenshots": null,
+    "2_static_baseline_screenshots": {
+      "status": "evidence_recorded_manual_judgment_pending",
+      "evidence": [
+        "docs/plans/stage-4-artifacts/p2-workbench-graph.png",
+        "docs/plans/stage-4-artifacts/p2-workbench-graph-light.png",
+        "docs/plans/stage-4-artifacts/p2-workbench-graph-building.png",
+        "docs/plans/stage-4-artifacts/p2-legacy-html.png"
+      ],
+      "summary": "Workbench graph screenshots and legacy offline HTML baseline screenshot are committed for reviewer comparison. Codex does not self-certify final visual equivalence."
+    },
     "3_pinning_persistence": null,
     "4_selection_closed_loop": null,
     "5_growth_and_watcher": null,
     "6_offline_html": null,
     "7_theme_follow": null
   },
-  "manual_acceptance": [],
+  "manual_acceptance": [
+    {
+      "phase": "phase-2",
+      "work_unit": "2.2",
+      "item": "Static graph visual consistency against legacy offline HTML.",
+      "status": "pending_reviewer",
+      "evidence": [
+        "docs/plans/stage-4-artifacts/p2-workbench-graph.png",
+        "docs/plans/stage-4-artifacts/p2-workbench-graph-light.png",
+        "docs/plans/stage-4-artifacts/p2-legacy-html.png"
+      ],
+      "reason": "Visual consistency is subjective per plan; screenshots are provided for the reviewer instead of Codex self-approval."
+    }
+  ],
   "phases": [
     {
       "id": "phase-0",
@@ -202,7 +224,7 @@
     {
       "id": "phase-2",
       "name": "工作台图谱视图静态复现",
-      "status": "pending",
+      "status": "done",
       "work_units": [
         {
           "id": "2.1",
@@ -238,7 +260,70 @@
           ],
           "notes": "Implemented static graph-engine renderer, graph-wash-derived renderable model mapping, shan-shui and mo-ye theme tokens, and createGraphEngine mount/render/theme/focus/select/destroy behavior. DOM/browser verification remains intentionally deferred to WU 2.2."
         },
-        { "id": "2.2", "name": "工作台视图壳 + /api/graph + rebuild + 对照截图", "status": "pending", "commit": null, "verification": [], "notes": "" }
+        {
+          "id": "2.2",
+          "name": "工作台视图壳 + /api/graph + rebuild + 对照截图",
+          "status": "completed",
+          "commit": "d64eedb6f21409199262e5f4672477cad9a3196c",
+          "verification": [
+            {
+              "command": "curl/node API script against running dev server",
+              "status": "passed",
+              "summary": "Selected the stage4 demo KB, removed graph-data.json, confirmed GET /api/graph returned needsBuild, POST /api/graph/rebuild started rebuild, and a later GET returned 11 nodes and 24 edges."
+            },
+            {
+              "command": "npx --no-install playwright screenshot with graph view storage state",
+              "status": "passed",
+              "summary": "Workbench graph rendered in dark mo-ye and light shan-shui themes; screenshots saved to p2-workbench-graph.png and p2-workbench-graph-light.png."
+            },
+            {
+              "command": "npx --no-install playwright screenshot waiting for [data-graph-status=\"building\"]",
+              "status": "passed",
+              "summary": "No-data state showed graph building UI; screenshot saved to p2-workbench-graph-building.png, then graph rebuilt back to 11 nodes and 24 edges."
+            },
+            {
+              "command": "file docs/plans/stage-4-artifacts/p2-*.png",
+              "status": "passed",
+              "summary": "All four Phase 2 evidence screenshots exist as 1440x900 PNG files, including the legacy offline HTML baseline."
+            },
+            {
+              "command": "npm run typecheck",
+              "status": "passed",
+              "summary": "server, web, and graph-engine workspace typechecks passed."
+            },
+            {
+              "command": "npm run build -w @llm-wiki-agent/web",
+              "status": "passed",
+              "summary": "Web production build passed after ensuring the graph-engine workspace builds first; Vite reported only the existing large chunk warning."
+            },
+            {
+              "command": "npm test -w @llm-wiki/graph-engine",
+              "status": "passed",
+              "summary": "92 graph-engine tests passed."
+            },
+            {
+              "command": "npm run build -w @llm-wiki/graph-engine",
+              "status": "passed",
+              "summary": "ESM, IIFE, and declaration outputs built successfully."
+            },
+            {
+              "command": "node --test tests/js/*.test.js",
+              "status": "passed",
+              "summary": "116 original repository JS tests passed."
+            },
+            {
+              "command": "bash tests/regression.sh",
+              "status": "passed",
+              "summary": "All regression checks passed; cp emitted the known .git fsmonitor socket warning but exited successfully."
+            },
+            {
+              "command": "git diff --cached --check; staged local-path scan; root package type check; scripts/build-graph-data.sh diff check",
+              "status": "passed",
+              "summary": "Staged whitespace check passed, no staged local absolute paths were present, root package.json still has no type field, and scripts/build-graph-data.sh was unchanged."
+            }
+          ],
+          "notes": "Added the workbench graph main view, graph API/rebuild flow, SSE graph events, React graph shell, current-KB graph loading, theme following, demo screenshots, and a web prebuild step so the internal graph-engine dependency has declarations before web production builds. Demo KB generated files remain local and were not committed."
+        }
       ]
     },
     {
@@ -344,6 +429,15 @@
       "verification": "graph-engine tests passed with 92 tests; graph-engine build passed; root typecheck passed; header.html/graph-wash d3/rough audit found no d3 or rough runtime usage; staged privacy scan found no local absolute paths.",
       "result": "completed",
       "next": "WU 2.2 workbench graph view shell, graph API/rebuild flow, and static baseline evidence."
+    },
+    {
+      "timestamp": "2026-06-12T15:52:46+08:00",
+      "phase": "phase-2",
+      "work_unit": "2.2",
+      "action": "Added the workbench graph view shell, graph API/rebuild flow, SSE graph events, demo KB graph evidence, and Phase 2 screenshot artifacts.",
+      "verification": "API rebuild script passed with 11 nodes and 24 edges; Playwright confirmed rendered graph and building state; typecheck, web build, graph-engine test/build, original JS tests, and regression all passed; staged privacy and root package type checks passed.",
+      "result": "completed",
+      "next": "Phase 2 done; WU 3.1 d3-force low-heat simulation, hybrid layout, and path caching."
     }
   ]
 }
