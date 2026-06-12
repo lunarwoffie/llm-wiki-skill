@@ -3,9 +3,9 @@
   "design": "workbench/docs/stage-4-design.md (before phase-0 completes: ../llm-wiki-agent/docs/stage-4-design.md)",
   "branch": "stage-4",
   "status": {
-    "phase": "phase-3",
-    "work_unit": "3.3",
-    "next_allowed_action": "Execute WU 3.3: implement community wash behavior during drag and record init-wiki .gitignore alignment for .wiki-graph-layout.json."
+    "phase": "phase-4",
+    "work_unit": "4.1",
+    "next_allowed_action": "Execute WU 4.1: implement four selection modes, structural facts, and action mapping in graph-engine."
   },
   "execution_rules": {
     "commit_each_completed_work_unit": true,
@@ -30,6 +30,14 @@
       "decision": "header.html inline d3/rough audit completed.",
       "evidence": "rg over templates/graph-styles/wash/header.html, graph-wash.js, and graph-wash-helpers.js for d3/rough/script-loader terms only matched the graph-data JSON script tag; no d3 or rough runtime usage was found.",
       "consequence": "Phase 6 can remove d3.min.js and rough.min.js from offline HTML packing if no later dependency appears; marked and DOMPurify remain outside this conclusion."
+    },
+    {
+      "timestamp": "2026-06-12T17:45:00+08:00",
+      "phase": "phase-3",
+      "work_unit": "3.3",
+      "decision": "init-wiki .gitignore alignment checked for .wiki-cache.json and .wiki-graph-layout.json.",
+      "evidence": "scripts/init-wiki.sh writes a knowledge-base .gitignore containing only .wiki-tmp/; it creates .wiki-cache.json but does not ignore it.",
+      "consequence": ".wiki-graph-layout.json should align with .wiki-cache.json as a knowledge-base asset and remain not ignored; no init-wiki.sh code change was made in WU 3.3."
     }
   ],
   "final_acceptance": {
@@ -45,12 +53,15 @@
       "summary": "Workbench graph screenshots and legacy offline HTML baseline screenshot are committed for reviewer comparison. Codex does not self-certify final visual equivalence."
     },
     "3_pinning_persistence": {
-      "status": "evidence_recorded",
+      "status": "evidence_recorded_manual_judgment_pending",
       "evidence": [
         "commit 5c28a30a3d18edb8ea532483886a8f44e5012fe2",
-        "docs/plans/stage-4-artifacts/p3-pinning-refresh.png"
+        "commit 5083521577d30e73615b8fe23854f351869a6794",
+        "docs/plans/stage-4-artifacts/p3-pinning-refresh.png",
+        "docs/plans/stage-4-artifacts/p3-community-drag.png",
+        "docs/plans/stage-4-artifacts/p3-community-drag.json"
       ],
-      "summary": "Node pinning, reset/undo, layout GET/PUT persistence, corrupted layout tolerance, and refresh restoration were implemented and verified against the demo KB."
+      "summary": "Node pinning, layout persistence, corrupted layout tolerance, refresh restoration, and community-stable drag behavior have evidence. Drag hand-feel remains pending reviewer judgment per manual acceptance rules."
     },
     "4_selection_closed_loop": null,
     "5_growth_and_watcher": null,
@@ -69,6 +80,17 @@
         "docs/plans/stage-4-artifacts/p2-legacy-html.png"
       ],
       "reason": "Visual consistency is subjective per plan; screenshots are provided for the reviewer instead of Codex self-approval."
+    },
+    {
+      "phase": "phase-3",
+      "work_unit": "3.3",
+      "item": "Drag hand-feel and visual smoothness during low-heat node drag.",
+      "status": "pending_reviewer",
+      "evidence": [
+        "docs/plans/stage-4-artifacts/p3-community-drag.png",
+        "docs/plans/stage-4-artifacts/p3-community-drag.json"
+      ],
+      "reason": "Drag smoothness is subjective per the plan; Codex records evidence and does not self-certify the hand-feel."
     }
   ],
   "phases": [
@@ -339,7 +361,7 @@
     {
       "id": "phase-3",
       "name": "活模拟 + 钉扎 + 持久化",
-      "status": "pending",
+      "status": "done",
       "work_units": [
         {
           "id": "3.1",
@@ -432,10 +454,41 @@
         {
           "id": "3.3",
           "name": "团块拖动行为 + init gitignore 查证",
-          "status": "pending",
-          "commit": null,
-          "verification": [],
-          "notes": ""
+          "status": "completed",
+          "commit": "5083521577d30e73615b8fe23854f351869a6794",
+          "verification": [
+            {
+              "command": "npm test -w @llm-wiki/graph-engine",
+              "status": "passed",
+              "summary": "99 graph-engine tests passed, including the new community wash test that keeps the wash around clustered members instead of stretching to a far outlier."
+            },
+            {
+              "command": "npm run typecheck",
+              "status": "passed",
+              "summary": "server, web, and graph-engine workspace typechecks passed; web pretypecheck rebuilt graph-engine declarations first."
+            },
+            {
+              "command": "npm run build -w @llm-wiki/graph-engine",
+              "status": "passed",
+              "summary": "ESM, IIFE, and declaration outputs built successfully."
+            },
+            {
+              "command": "System Chrome dev check on http://localhost:5180 graph view",
+              "status": "passed",
+              "summary": "Dragged Context Window from community agent-runtime near Retrieval in community knowledge-base; the node remained in agent-runtime, drag state cleared, and the demo KB layout file was restored afterward. Evidence stored in p3-community-drag.png/json."
+            },
+            {
+              "command": "sed -n scripts/init-wiki.sh and rg wiki-cache/wiki-graph-layout references",
+              "status": "passed",
+              "summary": "init-wiki.sh writes only .wiki-tmp/ to new KB .gitignore; .wiki-cache.json is created but not ignored, so .wiki-graph-layout.json aligns by remaining not ignored. No script change was made."
+            },
+            {
+              "command": "git diff --cached --check; staged local-path scan; binary screenshot strings scan; root package type check; scripts/build-graph-data.sh diff check",
+              "status": "passed",
+              "summary": "Staged whitespace check passed, no staged /Users paths were found, the evidence screenshot contained no /Users string, root package.json still has no type field, and scripts/build-graph-data.sh was unchanged."
+            }
+          ],
+          "notes": "Community wash now uses the clustered member body when a far outlier is present, so a pinned or dragged-away member does not stretch the wash. The renderer updates wash ellipses during live motion, fades all washes while a node is being dragged, and recalculates after drag end. init-wiki.sh was checked: .wiki-cache.json is not ignored, and .wiki-graph-layout.json should remain likewise not ignored as a user/KB asset. Browser drag evidence is stored under docs/plans/stage-4-artifacts/; hand-feel is recorded for manual review."
         }
       ]
     },
@@ -635,6 +688,22 @@
         "typecheck and builds passed",
         "pre-commit scans passed"
       ]
+    },
+    {
+      "timestamp": "2026-06-12T17:45:00+08:00",
+      "phase": "phase-3",
+      "work_unit": "3.3",
+      "action": "completed WU 3.3, marked Phase 3 done, and advanced to Phase 4 WU 4.1",
+      "commit": "5083521577d30e73615b8fe23854f351869a6794",
+      "verification": [
+        "graph-engine tests passed with 99 tests",
+        "typecheck passed",
+        "graph-engine build passed",
+        "browser drag DOM assertion passed with evidence artifact",
+        "init-wiki .gitignore alignment checked",
+        "pre-commit scans passed"
+      ],
+      "next": "WU 4.1 selection modes, structural facts, and action mapping."
     }
   ]
 }
