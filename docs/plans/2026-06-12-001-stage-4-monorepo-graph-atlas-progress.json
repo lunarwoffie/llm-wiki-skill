@@ -4,8 +4,8 @@
   "branch": "stage-4",
   "status": {
     "phase": "phase-5",
-    "work_unit": "5.2",
-    "next_allowed_action": "Execute WU 5.2: implement graph diff with community alignment and upgrade graph_updated payload."
+    "work_unit": "5.3",
+    "next_allowed_action": "Execute WU 5.3: implement living atlas growth animation and diff queue."
   },
   "execution_rules": {
     "commit_each_completed_work_unit": true,
@@ -664,10 +664,36 @@
         {
           "id": "5.2",
           "name": "diff.ts 社区对齐 + graph_updated 携带 diff",
-          "status": "pending",
-          "commit": null,
-          "verification": [],
-          "notes": ""
+          "status": "completed",
+          "commit": "3304cf93ea7bb5a1799b60bbb12cb2ac655dfa59",
+          "verification": [
+            {
+              "command": "npm test -w @llm-wiki/graph-engine",
+              "status": "passed",
+              "summary": "111 graph-engine tests passed, including six graph diff fixtures for community id shuffle, added/removed nodes and edges, real recolor, unmatched new community, and community split alignment."
+            },
+            {
+              "command": "node --import tsx --test workbench/server/src/*.test.ts workbench/server/src/digest/*.test.ts",
+              "status": "passed",
+              "summary": "19 server tests passed after graph_updated started carrying real GraphDiff payloads from the rebuild queue."
+            },
+            {
+              "command": "npm run typecheck",
+              "status": "passed",
+              "summary": "server, web, and graph-engine workspace typechecks passed."
+            },
+            {
+              "command": "npm run build -w @llm-wiki/graph-engine",
+              "status": "passed",
+              "summary": "ESM/IIFE graph-engine build and declaration emit completed."
+            },
+            {
+              "command": "git diff --cached --check; staged local-path scan; root package type check; scripts/build-graph-data.sh diff check",
+              "status": "passed",
+              "summary": "Staged whitespace check passed, no staged local absolute paths were present, root package.json still has no type: module, and scripts/build-graph-data.sh was unchanged."
+            }
+          ],
+          "notes": "Added graph-engine diffGraphData with greedy Jaccard community alignment before recolor detection, exported it from the package, and upgraded server rebuild completion to compare old/new graph data and emit real graph_updated diffs. The rebuild queue now runs one full old-read/rebuild/new-read/event cycle per queued rebuild, avoiding a double rebuild."
         },
         {
           "id": "5.3",
@@ -883,6 +909,22 @@
         "pre-commit scans passed"
       ],
       "next": "phase-5 work_unit 5.2"
+    },
+    {
+      "timestamp": "2026-06-12T19:15:00+08:00",
+      "phase": "phase-5",
+      "work_unit": "5.2",
+      "action": "completed",
+      "summary": "Implemented graph diff calculation with community alignment and upgraded graph_updated events to include real diffs after rebuild.",
+      "commit": "3304cf93ea7bb5a1799b60bbb12cb2ac655dfa59",
+      "verification": [
+        "graph-engine tests passed with 111 tests, including all six required diff fixtures",
+        "server tests passed with 19 tests",
+        "typecheck passed",
+        "graph-engine build passed",
+        "pre-commit scans passed"
+      ],
+      "next": "phase-5 work_unit 5.3"
     }
   ]
 }
