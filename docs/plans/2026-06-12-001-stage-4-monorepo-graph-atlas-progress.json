@@ -4,8 +4,8 @@
   "branch": "stage-4",
   "status": {
     "phase": "phase-2",
-    "work_unit": "2.1",
-    "next_allowed_action": "Execute WU 2.1: implement graph-engine static renderer and theme tokens, verify logic tests/typecheck, and record header.html inline d3/rough audit in decision_log."
+    "work_unit": "2.2",
+    "next_allowed_action": "Execute WU 2.2: add workbench graph view shell, /api/graph and rebuild flow, prepare demo KB evidence, and record static baseline screenshots or manual-acceptance fallback."
   },
   "execution_rules": {
     "commit_each_completed_work_unit": true,
@@ -19,7 +19,16 @@
     "privacy_check_every_commit": "git diff --cached must not contain /Users/ paths; never commit demo-KB generated graph-data/offline HTML",
     "stop_after_three_failed_verification_attempts": true
   },
-  "decision_log": [],
+  "decision_log": [
+    {
+      "timestamp": "2026-06-12T15:21:59+08:00",
+      "phase": "phase-2",
+      "work_unit": "2.1",
+      "decision": "header.html inline d3/rough audit completed.",
+      "evidence": "rg over templates/graph-styles/wash/header.html, graph-wash.js, and graph-wash-helpers.js for d3/rough/script-loader terms only matched the graph-data JSON script tag; no d3 or rough runtime usage was found.",
+      "consequence": "Phase 6 can remove d3.min.js and rough.min.js from offline HTML packing if no later dependency appears; marked and DOMPurify remain outside this conclusion."
+    }
+  ],
   "final_acceptance": {
     "1_monorepo_dev_and_skill_tests": null,
     "2_static_baseline_screenshots": null,
@@ -195,7 +204,40 @@
       "name": "工作台图谱视图静态复现",
       "status": "pending",
       "work_units": [
-        { "id": "2.1", "name": "静态渲染器 + 主题 token（含 header.html 内联 d3/rough 核查）", "status": "pending", "commit": null, "verification": [], "notes": "" },
+        {
+          "id": "2.1",
+          "name": "静态渲染器 + 主题 token（含 header.html 内联 d3/rough 核查）",
+          "status": "completed",
+          "commit": "c24b00ea4a53c5539776dd763963fd6033b68e5f",
+          "verification": [
+            {
+              "command": "npm test -w @llm-wiki/graph-engine",
+              "status": "passed",
+              "summary": "92 graph-engine tests passed, including new theme token parsing and graph-to-renderable mapping tests."
+            },
+            {
+              "command": "npm run build -w @llm-wiki/graph-engine",
+              "status": "passed",
+              "summary": "Vite produced ESM and IIFE graph-engine builds; declaration output completed."
+            },
+            {
+              "command": "npm run typecheck",
+              "status": "passed",
+              "summary": "server, web, and graph-engine workspace typechecks passed."
+            },
+            {
+              "command": "rg header.html/graph-wash runtime files for d3/rough usage",
+              "status": "passed",
+              "summary": "Only the graph-data JSON script tag matched; no d3 or rough runtime usage found."
+            },
+            {
+              "command": "git diff --cached --check and staged diff privacy scan before commit",
+              "status": "passed",
+              "summary": "Whitespace check passed and no staged local absolute paths were present before committing."
+            }
+          ],
+          "notes": "Implemented static graph-engine renderer, graph-wash-derived renderable model mapping, shan-shui and mo-ye theme tokens, and createGraphEngine mount/render/theme/focus/select/destroy behavior. DOM/browser verification remains intentionally deferred to WU 2.2."
+        },
         { "id": "2.2", "name": "工作台视图壳 + /api/graph + rebuild + 对照截图", "status": "pending", "commit": null, "verification": [], "notes": "" }
       ]
     },
@@ -293,6 +335,15 @@
       "verification": "graph-engine tests passed with 82 migrated helper tests; old-to-new test case count stayed 82 to 82; graph-engine build, root typecheck, and original JS tests passed.",
       "result": "completed",
       "next": "Phase 1 done; WU 2.1 static renderer and theme tokens."
+    },
+    {
+      "timestamp": "2026-06-12T15:21:59+08:00",
+      "phase": "phase-2",
+      "work_unit": "2.1",
+      "action": "Implemented the graph-engine static renderer, renderable graph mapping, shan-shui and mo-ye theme token modules, and wired createGraphEngine to mount, render, theme, focus, select, and destroy a static atlas.",
+      "verification": "graph-engine tests passed with 92 tests; graph-engine build passed; root typecheck passed; header.html/graph-wash d3/rough audit found no d3 or rough runtime usage; staged privacy scan found no local absolute paths.",
+      "result": "completed",
+      "next": "WU 2.2 workbench graph view shell, graph API/rebuild flow, and static baseline evidence."
     }
   ]
 }
