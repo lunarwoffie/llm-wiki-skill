@@ -3,9 +3,9 @@
   "design": "workbench/docs/stage-4-design.md (before phase-0 completes: ../llm-wiki-agent/docs/stage-4-design.md)",
   "branch": "stage-4",
   "status": {
-    "phase": "phase-0",
-    "work_unit": "0.3",
-    "next_allowed_action": "Execute WU 0.3: set up the monorepo workspace root, move shared config to root, run npm install, then verify per plan section 5."
+    "phase": "phase-1",
+    "work_unit": "1.1",
+    "next_allowed_action": "Execute WU 1.1: scaffold packages/graph-engine with types.ts and dual ESM/IIFE build output, then verify per plan section 5."
   },
   "execution_rules": {
     "commit_each_completed_work_unit": true,
@@ -34,7 +34,7 @@
     {
       "id": "phase-0",
       "name": "monorepo 搬家",
-      "status": "pending",
+      "status": "done",
       "work_units": [
         {
           "id": "0.1",
@@ -79,7 +79,50 @@
           ],
           "notes": "git subtree add created merge commit 510eb9f. Privacy scrub replaced example user-directory paths with ~ or abstract wording and committed 95bcc11. No push performed; existing unrelated untracked files remained untouched."
         },
-        { "id": "0.3", "name": "workspace 根 package.json + lockfile 统一 + 配置上移", "status": "pending", "commit": null, "verification": [], "notes": "" }
+        {
+          "id": "0.3",
+          "name": "workspace 根 package.json + lockfile 统一 + 配置上移",
+          "status": "completed",
+          "commit": "a55f32f",
+          "verification": [
+            {
+              "command": "npm install",
+              "status": "passed",
+              "summary": "Generated the root npm workspace lockfile successfully."
+            },
+            {
+              "command": "which jq && node --version",
+              "status": "passed",
+              "summary": "jq exists and node is v22.22.3, satisfying the >=22.19.0 requirement."
+            },
+            {
+              "command": "npm run dev; curl backend and frontend; stop dev process",
+              "status": "passed",
+              "summary": "Root dev script started server and web; backend knowledge-bases endpoint and frontend root both responded."
+            },
+            {
+              "command": "node --test tests/js/*.test.js",
+              "status": "passed",
+              "summary": "116 tests passed."
+            },
+            {
+              "command": "bash install.sh --dry-run --platform codex",
+              "status": "passed",
+              "summary": "Codex install dry-run completed."
+            },
+            {
+              "command": "npm run typecheck",
+              "status": "passed",
+              "summary": "server and web workspace typechecks passed."
+            },
+            {
+              "command": "bash tests/regression.sh",
+              "status": "passed",
+              "summary": "All regression checks passed."
+            }
+          ],
+          "notes": "Created root npm workspace package.json without a type field; moved Node version config to root; removed workbench root package files; merged workbench ignore rules into root .gitignore; generated root package-lock.json."
+        }
       ]
     },
     {
@@ -167,6 +210,15 @@
       "verification": "workbench/docs/stage-4-design.md exists; subtree merge commit 510eb9f links to agent parent a69fa9b; grep for user-home path examples in workbench md/ts/tsx/json returned no matches.",
       "result": "completed",
       "next": "WU 0.3 monorepo workspace root setup."
+    },
+    {
+      "timestamp": "2026-06-12T15:00:00+08:00",
+      "phase": "phase-0",
+      "work_unit": "0.3",
+      "action": "Set up the monorepo workspace root and moved workbench root package and Node config to the repository root.",
+      "verification": "npm install, dev smoke curl checks, JS tests, Codex install dry-run, typecheck, environment check, and regression all passed.",
+      "result": "completed",
+      "next": "Phase 0 done; WU 1.1 graph-engine scaffold."
     }
   ]
 }
