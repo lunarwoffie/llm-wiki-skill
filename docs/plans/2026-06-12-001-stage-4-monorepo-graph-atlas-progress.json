@@ -4,8 +4,8 @@
   "branch": "stage-4",
   "status": {
     "phase": "phase-0",
-    "work_unit": "0.1",
-    "next_allowed_action": "Execute WU 0.1: merge stage-4-design into local main of ../llm-wiki-agent (no push). Then continue per plan section 5."
+    "work_unit": "0.2",
+    "next_allowed_action": "Execute WU 0.2: git subtree add --prefix=workbench ../llm-wiki-agent main, then scrub absolute paths from workbench and verify per plan section 5."
   },
   "execution_rules": {
     "commit_each_completed_work_unit": true,
@@ -36,7 +36,20 @@
       "name": "monorepo 搬家",
       "status": "pending",
       "work_units": [
-        { "id": "0.1", "name": "agent 仓库 stage-4-design 合入本地 main（不 push）", "status": "pending", "commit": null, "verification": [], "notes": "" },
+        {
+          "id": "0.1",
+          "name": "agent 仓库 stage-4-design 合入本地 main（不 push）",
+          "status": "completed",
+          "commit": "manual: ../llm-wiki-agent main@a69fa9b",
+          "verification": [
+            {
+              "command": "git -C ../llm-wiki-agent log main --oneline -3",
+              "status": "passed",
+              "summary": "main contains a69fa9b and predecessor 1e1811c after fast-forward merge from stage-4-design."
+            }
+          ],
+          "notes": "../llm-wiki-agent main fast-forwarded from ab419ca to a69fa9b. No push performed. Existing unrelated untracked files in ../llm-wiki-agent were left untouched."
+        },
         { "id": "0.2", "name": "subtree add 进 workbench/ + 隐私清理", "status": "pending", "commit": null, "verification": [], "notes": "" },
         { "id": "0.3", "name": "workspace 根 package.json + lockfile 统一 + 配置上移", "status": "pending", "commit": null, "verification": [], "notes": "" }
       ]
@@ -108,5 +121,15 @@
       ]
     }
   ],
-  "turn_log": []
+  "turn_log": [
+    {
+      "timestamp": "2026-06-12T14:47:00+08:00",
+      "phase": "phase-0",
+      "work_unit": "0.1",
+      "action": "Fast-forwarded ../llm-wiki-agent main to stage-4-design for subtree readiness.",
+      "verification": "git -C ../llm-wiki-agent log main --oneline -3 showed a69fa9b, 1e1811c, and ab419ca.",
+      "result": "completed",
+      "next": "WU 0.2 subtree add into workbench plus privacy scrub."
+    }
+  ]
 }
