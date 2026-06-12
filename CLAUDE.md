@@ -6,7 +6,7 @@
 
 ## 必读文档
 
-**[PRODUCT.md](PRODUCT.md)** —— 产品定位、架构、5 阶段路线（+ 阶段 3.5）、19 条 ADR、协作规则。任何动手前先读这份文档。
+**[PRODUCT.md](PRODUCT.md)** —— 产品定位、架构、5 阶段路线（+ 阶段 3.5）、21 条 ADR、协作规则。任何动手前先读这份文档。
 
 文档与代码 / 约定冲突时，**以 PRODUCT.md 为准**。
 
@@ -21,7 +21,9 @@
 
 ## 项目当前阶段
 
-**阶段 3.5 已完成并合并到 `main`** ✅（导航 UX 重构 + 多模型双角色 + 子代理批量消化 + 收尾补强）。当前处于阶段四开始前的收尾维护期，详见 PRODUCT.md §4 / §10。
+**阶段四设计完成，待实施** 🚧（monorepo 合并 + 图谱活地图）。设计文档：[docs/stage-4-design.md](docs/stage-4-design.md)；决策：PRODUCT.md ADR-20 / ADR-21。
+
+❗ 阶段四 Step 0 起开发主场切到**主仓库**（llm-wiki-skill 仓库 monorepo）：本仓库 subtree 进 `workbench/`，引擎落 `packages/graph-engine/`。Step 0 完成后本仓库进入只读过渡状态（不 archive，处置留品牌阶段，见 ADR-20）。
 
 阶段一 / 二 / 三已完成（详见 PRODUCT.md §10）：
 
