@@ -4,8 +4,8 @@
   "branch": "stage-4",
   "status": {
     "phase": "phase-0",
-    "work_unit": "0.2",
-    "next_allowed_action": "Execute WU 0.2: git subtree add --prefix=workbench ../llm-wiki-agent main, then scrub absolute paths from workbench and verify per plan section 5."
+    "work_unit": "0.3",
+    "next_allowed_action": "Execute WU 0.3: set up the monorepo workspace root, move shared config to root, run npm install, then verify per plan section 5."
   },
   "execution_rules": {
     "commit_each_completed_work_unit": true,
@@ -50,7 +50,35 @@
           ],
           "notes": "../llm-wiki-agent main fast-forwarded from ab419ca to a69fa9b. No push performed. Existing unrelated untracked files in ../llm-wiki-agent were left untouched."
         },
-        { "id": "0.2", "name": "subtree add 进 workbench/ + 隐私清理", "status": "pending", "commit": null, "verification": [], "notes": "" },
+        {
+          "id": "0.2",
+          "name": "subtree add 进 workbench/ + 隐私清理",
+          "status": "completed",
+          "commit": "subtree: 510eb9f449aab2183f74f1cf62fc20c982af3b56; scrub: 95bcc11cfc2832062fbc3f3df07daf1caad66873",
+          "verification": [
+            {
+              "command": "test -f workbench/docs/stage-4-design.md",
+              "status": "passed",
+              "summary": "workbench/docs/stage-4-design.md exists after subtree add."
+            },
+            {
+              "command": "git log --oneline workbench/ | head -10; git show --no-patch --pretty='%h %p %s' 510eb9f; git log --oneline 510eb9f^2 -5",
+              "status": "passed",
+              "summary": "Path-limited log shows the subtree add and scrub commits; subtree commit 510eb9f has second parent a69fa9b, whose history includes stage-4 design commits a69fa9b and 1e1811c."
+            },
+            {
+              "command": "grep workbench md/ts/tsx/json files for the user-home absolute-path marker",
+              "status": "passed",
+              "summary": "No matches after scrub commit 95bcc11."
+            },
+            {
+              "command": "git grep committed workbench content for the user-home absolute-path marker",
+              "status": "passed",
+              "summary": "No committed workbench content contains the user-home absolute-path marker."
+            }
+          ],
+          "notes": "git subtree add created merge commit 510eb9f. Privacy scrub replaced example user-directory paths with ~ or abstract wording and committed 95bcc11. No push performed; existing unrelated untracked files remained untouched."
+        },
         { "id": "0.3", "name": "workspace 根 package.json + lockfile 统一 + 配置上移", "status": "pending", "commit": null, "verification": [], "notes": "" }
       ]
     },
@@ -130,6 +158,15 @@
       "verification": "git -C ../llm-wiki-agent log main --oneline -3 showed a69fa9b, 1e1811c, and ab419ca.",
       "result": "completed",
       "next": "WU 0.2 subtree add into workbench plus privacy scrub."
+    },
+    {
+      "timestamp": "2026-06-12T14:52:33+08:00",
+      "phase": "phase-0",
+      "work_unit": "0.2",
+      "action": "Added ../llm-wiki-agent main as workbench/ using git subtree, then scrubbed user-home path examples from imported workbench files.",
+      "verification": "workbench/docs/stage-4-design.md exists; subtree merge commit 510eb9f links to agent parent a69fa9b; grep for user-home path examples in workbench md/ts/tsx/json returned no matches.",
+      "result": "completed",
+      "next": "WU 0.3 monorepo workspace root setup."
     }
   ]
 }
