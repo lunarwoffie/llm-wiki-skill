@@ -36,25 +36,25 @@ const SHAN_SHUI_ROOT = `
 
 const MO_YE_ROOT = `
   color-scheme: dark;
-  --bg: #11100e;
-  --surface: #1b1a17;
-  --surface-2: #24221e;
-  --vellum: #343028;
-  --mist: #292723;
-  --ink: #f3eee3;
-  --muted: #b9ae9e;
-  --faint: #887f72;
-  --rule: #403b33;
-  --line: #5a5247;
-  --cinnabar: #d65a46;
-  --cinnabar-2: #ef7058;
-  --jade: #78a891;
-  --green: #78a06e;
-  --night: #79a9bd;
-  --amber: #d6a34b;
-  --violet: #b397c9;
-  --shadow: 0 18px 36px rgba(0, 0, 0, .34);
-  --soft-shadow: 0 10px 24px rgba(0, 0, 0, .24);
+  --bg: #0d0f0e;
+  --surface: #181a18;
+  --surface-2: #21231f;
+  --vellum: #2c2d28;
+  --mist: #20241f;
+  --ink: #f5f0e6;
+  --muted: #c6bbab;
+  --faint: #8f8677;
+  --rule: #3b3932;
+  --line: #8e8778;
+  --cinnabar: #e45d4a;
+  --cinnabar-2: #ff8066;
+  --jade: #8ab6a2;
+  --green: #8bae78;
+  --night: #a9bfcb;
+  --amber: #e0b35e;
+  --violet: #c1a8d5;
+  --shadow: 0 22px 44px rgba(0, 0, 0, .48);
+  --soft-shadow: 0 12px 28px rgba(0, 0, 0, .36);
   --radius: 12px;
   --font-serif: "Noto Serif SC", "Songti SC", "STSong", Georgia, serif;
   --font-ui: "Noto Sans SC", -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
@@ -87,7 +87,7 @@ export const THEMES: Record<ThemeId, ThemeTokens> = {
     id: "mo-ye",
     colorScheme: "dark",
     vars: parseCssTokens(MO_YE_ROOT),
-    communityColors: ["#d65a46", "#79a9bd", "#78a891", "#d6a34b", "#b397c9", "#78a06e", "#c29061", "#9aa8d8"]
+    communityColors: ["#e45d4a", "#a9bfcb", "#8ab6a2", "#e0b35e", "#c1a8d5", "#8bae78", "#d19966", "#aeb8e4"]
   }
 };
 

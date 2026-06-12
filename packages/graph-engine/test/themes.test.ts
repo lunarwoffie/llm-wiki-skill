@@ -46,15 +46,17 @@ describe("theme tokens", () => {
     const moYe = themeTokensToCssVars("mo-ye");
 
     assert.equal(getThemeTokens("mo-ye").colorScheme, "dark");
-    assert.equal(moYe["--bg"], "#11100e");
-    assert.equal(moYe["--ink"], "#f3eee3");
-    assert.equal(moYe["--cinnabar"], "#d65a46");
+    assert.equal(moYe["--bg"], "#0d0f0e");
+    assert.equal(moYe["--ink"], "#f5f0e6");
+    assert.equal(moYe["--line"], "#8e8778");
+    assert.equal(moYe["--cinnabar"], "#e45d4a");
+    assert.equal(moYe["--night"], "#a9bfcb");
     assert.deepEqual(Object.keys(moYe).sort(), Object.keys(shanShui).sort());
   });
 
   it("cycles community colors deterministically", () => {
     assert.equal(getCommunityColor("shan-shui", 0), "#8b2e24");
     assert.equal(getCommunityColor("shan-shui", 8), "#8b2e24");
-    assert.equal(getCommunityColor("mo-ye", 1), "#79a9bd");
+    assert.equal(getCommunityColor("mo-ye", 1), "#a9bfcb");
   });
 });

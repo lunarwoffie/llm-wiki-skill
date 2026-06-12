@@ -651,6 +651,13 @@ const STATIC_RENDERER_CSS = `
     radial-gradient(ellipse at 70% 48%, color-mix(in srgb, var(--mist) 60%, transparent), transparent 58%),
     var(--bg);
 }
+.llm-wiki-graph-engine[data-theme="mo-ye"] {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--surface-2) 38%, transparent), transparent 34%),
+    radial-gradient(ellipse at 28% 56%, color-mix(in srgb, var(--night) 13%, transparent), transparent 58%),
+    radial-gradient(ellipse at 76% 38%, color-mix(in srgb, var(--cinnabar) 9%, transparent), transparent 54%),
+    var(--bg);
+}
 .llm-wiki-graph-svg {
   position: absolute;
   inset: 0;
@@ -675,8 +682,19 @@ const STATIC_RENDERER_CSS = `
 .edge.inferred { stroke: color-mix(in srgb, var(--jade) 62%, transparent); stroke-dasharray: 6 8; }
 .edge.ambiguous { stroke: color-mix(in srgb, var(--amber) 66%, transparent); stroke-dasharray: 2 7; }
 .edge.unverified { stroke: color-mix(in srgb, var(--muted) 45%, transparent); stroke-dasharray: 1 8; }
+.llm-wiki-graph-engine[data-theme="mo-ye"] .edge {
+  opacity: .82;
+}
+.llm-wiki-graph-engine[data-theme="mo-ye"] .edge.extracted { stroke: color-mix(in srgb, var(--line) 68%, transparent); }
+.llm-wiki-graph-engine[data-theme="mo-ye"] .edge.inferred { stroke: color-mix(in srgb, var(--jade) 70%, transparent); }
+.llm-wiki-graph-engine[data-theme="mo-ye"] .edge.ambiguous { stroke: color-mix(in srgb, var(--amber) 72%, transparent); }
+.llm-wiki-graph-engine[data-theme="mo-ye"] .edge.unverified { stroke: color-mix(in srgb, var(--muted) 52%, transparent); }
 .community-wash {
   transition: opacity .16s ease, cx .24s ease, cy .24s ease, rx .24s ease, ry .24s ease;
+}
+.llm-wiki-graph-engine[data-theme="mo-ye"] .community-wash {
+  mix-blend-mode: screen;
+  filter: saturate(.9);
 }
 .community-wash.is-diff-new-community {
   animation: llm-wiki-community-emerge .85s ease both;
@@ -703,6 +721,11 @@ const STATIC_RENDERER_CSS = `
   text-align: left;
   color: var(--ink);
 }
+.llm-wiki-graph-engine[data-theme="mo-ye"] .node {
+  border-color: color-mix(in srgb, var(--rule) 84%, transparent);
+  background: color-mix(in srgb, var(--surface) 86%, transparent);
+  box-shadow: 0 16px 30px rgba(0, 0, 0, .34), inset 0 0 0 1px rgba(245, 240, 230, .07);
+}
 .node::before {
   content: "";
   position: absolute;
@@ -711,6 +734,10 @@ const STATIC_RENDERER_CSS = `
   background: radial-gradient(circle, color-mix(in srgb, var(--night) 18%, transparent), transparent 66%);
   z-index: -1;
   opacity: .46;
+}
+.llm-wiki-graph-engine[data-theme="mo-ye"] .node::before {
+  background: radial-gradient(circle, color-mix(in srgb, var(--night) 24%, transparent), transparent 68%);
+  opacity: .4;
 }
 .node[data-type="topic"] { border-left: 5px solid var(--cinnabar); }
 .node[data-type="entity"] { border-left: 5px solid var(--night); }
@@ -818,6 +845,11 @@ const STATIC_RENDERER_CSS = `
   background: color-mix(in srgb, var(--surface) 70%, transparent);
   box-shadow: 0 8px 16px rgba(36, 31, 26, .06);
 }
+.llm-wiki-graph-engine[data-theme="mo-ye"] .node[data-visual-role="landmark"] {
+  border-color: color-mix(in srgb, var(--line) 38%, transparent);
+  background: color-mix(in srgb, var(--surface) 64%, transparent);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, .22);
+}
 .node[data-visual-role="landmark"]::before {
   inset: auto auto auto 9px;
   top: 50%;
@@ -847,6 +879,11 @@ const STATIC_RENDERER_CSS = `
   background: color-mix(in srgb, var(--surface) 92%, transparent);
   box-shadow: 0 13px 24px rgba(36, 31, 26, .1), inset 0 0 0 1px rgba(255, 255, 255, .32);
 }
+.llm-wiki-graph-engine[data-theme="mo-ye"] .node[data-visual-role="index-slip"],
+.llm-wiki-graph-engine[data-theme="mo-ye"] .node[data-visual-role="cinnabar-note"] {
+  background: color-mix(in srgb, var(--surface-2) 88%, transparent);
+  box-shadow: 0 16px 30px rgba(0, 0, 0, .38), inset 0 0 0 1px rgba(245, 240, 230, .09);
+}
 .node[data-visual-role="cinnabar-note"] {
   border-color: color-mix(in srgb, var(--cinnabar) 78%, transparent);
   box-shadow: 0 17px 30px color-mix(in srgb, var(--cinnabar) 18%, transparent), 0 0 0 4px color-mix(in srgb, var(--cinnabar) 11%, transparent);
@@ -873,6 +910,12 @@ const STATIC_RENDERER_CSS = `
   border-radius: var(--radius);
   background: color-mix(in srgb, var(--surface) 74%, transparent);
   box-shadow: var(--soft-shadow);
+}
+.llm-wiki-graph-engine[data-theme="mo-ye"] .mini-map,
+.llm-wiki-graph-engine[data-theme="mo-ye"] .graph-reader {
+  border-color: color-mix(in srgb, var(--line) 34%, transparent);
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  box-shadow: var(--soft-shadow), inset 0 0 0 1px rgba(245, 240, 230, .05);
 }
 .mini-map svg {
   width: 100%;
