@@ -14,7 +14,9 @@
     "no_commit_on_failed_verification": true,
     "no_push_no_pr_no_merge_to_main": true,
     "root_package_json_must_not_set_type_module": true,
-    "new_dependency_whitelist": ["d3-force", "chokidar (only if fs.watch recursive proven unreliable; record evidence)"],
+    "new_dependency_whitelist_runtime": ["d3-force", "chokidar (only if fs.watch recursive proven unreliable; record evidence)"],
+    "toolchain_devdeps_allowed": "typescript/vite/tsx/concurrently and @types/* reusing workbench-pinned versions do NOT count as new dependencies",
+    "privacy_check_every_commit": "git diff --cached must not contain /Users/ paths; never commit demo-KB generated graph-data/offline HTML",
     "stop_after_three_failed_verification_attempts": true
   },
   "decision_log": [],
@@ -45,7 +47,7 @@
       "status": "pending",
       "work_units": [
         { "id": "1.1", "name": "graph-engine 包骨架 + types.ts + 双产物构建", "status": "pending", "commit": null, "verification": [], "notes": "" },
-        { "id": "1.2", "name": "helpers 1:1 TS 化 + 测试迁移（断言数对比记录）", "status": "pending", "commit": null, "verification": [], "notes": "" }
+        { "id": "1.2", "name": "helpers 1:1 TS 化 + 测试迁移（test case 数对比记录）", "status": "pending", "commit": null, "verification": [], "notes": "" }
       ]
     },
     {
@@ -93,7 +95,7 @@
       "status": "pending",
       "work_units": [
         { "id": "6.1", "name": "build-graph-html.sh 改造 + 钉位烤入 + 打包清单", "status": "pending", "commit": null, "verification": [], "notes": "" },
-        { "id": "6.2", "name": "回归断言修订（语义断言保留）+ 旧模板 deprecated", "status": "pending", "commit": null, "verification": [], "notes": "" }
+        { "id": "6.2", "name": "回归断言重写（语义断言保留）+ 旧模板与旧 helpers 测试 deprecated", "status": "pending", "commit": null, "verification": [], "notes": "" }
       ]
     },
     {
