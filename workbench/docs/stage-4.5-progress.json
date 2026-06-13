@@ -1,10 +1,10 @@
 {
   "plan": "workbench/docs/stage-4.5-plan.md",
   "status": {
-    "phase": "phase-2",
-    "task": "2.5",
+    "phase": "phase-3",
+    "task": "3.1",
     "overall": "in_progress",
-    "next_allowed_action": "Run git log --oneline -15 and npm run test -w @llm-wiki/graph-engine before implementing work unit 2.5."
+    "next_allowed_action": "Run git log --oneline -15 and npm run test -w @llm-wiki/graph-engine before implementing work unit 3.1."
   },
   "execution_rules": {
     "branch": "codex/feat-stage-4-5-graph-usability",
@@ -247,7 +247,7 @@
       "id": "phase-2",
       "title": "Reading Drawer And Selection Semantics",
       "goal": "Make node click read, make selection an upgraded state, and fix single-node action mapping.",
-      "status": "pending",
+      "status": "completed",
       "acceptance": [
         "`npm run test -w @llm-wiki/graph-engine` exits 0.",
         "`node --import tsx --test workbench/web/test/*.test.ts` exits 0.",
@@ -255,8 +255,15 @@
         "Browser checks at 1440 x 960 and 390 x 844 prove node click opens reader, Shift-click opens selection, Esc clears, and no selection panel overlays the canvas.",
         "Browser check proves reader state has no learning queue, no summary block, no confidence list, and no neighbor section."
       ],
-      "evidence": [],
-      "commit": null,
+      "evidence": [
+        "npm run test -w @llm-wiki/graph-engine exited 0 with 128 tests passing.",
+        "node --import tsx --test workbench/web/test/*.test.ts exited 0 with 9 tests passing.",
+        "npm run build -w @llm-wiki-agent/web exited 0.",
+        "bash tests/graph-browser-stage-4-5.regression-1.sh --target workbench exited 0 and now covers 1440 x 960 plus 390 x 844: plain node click opens the right-drawer reader, Shift-click opens the right-drawer selection, Esc closes and clears graph highlights, and .graph-selection-panel is absent.",
+        "Workbench browser regression proves the graph reader has no learning queue, summary block, or neighbor section, and proves single-node selection hides structural stats and omits 探索潜在联系 while multi-node selection shows Shift+点击 增删节点 and structural facts.",
+        "bash tests/graph-browser-stage-4-5.regression-1.sh --target offline exited 0, preserving offline reader, Shift selection, Esc clear, viewport, and dense interaction coverage."
+      ],
+      "commit": "67b87dc",
       "tasks": [
         {
           "id": "2.1",
@@ -317,9 +324,19 @@
         {
           "id": "2.5",
           "title": "Move workbench selection into the right drawer.",
-          "status": "pending",
-          "verification": [],
-          "commit": null
+          "status": "completed",
+          "verification": [
+            "RED: node --import tsx --test workbench/web/test/graph-selection-drawer.test.ts failed because ../src/lib/graph-selection-drawer did not exist yet.",
+            "GREEN: node --import tsx --test workbench/web/test/graph-selection-drawer.test.ts exited 0 with 2 tests passing for single-node and multi-node drawer rules.",
+            "node --import tsx --test workbench/web/test/*.test.ts exited 0 with 9 tests passing.",
+            "npm run typecheck -w @llm-wiki-agent/web exited 0 after the selection drawer wiring changes.",
+            "npm run build -w @llm-wiki-agent/web exited 0.",
+            "npm run test -w @llm-wiki/graph-engine exited 0 with 128 tests passing.",
+            "bash tests/graph-browser-stage-4-5.regression-1.sh --target workbench exited 0 and proves the selection UI is in the right drawer at 1440 x 960 and 390 x 844, not as the old canvas overlay.",
+            "bash tests/graph-browser-stage-4-5.regression-1.sh --target offline exited 0.",
+            "Root cause for missing workbench selection actions during verification: graph-engine only includes ask actions when the host declares onAsk capability; GraphPanel now declares that capability while the actual ask is still initiated by the right-drawer buttons."
+          ],
+          "commit": "67b87dc"
         }
       ]
     },
