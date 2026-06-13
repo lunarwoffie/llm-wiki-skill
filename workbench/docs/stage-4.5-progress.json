@@ -2,9 +2,9 @@
   "plan": "workbench/docs/stage-4.5-plan.md",
   "status": {
     "phase": "phase-5",
-    "task": "5.2",
+    "task": "5.3",
     "overall": "in_progress",
-    "next_allowed_action": "Run git log --oneline -15 and npm run test -w @llm-wiki/graph-engine before implementing work unit 5.2."
+    "next_allowed_action": "Run git log --oneline -15 and npm run test -w @llm-wiki/graph-engine before implementing work unit 5.3."
   },
   "execution_rules": {
     "branch": "codex/feat-stage-4-5-graph-usability",
@@ -539,9 +539,20 @@
         {
           "id": "5.2",
           "title": "Verify workbench theme and responsive behavior.",
-          "status": "pending",
-          "verification": [],
-          "commit": null
+          "status": "completed",
+          "verification": [
+            "npm run test -w @llm-wiki/graph-engine exited 0 with 138 tests passing before implementation verification.",
+            "bash tests/graph-browser-stage-4-5.regression-1.sh --target workbench exited 0 and now runs workbench graph checks across 1440 x 960, 768 x 1024, and 390 x 844 in both light/shan-shui and dark/mo-ye themes.",
+            "Workbench browser matrix proves graph navigation, drawer reader, selection drawer, graph search, legend hover, and hover preview stay usable without viewport overflow.",
+            "Screenshots recorded: stage-4.5-workbench-desktop-light.png, stage-4.5-workbench-desktop-dark.png, stage-4.5-workbench-tablet-light.png, stage-4.5-workbench-tablet-dark.png, stage-4.5-workbench-mobile-light.png, stage-4.5-workbench-mobile-dark.png.",
+            "bash tests/graph-browser-stage-4-5.regression-1.sh --target offline exited 0 after the shared preview positioning change.",
+            "bash tests/graph-html-long-label.regression-1.sh exited 0.",
+            "bash tests/graph-html-density.regression-1.sh exited 0.",
+            "npm run typecheck -w @llm-wiki/graph-engine exited 0.",
+            "npm run build -w @llm-wiki/graph-engine exited 0.",
+            "npm run build -w @llm-wiki-agent/web exited 0 with only the existing Vite chunk-size warning."
+          ],
+          "commit": "1836438"
         },
         {
           "id": "5.3",
@@ -641,6 +652,10 @@
     {
       "timestamp": "2026-06-13",
       "entry": "Work unit 5.1 verified and completed offline HTML reader capabilities. Offline reader metadata now matches graph payload type/date/source rules, source-path links appear only for source pages, and browser regression proves no ask buttons, search, legend reload persistence, navigation, hover/dense behavior, and localStorage pins after reload. Verification passed: graph-engine tests/typecheck/build, offline/workbench stage 4.5 browser regressions, and focused graph HTML reader/search/insights/toolbar regressions."
+    },
+    {
+      "timestamp": "2026-06-13",
+      "entry": "Work unit 5.2 verified workbench themes and responsive behavior. Browser regression now checks 1440 x 960, 768 x 1024, and 390 x 844 in light/shan-shui and dark/mo-ye themes, covering navigation, reader drawer, selection drawer, search, legend hover, and hover preview. A real mobile hover-preview overflow was fixed by clamping preview placement inside the graph viewport. Verification passed: graph-engine tests/typecheck/build, web build, offline/workbench stage 4.5 browser regressions, long-label regression, and density regression."
     }
   ]
 }
