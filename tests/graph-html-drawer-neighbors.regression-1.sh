@@ -32,7 +32,8 @@ test_graph_html_reader_uses_marked_and_purify() {
     assert_file_contains "$html" "marked.parse"
     assert_file_contains "$html" "DOMPurify.sanitize"
     assert_file_contains "$html" "graph-reader-markdown"
-    assert_file_contains "$html" "r.content||r.summary||t.label"
+    grep -Eq '[[:alnum:]_$]+\.content\|\|[[:alnum:]_$]+\.summary\|\|[[:alnum:]_$]+\.label' "$html" \
+        || fail "Expected $html to contain the reader content/summary/label fallback chain"
 
     rm -rf "$tmp_dir"
 }
