@@ -849,9 +849,24 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
     preview.dataset.state = rawNode && renderedNode ? "open" : "closed";
     if (!rawNode || !renderedNode) return;
     const content = buildHoverPreview(rawNode);
-    preview.style.left = `${renderedNode.x}%`;
-    preview.style.top = `${renderedNode.y}%`;
     preview.append(createHoverPreviewContent(content));
+    positionHoverPreview(preview, renderedNode);
+  }
+
+  function positionHoverPreview(preview: HTMLElement, node: RenderableNode): void {
+    const rootRect = root.getBoundingClientRect();
+    const previewRect = preview.getBoundingClientRect();
+    const margin = 12;
+    const nodeX = rootRect.width * node.x / 100;
+    const nodeY = rootRect.height * node.y / 100;
+    const preferredLeft = nodeX + 18;
+    const preferredTop = nodeY - previewRect.height - 24;
+    const maxLeft = Math.max(margin, rootRect.width - previewRect.width - margin);
+    const maxTop = Math.max(margin, rootRect.height - previewRect.height - margin);
+    const left = clamp(preferredLeft, margin, maxLeft);
+    const top = clamp(preferredTop, margin, maxTop);
+    preview.style.left = `${left}px`;
+    preview.style.top = `${top}px`;
   }
 }
 
@@ -1717,12 +1732,10 @@ const STATIC_RENDERER_CSS = `
   width: min(300px, calc(100% - 32px));
   pointer-events: none;
   opacity: 0;
-  transform: translate(18px, calc(-100% - 18px));
-  transition: opacity .14s ease, transform .14s ease;
+  transition: opacity .14s ease;
 }
 .graph-hover-preview[data-state="open"] {
   opacity: 1;
-  transform: translate(18px, calc(-100% - 24px));
 }
 .graph-hover-preview-card {
   border: 1px solid color-mix(in srgb, var(--rule) 74%, transparent);

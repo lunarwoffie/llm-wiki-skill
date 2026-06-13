@@ -333,16 +333,7 @@ async function waitForLegendState(page, state) {
 
 async function runWorkbenchChecks(browser) {
   assert.notEqual(workbenchUrl, "", "GRAPH_STAGE_4_5_WORKBENCH_URL must point at the workbench dev server");
-  const page = await browser.newPage({ viewport: { width: 1440, height: 960 } });
-  await page.goto(workbenchUrl);
-  await page.waitForSelector(".app-shell");
-
-  const kbButton = page.getByRole("button", { name: /Stage 4\.5 Workbench Test|workbench-kb/ });
-  if (await kbButton.count()) {
-    await kbButton.click();
-  }
-  await page.getByRole("button", { name: /图谱/ }).click();
-  await page.waitForSelector("[data-llm-wiki-graph-root='true']");
+  const page = await openWorkbenchGraphPage(browser, { width: 1440, height: 960 }, "dark");
   await runSearchKeyboardChecks(page, "workbench graph search should support shortcut, cycling, focus, and Escape");
   await page.locator(".node[data-id='A']").click();
 
@@ -391,28 +382,73 @@ async function runWorkbenchChecks(browser) {
   await page.waitForSelector(".drawer-panel-open", { state: "detached" });
   await expectNoPressedNodes(page, "Escape should clear the workbench selection drawer and graph highlights");
   await runLegendChecks(page, { persistReload: false, expectWorkbenchDrawer: true });
-  await runWorkbenchMobileChecks(browser);
+  await runWorkbenchThemeViewportMatrix(browser);
 }
 
-async function runWorkbenchMobileChecks(browser) {
-  const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
-  await page.addInitScript(() => {
+async function openWorkbenchGraphPage(browser, viewport, theme) {
+  const page = await browser.newPage({ viewport });
+  await page.addInitScript(({ theme }) => {
     window.localStorage.setItem("llm-wiki-agent-main-view", "graph");
-  });
+    window.localStorage.setItem("llm-wiki-agent-theme", theme);
+  }, { theme });
   await page.goto(workbenchUrl);
   await page.waitForSelector(".app-shell");
+  const kbButton = page.getByRole("button", { name: /Stage 4\.5 Workbench Test|workbench-kb/ });
+  if (await kbButton.count() && await kbButton.first().isVisible()) {
+    await kbButton.first().click();
+  }
+  const graphButton = page.getByRole("button", { name: /图谱/ });
+  if (await graphButton.count() && await graphButton.first().isVisible()) {
+    await graphButton.first().click();
+  }
   await page.waitForSelector("[data-llm-wiki-graph-root='true']");
+  const expectedGraphTheme = theme === "dark" ? "mo-ye" : "shan-shui";
+  await page.waitForFunction((expectedGraphTheme) => {
+    return document.querySelector(".graph-screen")?.dataset.graphTheme === expectedGraphTheme
+      && document.querySelector(".llm-wiki-graph-engine")?.dataset.theme === expectedGraphTheme;
+  }, expectedGraphTheme);
+  return page;
+}
+
+async function runWorkbenchThemeViewportMatrix(browser) {
+  const cases = [
+    { name: "desktop-light", viewport: { width: 1440, height: 960 }, theme: "light" },
+    { name: "desktop-dark", viewport: { width: 1440, height: 960 }, theme: "dark" },
+    { name: "tablet-light", viewport: { width: 768, height: 1024 }, theme: "light" },
+    { name: "tablet-dark", viewport: { width: 768, height: 1024 }, theme: "dark" },
+    { name: "mobile-light", viewport: { width: 390, height: 844 }, theme: "light" },
+    { name: "mobile-dark", viewport: { width: 390, height: 844 }, theme: "dark" }
+  ];
+  for (const item of cases) {
+    const page = await openWorkbenchGraphPage(browser, item.viewport, item.theme);
+    await runWorkbenchThemeViewportChecks(page, item);
+    await page.close();
+  }
+}
+
+async function runWorkbenchThemeViewportChecks(page, item) {
+  await runPreviewCheck(page, `${item.name} hover preview should open`);
+  await runSearchKeyboardChecks(page, `${item.name} workbench graph search should work`);
+  await page.locator(".community-legend-row").first().hover();
+  await page.waitForSelector('.node[data-community-state="faded"]');
+  await page.mouse.move(80, 80);
+
   await page.locator(".node[data-id='A']").click();
 
   await page.waitForSelector(".drawer-panel-open");
   const drawer = page.locator(".drawer-panel-open");
   await drawer.locator(".drawer-title", { hasText: "节点A" }).waitFor();
   await drawer.getByText("这是节点A的正文").waitFor();
-  assert.equal(await page.locator(".graph-selection-panel").count(), 0, "mobile should not use the old floating canvas panel");
+  await assertNoViewportOverflow(page, `.drawer reader ${item.name}`);
+  assert.equal(await page.locator(".graph-selection-panel").count(), 0, `${item.name} should not use the old floating canvas panel`);
+
+  if (artifactDir) {
+    await page.screenshot({ path: path.join(artifactDir, `stage-4.5-workbench-${item.name}.png`), fullPage: true });
+  }
 
   await page.keyboard.press("Escape");
   await page.waitForSelector(".drawer-panel-open", { state: "detached" });
-  await expectNoPressedNodes(page, "mobile Escape should clear the graph reader highlight");
+  await expectNoPressedNodes(page, `${item.name} Escape should clear the graph reader highlight`);
 
   await page.keyboard.down("Shift");
   await page.locator(".node[data-id='A']").click();
@@ -420,8 +456,43 @@ async function runWorkbenchMobileChecks(browser) {
   await page.waitForSelector(".drawer-panel-open");
   await drawer.locator(".drawer-title", { hasText: "选区" }).waitFor();
   await drawer.getByText("Shift+点击 增删节点").waitFor();
+  await assertNoViewportOverflow(page, `.drawer selection ${item.name}`);
 
   await page.keyboard.press("Escape");
   await page.waitForSelector(".drawer-panel-open", { state: "detached" });
-  await expectNoPressedNodes(page, "mobile Escape should clear the selection drawer and graph highlights");
+  await expectNoPressedNodes(page, `${item.name} Escape should clear the selection drawer and graph highlights`);
+}
+
+async function runPreviewCheck(page, message) {
+  const node = page.locator(".node[data-id='A']");
+  await node.hover();
+  await page.waitForSelector(".graph-hover-preview[data-state='open']");
+  const preview = page.locator(".graph-hover-preview");
+  await preview.locator(".graph-hover-preview-title").waitFor();
+  await preview.locator(".graph-hover-preview-type").waitFor();
+  await assertBoxInsideViewport(page, ".graph-hover-preview", message);
+  await page.mouse.move(20, 20);
+  await waitForPreviewState(page, "closed");
+}
+
+async function waitForPreviewState(page, state) {
+  await page.waitForFunction((state) => {
+    return document.querySelector(".graph-hover-preview")?.dataset.state === state;
+  }, state);
+}
+
+async function assertNoViewportOverflow(page, label) {
+  await assertBoxInsideViewport(page, ".drawer-panel-open", label);
+  await assertBoxInsideViewport(page, "[data-llm-wiki-graph-root='true']", label);
+}
+
+async function assertBoxInsideViewport(page, selector, label) {
+  const box = await page.locator(selector).boundingBox();
+  assert.ok(box, `${label}: ${selector} should have a bounding box`);
+  const viewport = page.viewportSize();
+  assert.ok(viewport, `${label}: viewport should be available`);
+  assert.ok(box.x >= -1, `${label}: ${selector} should not overflow left`);
+  assert.ok(box.y >= -1, `${label}: ${selector} should not overflow top`);
+  assert.ok(box.x + box.width <= viewport.width + 1, `${label}: ${selector} should not overflow right`);
+  assert.ok(box.y + box.height <= viewport.height + 1, `${label}: ${selector} should not overflow bottom`);
 }
