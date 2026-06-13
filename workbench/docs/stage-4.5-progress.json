@@ -2,9 +2,9 @@
   "plan": "workbench/docs/stage-4.5-plan.md",
   "status": {
     "phase": "phase-3",
-    "task": "3.1",
+    "task": "3.2",
     "overall": "in_progress",
-    "next_allowed_action": "Run git log --oneline -15 and npm run test -w @llm-wiki/graph-engine before implementing work unit 3.1."
+    "next_allowed_action": "Run git log --oneline -15 and npm run test -w @llm-wiki/graph-engine before implementing work unit 3.2."
   },
   "execution_rules": {
     "branch": "codex/feat-stage-4-5-graph-usability",
@@ -358,9 +358,16 @@
         {
           "id": "3.1",
           "title": "Add graph-scoped search UI.",
-          "status": "pending",
-          "verification": [],
-          "commit": null
+          "status": "completed",
+          "verification": [
+            "RED: node --import tsx --test packages/graph-engine/test/search-and-legend.test.ts failed because ../src/render did not export resolveGraphSearchState.",
+            "GREEN: node --import tsx --test packages/graph-engine/test/search-and-legend.test.ts exited 0 with 2 tests passing for search matches, faded non-matches, empty-query reset, and cached index reuse.",
+            "npm run test -w @llm-wiki/graph-engine exited 0 with 130 tests passing.",
+            "npm run typecheck -w @llm-wiki/graph-engine exited 0.",
+            "npm run build -w @llm-wiki/graph-engine exited 0.",
+            "bash tests/graph-html-search.regression-1.sh exited 0 and now asserts the new graph-scoped search UI, node search-state styling, and shared search helpers are present while the old cockpit search UI remains absent."
+          ],
+          "commit": "6745f98"
         },
         {
           "id": "3.2",
@@ -525,6 +532,10 @@
     {
       "timestamp": "2026-06-13",
       "entry": "Work unit 2.3 split graph read and selection routing. Plain node click emits open-page metadata and highlights the node; Shift/community selection emits selection-change separately; clearInteraction/Esc clears graph-local interaction without resetting viewport. Verification passed: graph-engine tests/typecheck, workbench web tests, web build, and offline browser regression."
+    },
+    {
+      "timestamp": "2026-06-13",
+      "entry": "Work unit 3.1 added graph-scoped search UI. Cmd/Ctrl+F opens graph search only while graph focus is active, blank graph pointerdown focuses the graph root, queries reuse the shared search helpers, matching nodes are highlighted, non-matches fade, and empty query restores all node states. Verification passed: graph-engine search test, graph-engine full test suite, graph-engine typecheck, graph-engine build, and graph-html-search regression."
     }
   ]
 }
