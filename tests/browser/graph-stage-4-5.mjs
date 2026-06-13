@@ -84,6 +84,8 @@ async function runOfflineChecks(browser) {
     "clearing graph interaction should not reset the viewport transform"
   );
 
+  await runSearchKeyboardChecks(page, "offline graph search should support shortcut, cycling, focus, and Escape");
+
   if (artifactDir) {
     await page.screenshot({ path: path.join(artifactDir, "stage-4.5-offline-navigation.png"), fullPage: true });
   }
@@ -164,6 +166,69 @@ async function expectNoPressedNodes(page, message) {
   assert.equal(pressed, 0, message);
 }
 
+async function runSearchKeyboardChecks(page, message) {
+  const root = page.locator("[data-llm-wiki-graph-root='true']");
+  await root.click({ position: { x: 24, y: 24 } });
+  await root.evaluate((element) => element.focus({ preventScroll: true }));
+  await page.keyboard.press(searchShortcut());
+  await waitForSearchState(page, "open");
+
+  const input = page.locator(".graph-search-input");
+  await input.fill("节点");
+  await page.waitForSelector('.node[data-search-state="match"]');
+  const matches = await page.locator('.node[data-search-state="match"]').count();
+  assert.ok(matches >= 2, `${message}: query should match multiple nodes`);
+  assert.equal(
+    await page.locator('.node[data-search-state="faded"]').count(),
+    0,
+    `${message}: broad query should not fade matching fixture nodes`
+  );
+
+  const beforeFocus = await layerTransform(page);
+  await input.press("Enter");
+  await page.waitForSelector('.node[data-search-focus="true"]');
+  const firstFocus = await focusedSearchNodeId(page);
+  await input.press("Enter");
+  await page.waitForFunction((previous) => {
+    const focused = document.querySelector('.node[data-search-focus="true"]');
+    return Boolean(focused && focused.dataset.id && focused.dataset.id !== previous);
+  }, firstFocus);
+  const secondFocus = await focusedSearchNodeId(page);
+  assert.notEqual(secondFocus, firstFocus, `${message}: Enter should cycle to another result`);
+  assert.notEqual(
+    await waitForLayerTransform(page, beforeFocus),
+    beforeFocus,
+    `${message}: Enter should move the viewport to the focused result`
+  );
+
+  await input.press("Escape");
+  await waitForSearchState(page, "closed");
+  assert.equal(
+    await page.locator('.node[data-search-state="match"], .node[data-search-state="faded"]').count(),
+    0,
+    `${message}: Escape should restore search visual state`
+  );
+  assert.equal(
+    await page.locator('.node[data-search-focus="true"]').count(),
+    0,
+    `${message}: Escape should clear the focused search result`
+  );
+}
+
+async function focusedSearchNodeId(page) {
+  return page.locator('.node[data-search-focus="true"]').evaluate((element) => element.dataset.id || "");
+}
+
+function searchShortcut() {
+  return process.platform === "darwin" ? "Meta+F" : "Control+F";
+}
+
+async function waitForSearchState(page, state) {
+  await page.waitForFunction((state) => {
+    return document.querySelector(".graph-search")?.dataset.state === state;
+  }, state);
+}
+
 async function runWorkbenchChecks(browser) {
   assert.notEqual(workbenchUrl, "", "GRAPH_STAGE_4_5_WORKBENCH_URL must point at the workbench dev server");
   const page = await browser.newPage({ viewport: { width: 1440, height: 960 } });
@@ -176,6 +241,7 @@ async function runWorkbenchChecks(browser) {
   }
   await page.getByRole("button", { name: /图谱/ }).click();
   await page.waitForSelector("[data-llm-wiki-graph-root='true']");
+  await runSearchKeyboardChecks(page, "workbench graph search should support shortcut, cycling, focus, and Escape");
   await page.locator(".node[data-id='A']").click();
 
   await page.waitForSelector(".drawer-panel-open");

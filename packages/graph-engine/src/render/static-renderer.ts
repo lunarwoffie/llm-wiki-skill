@@ -26,6 +26,7 @@ import {
 import {
   DEFAULT_RENDERER_VIEWPORT,
   applyRendererViewportTransform,
+  centerRendererViewportOnPoint,
   createViewportFrameCommitter,
   fitRendererViewportToPoints,
   panRendererViewport,
@@ -33,7 +34,7 @@ import {
   viewportAfterWheelZoom,
   type RendererViewport
 } from "./viewport";
-import { resolveGraphSearchState } from "./search";
+import { resolveGraphSearchState, resolveNextGraphSearchFocus } from "./search";
 
 interface StaticRendererOptions {
   data: GraphData;
@@ -93,6 +94,7 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
   let activeDiff: GraphDiff | null = null;
   let searchOpen = false;
   let searchQuery = "";
+  let searchFocusedNodeId: NodeId | null = null;
   let searchIndex: ReturnType<typeof resolveGraphSearchState>["searchIndex"] | undefined;
   const pathCache = createRenderPathCache();
   const root = document.createElement("div");
@@ -107,6 +109,12 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
     if ((event.metaKey || event.ctrlKey) && key === "f" && isGraphFocusActive()) {
       event.preventDefault();
       openSearch();
+      return;
+    }
+    if (event.key === "Escape" && (searchOpen || searchQuery || searchFocusedNodeId)) {
+      event.preventDefault();
+      event.stopPropagation();
+      closeSearch();
       return;
     }
     if (event.key !== "Escape" || !hasInteractionState()) return;
@@ -260,6 +268,7 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
     manualNodeIds = [];
     selection = null;
     selectedNodeId = null;
+    searchFocusedNodeId = null;
     delete root.dataset.focus;
     render({ selectedNodeId: null, selection: null });
   }
@@ -288,7 +297,9 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
       open: searchOpen,
       query: searchQuery,
       onOpen: () => openSearch(),
-      onQuery: (query) => applySearchQuery(query)
+      onQuery: (query) => applySearchQuery(query),
+      onNext: () => focusNextSearchResult(),
+      onClose: () => closeSearch()
     });
     dom.searchElement = control.element;
     dom.searchInput = control.input;
@@ -298,20 +309,54 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
   }
 
   function applySearchQuery(query: string): void {
+    if (query !== searchQuery) searchFocusedNodeId = null;
     searchQuery = query;
     const state = resolveGraphSearchState(data.nodes, searchQuery, searchIndex);
     searchIndex = state.searchIndex;
     root.dataset.searchActive = state.query ? "true" : "false";
     root.dataset.searchQuery = state.query;
+    if (!state.matchIds.includes(searchFocusedNodeId || "")) searchFocusedNodeId = null;
     for (const node of state.nodes) {
       const element = dom.nodeElements.get(node.id);
       if (!element) continue;
       element.dataset.searchState = node.searchState;
+      element.dataset.searchFocus = node.id === searchFocusedNodeId ? "true" : "false";
     }
     if (dom.searchInput && dom.searchInput.value !== searchQuery) dom.searchInput.value = searchQuery;
     if (dom.searchStatusElement) {
-      dom.searchStatusElement.textContent = state.query ? `${state.matchIds.length} 个结果` : "输入关键词";
+      const focusedIndex = searchFocusedNodeId ? state.matchIds.indexOf(searchFocusedNodeId) : -1;
+      dom.searchStatusElement.textContent = state.query
+        ? focusedIndex >= 0
+          ? `${focusedIndex + 1}/${state.matchIds.length}`
+          : `${state.matchIds.length} 个结果`
+        : "输入关键词";
     }
+  }
+
+  function focusNextSearchResult(): void {
+    const state = resolveGraphSearchState(data.nodes, searchQuery, searchIndex);
+    searchIndex = state.searchIndex;
+    const next = resolveNextGraphSearchFocus(state.matchIds, searchFocusedNodeId);
+    searchFocusedNodeId = next.id;
+    if (!next.id) {
+      applySearchQuery(searchQuery);
+      return;
+    }
+    const node = graph.nodes.find((item) => item.id === next.id);
+    if (node) {
+      setViewportAnimating(true);
+      viewportCommitter.schedule(centerRendererViewportOnPoint(node.point, viewport, viewportSize()));
+    }
+    applySearchQuery(searchQuery);
+  }
+
+  function closeSearch(): void {
+    searchOpen = false;
+    searchFocusedNodeId = null;
+    if (dom.searchElement) dom.searchElement.dataset.state = "closed";
+    root.dataset.searchOpen = "false";
+    applySearchQuery("");
+    root.focus({ preventScroll: true });
   }
 
   function restartSimulation(): void {
@@ -937,6 +982,8 @@ function createSearchControl(
     query: string;
     onOpen: () => void;
     onQuery: (query: string) => void;
+    onNext: () => void;
+    onClose: () => void;
   }
 ): { element: HTMLElement; input: HTMLInputElement; status: HTMLElement } {
   const element = ownerDocument.createElement("div");
@@ -950,6 +997,17 @@ function createSearchControl(
   input.value = options.query;
   input.addEventListener("focus", options.onOpen);
   input.addEventListener("input", () => options.onQuery(input.value));
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      options.onNext();
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      options.onClose();
+    }
+  });
   const status = ownerDocument.createElement("span");
   status.className = "graph-search-status";
   status.textContent = options.query ? "0 个结果" : "输入关键词";
@@ -1179,6 +1237,10 @@ const STATIC_RENDERER_CSS = `
 .node[data-search-state="match"] {
   border-color: color-mix(in srgb, var(--cinnabar) 78%, transparent);
   box-shadow: 0 16px 28px color-mix(in srgb, var(--cinnabar) 15%, transparent), 0 0 0 4px color-mix(in srgb, var(--cinnabar) 9%, transparent);
+}
+.node[data-search-focus="true"] {
+  outline: 3px solid color-mix(in srgb, var(--cinnabar) 68%, transparent);
+  outline-offset: 4px;
 }
 .node[data-search-state="faded"] {
   opacity: .28;

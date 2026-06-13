@@ -23,11 +23,12 @@ export type {
 } from "./model";
 export { createStaticGraphRenderer } from "./static-renderer";
 export type { StaticGraphRenderer } from "./static-renderer";
-export { resolveGraphSearchState } from "./search";
-export type { GraphSearchNodeState, GraphSearchNodeView, GraphSearchState } from "./search";
+export { resolveGraphSearchState, resolveNextGraphSearchFocus } from "./search";
+export type { GraphSearchFocus, GraphSearchNodeState, GraphSearchNodeView, GraphSearchState } from "./search";
 export {
   DEFAULT_RENDERER_VIEWPORT,
   applyRendererViewportTransform,
+  centerRendererViewportOnPoint,
   createViewportFrameCommitter,
   fitRendererViewportToPoints,
   normalizeRendererViewport,

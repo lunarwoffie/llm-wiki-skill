@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   buildRenderableGraph,
+  centerRendererViewportOnPoint,
   createViewportFrameCommitter,
   fitRendererViewportToPoints,
   normalizeWheelDelta,
@@ -87,6 +88,17 @@ describe("renderer viewport state", () => {
     assert.ok(fitted.scale >= 0.5);
     assert.ok(fitted.scale <= 4);
     assert.notDeepEqual(fitted, { x: 0, y: 0, scale: 1 });
+  });
+
+  it("centers a model point while preserving the current zoom scale", () => {
+    const centered = centerRendererViewportOnPoint(
+      { x: 500, y: 340 },
+      { x: -20, y: -30, scale: 2 },
+      { width: 1000, height: 680 }
+    );
+
+    assert.equal(centered.scale, 2);
+    assert.deepEqual(centered, { x: -500, y: -340, scale: 2 });
   });
 
   it("maps the current viewport to a minimap rectangle", () => {

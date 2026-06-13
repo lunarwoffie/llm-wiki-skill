@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { resolveGraphSearchState } from "../src/render";
+import { resolveGraphSearchState, resolveNextGraphSearchFocus } from "../src/render";
 import type { GraphNode } from "../src/types";
 
 describe("graph scoped search", () => {
@@ -24,6 +24,13 @@ describe("graph scoped search", () => {
     assert.equal(second.searchIndex, first.searchIndex);
     assert.deepEqual(second.matchIds, ["A", "B", "C"]);
     assert.deepEqual(second.nodes.map((node) => node.searchState), ["none", "none", "none"]);
+  });
+
+  it("cycles focus through search matches and handles empty results", () => {
+    assert.deepEqual(resolveNextGraphSearchFocus(["A", "B", "C"], null), { id: "A", index: 0 });
+    assert.deepEqual(resolveNextGraphSearchFocus(["A", "B", "C"], "A"), { id: "B", index: 1 });
+    assert.deepEqual(resolveNextGraphSearchFocus(["A", "B", "C"], "C"), { id: "A", index: 0 });
+    assert.deepEqual(resolveNextGraphSearchFocus([], "A"), { id: null, index: -1 });
   });
 });
 

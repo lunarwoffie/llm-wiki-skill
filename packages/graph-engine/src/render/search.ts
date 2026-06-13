@@ -15,6 +15,11 @@ export interface GraphSearchState {
   searchIndex: Array<{ node: GraphNode; haystack: string }>;
 }
 
+export interface GraphSearchFocus {
+  id: NodeId | null;
+  index: number;
+}
+
 export function resolveGraphSearchState(
   nodes: GraphNode[],
   query: string,
@@ -33,4 +38,11 @@ export function resolveGraphSearchState(
     })),
     searchIndex
   };
+}
+
+export function resolveNextGraphSearchFocus(matchIds: NodeId[], currentId: NodeId | null | undefined): GraphSearchFocus {
+  if (!matchIds.length) return { id: null, index: -1 };
+  const currentIndex = currentId ? matchIds.indexOf(currentId) : -1;
+  const nextIndex = (currentIndex + 1) % matchIds.length;
+  return { id: matchIds[nextIndex], index: nextIndex };
 }

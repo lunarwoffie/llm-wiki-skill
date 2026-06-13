@@ -1,4 +1,4 @@
-import { atlasViewportToMinimapRect, clampAtlasViewport, fitAtlasViewport, zoomAtlasViewport } from "../model";
+import { atlasViewportToMinimapRect, centerAtlasViewportOnPoint, clampAtlasViewport, fitAtlasViewport, zoomAtlasViewport } from "../model";
 
 export interface RendererViewport {
   x: number;
@@ -119,6 +119,16 @@ export function fitRendererViewportToPoints(
     padding: 0.82,
     ...viewportOptions(options)
   }) as RendererViewport;
+}
+
+export function centerRendererViewportOnPoint(
+  point: RendererPoint,
+  viewport: Partial<RendererViewport> | null | undefined,
+  viewportSize: RendererViewportSize,
+  options: RendererViewportOptions = {}
+): RendererViewport {
+  const safe = normalizeRendererViewport(viewport);
+  return centerAtlasViewportOnPoint(point, viewportSize, safe.scale, viewportOptions(options)) as RendererViewport;
 }
 
 export function rendererViewportToMinimapRect(
