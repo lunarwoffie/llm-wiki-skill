@@ -3,8 +3,8 @@
   "status": {
     "phase": "phase-5",
     "task": "5.4",
-    "overall": "in_progress",
-    "next_allowed_action": "Run git log --oneline -15 and npm run test -w @llm-wiki/graph-engine before implementing work unit 5.4."
+    "overall": "completed",
+    "next_allowed_action": "Stage 4.5 complete. Report results without pushing, merging, or amending."
   },
   "execution_rules": {
     "branch": "codex/feat-stage-4-5-graph-usability",
@@ -501,7 +501,7 @@
       "id": "phase-5",
       "title": "Integration, Offline HTML, Themes, And Release Docs",
       "goal": "Prove the complete graph experience across workbench, offline HTML, themes, and viewports.",
-      "status": "pending",
+      "status": "completed",
       "acceptance": [
         "`npm run typecheck` exits 0.",
         "`npm run build -w @llm-wiki-agent/web` exits 0.",
@@ -516,8 +516,23 @@
         "Browser verification evidence is recorded for all named viewports and both themes.",
         "Final residual risk is recorded."
       ],
-      "evidence": [],
-      "commit": null,
+      "evidence": [
+        "npm run typecheck exited 0 during work unit 5.3 full verification.",
+        "npm run build -w @llm-wiki-agent/web exited 0 during work unit 5.3 full verification with only the existing Vite chunk-size warning.",
+        "npm run test -w @llm-wiki/graph-engine exited 0 with 138 tests passing before work unit 5.4 documentation updates.",
+        "node --import tsx --test workbench/web/test/*.test.ts exited 0 with 9 tests passing during work unit 5.3 full verification.",
+        "node --import tsx --test workbench/server/src/*.test.ts workbench/server/src/digest/*.test.ts exited 0 with 19 tests passing during work unit 5.3 full verification.",
+        "bash tests/graph-browser-stage-4-5.regression-1.sh --target workbench exited 0 during work units 5.2 and 5.3, covering 1440 x 960, 768 x 1024, and 390 x 844 in light/shan-shui and dark/mo-ye themes.",
+        "bash tests/graph-browser-stage-4-5.regression-1.sh --target offline exited 0 during work units 5.1, 5.2, and 5.3, covering offline reader metadata, no ask buttons, search, legend reload persistence, navigation, hover/dense behavior, and localStorage pins after reload.",
+        "bash tests/regression.sh exited 0 during work unit 5.3 with All regression checks passed.",
+        "bash install.sh --dry-run --platform codex exited 0 during work unit 5.3 and again after work unit 5.4 documentation/version updates.",
+        "Privacy scan command `if grep -r '/Users/kangjiaqi\\|康佳琦' scripts/ templates/ tests/ SKILL.md; then exit 1; else exit 0; fi` exited 0 during work unit 5.3 and again after work unit 5.4 documentation/version updates.",
+        "Browser verification evidence is recorded under workbench/docs/stage-4.5-artifacts for desktop, tablet, and mobile workbench theme matrix screenshots plus offline navigation and dense-wheel evidence.",
+        "rg -n \"学习队列|从这里开始|札记笔记\" README.md CHANGELOG.md workbench/docs/stage-4.5-plan.md was reviewed after docs updates: README has no matches; CHANGELOG matches are historical entries only; the plan match is the verification command itself.",
+        "README.md and README.en.md now describe the shipped stage 4.5 graph experience, CHANGELOG.md has v3.6.3 dated 2026-06-13, and SKILL.md version is 3.6.3.",
+        "Final residual risk is recorded in residual_risk."
+      ],
+      "commit": "77a6935",
       "tasks": [
         {
           "id": "5.1",
@@ -575,14 +590,23 @@
         {
           "id": "5.4",
           "title": "Update docs and release notes if code changed behavior.",
-          "status": "pending",
-          "verification": [],
-          "commit": null
+          "status": "completed",
+          "verification": [
+            "npm run test -w @llm-wiki/graph-engine exited 0 with 138 tests passing before work unit 5.4 implementation.",
+            "rg -n \"学习队列|从这里开始|札记笔记\" README.md CHANGELOG.md workbench/docs/stage-4.5-plan.md exited 0 and output was reviewed: README has no matches; CHANGELOG matches are historical release notes; the plan match is the verification instruction.",
+            "bash install.sh --dry-run --platform codex exited 0 after README, CHANGELOG, README.en, and SKILL version updates.",
+            "Privacy scan command `if grep -r '/Users/kangjiaqi\\|康佳琦' scripts/ templates/ tests/ SKILL.md; then exit 1; else exit 0; fi` exited 0 after documentation/version updates.",
+            "git diff --check README.md README.en.md CHANGELOG.md SKILL.md exited 0 before committing the work unit."
+          ],
+          "commit": "77a6935"
         }
       ]
     }
   ],
-  "residual_risk": [],
+  "residual_risk": [
+    "The web build still reports the existing Vite chunk-size warning, but the build exits 0 and full regression passed.",
+    "Browser verification uses representative stage 4.5 fixtures rather than a user's real large knowledge base."
+  ],
   "turn_log": [
     {
       "timestamp": "2026-06-13",
@@ -671,6 +695,14 @@
     {
       "timestamp": "2026-06-13",
       "entry": "Work unit 5.3 ran full project verification. Initial full regression failed because graph-html-a11y was asserting a stale minified renderer snippet; reader close now uses the shared clearInteractionState path and the regression checks that stable source contract. Verification passed: graph-engine tests, npm run typecheck, web build, workbench web tests, workbench server tests, offline/workbench browser regressions, full tests/regression.sh, Codex install dry-run, and privacy scan."
+    },
+    {
+      "timestamp": "2026-06-13",
+      "entry": "Work unit 5.4 updated release-facing docs for the shipped stage 4.5 graph behavior. README current-feature wording no longer describes removed learning queue/path/notes as current graph features; CHANGELOG has v3.6.3 dated 2026-06-13; README.en badge/text and SKILL.md version were aligned. Verification passed: graph-engine smoke test, release-wording rg review, Codex install dry-run, privacy scan, and diff check."
+    },
+    {
+      "timestamp": "2026-06-13",
+      "entry": "Phase 5 and Stage 4.5 acceptance completed. Full verification evidence is recorded, browser viewport/theme evidence is recorded, final residual risk is recorded, and no push, merge, or amend was performed."
     }
   ]
 }
