@@ -21,15 +21,37 @@ try {
 
   await node.hover();
   await assertNodeDetailDisplay(node, "block", "flex", "hovered card node should expose type and weight details");
+  await page.waitForSelector(".graph-hover-preview[data-state='open']");
+  const preview = page.locator(".graph-hover-preview");
+  await preview.locator(".graph-hover-preview-title", { hasText: /^节点A$/ }).waitFor();
+  await preview.getByText("实体").waitFor();
+  await preview.getByText("这是节点A的内容。").waitFor();
+  assert.equal(await preview.locator(".graph-hover-preview-summary").count(), 1, "content nodes should show a preview summary");
 
   await page.mouse.move(20, 20);
+  await waitForPreviewState(page, "closed");
   await assertNodeDetailDisplay(node, "none", "none", "card node details should hide again after hover leaves");
 
   await node.click();
   await page.waitForSelector(".graph-reader[data-state='open']");
   await assertNodeDetailDisplay(node, "block", "flex", "selected card node should expose type and weight details");
+
+  const emptyNode = page.locator(".node[data-id='empty-preview']");
+  if (await emptyNode.count()) {
+    await emptyNode.hover();
+    await page.waitForSelector(".graph-hover-preview[data-state='open']");
+    await preview.locator(".graph-hover-preview-title", { hasText: /^空内容节点$/ }).waitFor();
+    await preview.getByText("主题").waitFor();
+    assert.equal(await preview.locator(".graph-hover-preview-summary").count(), 0, "empty content nodes should omit summary text");
+  }
 } finally {
   await browser.close();
+}
+
+async function waitForPreviewState(page, state) {
+  await page.waitForFunction((state) => {
+    return document.querySelector(".graph-hover-preview")?.dataset.state === state;
+  }, state);
 }
 
 async function assertNodeDetailDisplay(node, expectedKind, expectedMeta, message) {

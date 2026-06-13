@@ -37,6 +37,7 @@ import {
   type RendererViewport
 } from "./viewport";
 import { resolveGraphSearchState, resolveNextGraphSearchFocus } from "./search";
+import { buildHoverPreview, type GraphHoverPreview } from "./preview";
 
 interface StaticRendererOptions {
   data: GraphData;
@@ -83,6 +84,7 @@ interface PaintedGraphDom {
   searchStatusElement: HTMLElement | null;
   legendElement: HTMLElement | null;
   legendRows: Map<string, HTMLButtonElement>;
+  previewElement: HTMLElement | null;
 }
 
 export function createStaticGraphRenderer(container: HTMLElement, options: StaticRendererOptions): StaticGraphRenderer {
@@ -102,6 +104,8 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
   let searchFocusedNodeId: NodeId | null = null;
   let searchIndex: ReturnType<typeof resolveGraphSearchState>["searchIndex"] | undefined;
   let hoveredCommunityId: string | null = null;
+  let previewNodeId: NodeId | null = null;
+  let previewTimer: ReturnType<typeof setTimeout> | null = null;
   const pathCache = createRenderPathCache();
   const root = document.createElement("div");
   root.className = "llm-wiki-graph-engine";
@@ -201,6 +205,12 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
         markPinnedNodes(nextState.pinnedNodeIds);
         void options.persistPins?.(nextState.pins);
         return true;
+      },
+      onNodePreviewEnter: (id) => {
+        scheduleHoverPreview(id);
+      },
+      onNodePreviewLeave: () => {
+        clearHoverPreview();
       }
     });
     mountSearchControl();
@@ -211,6 +221,7 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
     if (activeDiff && root.dataset.diffState === "playing") markDiffElements(activeDiff);
     renderReader();
     renderSelectionPanel();
+    renderHoverPreview();
     restartSimulation();
   }
 
@@ -260,6 +271,7 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
       simulation?.destroy();
       simulation = null;
       ownerDocument.removeEventListener("keydown", handleDocumentKeydown);
+      if (previewTimer) clearTimeout(previewTimer);
       pathCache.clear();
       root.remove();
     }
@@ -275,6 +287,11 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
     selectedNodeId = null;
     searchFocusedNodeId = null;
     hoveredCommunityId = null;
+    previewNodeId = null;
+    if (previewTimer) {
+      clearTimeout(previewTimer);
+      previewTimer = null;
+    }
     delete root.dataset.focus;
     render({ selectedNodeId: null, selection: null });
   }
@@ -479,6 +496,7 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
     }
     renderReader();
     renderSelectionPanel();
+    renderHoverPreview();
   }
 
   function markPinnedNodes(pinnedNodeIds: string[]): void {
@@ -790,6 +808,39 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
 
     panel.append(header, hint, facts, list);
   }
+
+  function scheduleHoverPreview(id: NodeId): void {
+    if (previewTimer) clearTimeout(previewTimer);
+    previewTimer = setTimeout(() => {
+      previewTimer = null;
+      previewNodeId = id;
+      renderHoverPreview();
+    }, 300);
+  }
+
+  function clearHoverPreview(): void {
+    if (previewTimer) {
+      clearTimeout(previewTimer);
+      previewTimer = null;
+    }
+    if (!previewNodeId) return;
+    previewNodeId = null;
+    renderHoverPreview();
+  }
+
+  function renderHoverPreview(): void {
+    const preview = dom.previewElement;
+    if (!preview) return;
+    const rawNode = previewNodeId ? data.nodes.find((node) => node.id === previewNodeId) : null;
+    const renderedNode = previewNodeId ? graph.nodes.find((node) => node.id === previewNodeId) : null;
+    preview.replaceChildren();
+    preview.dataset.state = rawNode && renderedNode ? "open" : "closed";
+    if (!rawNode || !renderedNode) return;
+    const content = buildHoverPreview(rawNode);
+    preview.style.left = `${renderedNode.x}%`;
+    preview.style.top = `${renderedNode.y}%`;
+    preview.append(createHoverPreviewContent(content));
+  }
 }
 
 interface DragHandlers {
@@ -799,6 +850,8 @@ interface DragHandlers {
   onDragMove: (id: string, event: PointerEvent) => void;
   onDragEnd: (id: string, event: PointerEvent) => void;
   onNodeDoubleClick: (id: string) => boolean;
+  onNodePreviewEnter: (id: NodeId) => void;
+  onNodePreviewLeave: () => void;
 }
 
 function paint(
@@ -874,6 +927,13 @@ function paint(
   contentLayer.appendChild(nodeLayer);
   root.appendChild(contentLayer);
 
+  const preview = document.createElement("aside");
+  preview.className = "graph-hover-preview";
+  preview.dataset.state = "closed";
+  preview.setAttribute("aria-live", "polite");
+  root.appendChild(preview);
+  painted.previewElement = preview;
+
   const minimap = document.createElement("div");
   minimap.className = "mini-map";
   const miniSvg = document.createElementNS(SVG_NS, "svg");
@@ -922,6 +982,25 @@ function paint(
   return painted;
 }
 
+function createHoverPreviewContent(preview: GraphHoverPreview): HTMLElement {
+  const article = document.createElement("article");
+  article.className = "graph-hover-preview-card";
+  const type = document.createElement("div");
+  type.className = "graph-hover-preview-type";
+  type.textContent = preview.typeLabel;
+  const title = document.createElement("div");
+  title.className = "graph-hover-preview-title";
+  title.textContent = preview.title;
+  article.append(type, title);
+  if (preview.summary) {
+    const summary = document.createElement("p");
+    summary.className = "graph-hover-preview-summary";
+    summary.textContent = preview.summary;
+    article.appendChild(summary);
+  }
+  return article;
+}
+
 function createSelectionFact(label: string, value: number): HTMLElement {
   const item = document.createElement("div");
   item.className = "graph-selection-fact";
@@ -962,6 +1041,10 @@ function createNodeButton(node: RenderableNode, dragHandlers: DragHandlers): HTM
     event.stopPropagation();
     dragHandlers.onNodeDoubleClick(node.id);
   });
+  button.addEventListener("pointerenter", () => dragHandlers.onNodePreviewEnter(node.id));
+  button.addEventListener("pointerleave", () => dragHandlers.onNodePreviewLeave());
+  button.addEventListener("focus", () => dragHandlers.onNodePreviewEnter(node.id));
+  button.addEventListener("blur", () => dragHandlers.onNodePreviewLeave());
   bindDragHandlers(button, node.id, dragHandlers);
 
   const kind = document.createElement("span");
@@ -1240,7 +1323,8 @@ function emptyPaintedDom(): PaintedGraphDom {
     searchInput: null,
     searchStatusElement: null,
     legendElement: null,
-    legendRows: new Map()
+    legendRows: new Map(),
+    previewElement: null
   };
 }
 
@@ -1607,6 +1691,57 @@ const STATIC_RENDERER_CSS = `
   position: absolute;
   inset: 0;
   z-index: 3;
+}
+.graph-hover-preview {
+  position: absolute;
+  z-index: 9;
+  width: min(300px, calc(100% - 32px));
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(18px, calc(-100% - 18px));
+  transition: opacity .14s ease, transform .14s ease;
+}
+.graph-hover-preview[data-state="open"] {
+  opacity: 1;
+  transform: translate(18px, calc(-100% - 24px));
+}
+.graph-hover-preview-card {
+  border: 1px solid color-mix(in srgb, var(--rule) 74%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  box-shadow: 0 18px 34px rgba(36, 31, 26, .16);
+  padding: 11px 12px;
+}
+.llm-wiki-graph-engine[data-theme="mo-ye"] .graph-hover-preview-card {
+  border-color: color-mix(in srgb, var(--line) 38%, transparent);
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  box-shadow: 0 18px 36px rgba(0, 0, 0, .38);
+}
+.graph-hover-preview-type {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.2;
+}
+.graph-hover-preview-title {
+  margin-top: 3px;
+  overflow: hidden;
+  color: var(--ink);
+  font-family: var(--font-serif);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.graph-hover-preview-summary {
+  display: -webkit-box;
+  margin: 7px 0 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
 }
 .node {
   position: absolute;

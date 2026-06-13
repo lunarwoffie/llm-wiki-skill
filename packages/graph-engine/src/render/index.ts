@@ -27,6 +27,8 @@ export { createStaticGraphRenderer } from "./static-renderer";
 export type { StaticGraphRenderer } from "./static-renderer";
 export { resolveGraphSearchState, resolveNextGraphSearchFocus } from "./search";
 export type { GraphSearchFocus, GraphSearchNodeState, GraphSearchNodeView, GraphSearchState } from "./search";
+export { buildHoverPreview, firstUsefulParagraph, previewSummary } from "./preview";
+export type { GraphHoverPreview } from "./preview";
 export {
   DEFAULT_RENDERER_VIEWPORT,
   applyRendererViewportTransform,

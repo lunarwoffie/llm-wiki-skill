@@ -22,6 +22,9 @@ test_graph_html_has_truncate_label_markup_hooks() {
     assert_file_contains "$html" "display: none;"
     assert_file_contains "$html" ".node:hover .node-kind"
     assert_file_contains "$html" ".node:hover .node-meta"
+    assert_file_contains "$html" "graph-hover-preview"
+    assert_file_contains "$html" "graph-hover-preview-summary"
+    assert_file_contains "$html" "-webkit-line-clamp: 3;"
     assert_file_contains "$html" "graph-reader-body pre"
     assert_file_contains "$html" "overflow-wrap: anywhere;"
 
@@ -36,6 +39,23 @@ test_default_nodes_hide_details_until_hover_or_selection() {
         || fail "graph-engine build should succeed before node slim browser regression"
     build_graph_html_fixture "$tmp_dir"
     html="$tmp_dir/wiki/knowledge-graph.html"
+    node - "$tmp_dir/wiki/graph-data.json" <<'NODE'
+const fs = require("fs");
+const file = process.argv[2];
+const graph = JSON.parse(fs.readFileSync(file, "utf8"));
+graph.nodes.push({
+  id: "empty-preview",
+  label: "空内容节点",
+  type: "topic",
+  community: "t1",
+  content: "",
+  source_path: "/fake/wiki/topics/empty-preview.md"
+});
+graph.meta.total_nodes = graph.nodes.length;
+fs.writeFileSync(file, `${JSON.stringify(graph, null, 2)}\n`);
+NODE
+    bash "$REPO_ROOT/scripts/build-graph-html.sh" "$tmp_dir" > /dev/null 2>&1 \
+        || fail "build-graph-html.sh should succeed on node preview fixture"
     playwright_node_path="$(
         npx --yes -p playwright -c 'node -e "const path=require(\"path\"); console.log(path.dirname(process.env.PATH.split(\":\")[0]))"'
     )"
