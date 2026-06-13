@@ -209,7 +209,7 @@
             "npm run typecheck -w @llm-wiki/graph-engine exited 0.",
             "bash tests/graph-browser-stage-4-5.regression-1.sh --target offline exited 0 and captured workbench/docs/stage-4.5-artifacts/stage-4.5-offline-navigation.png."
           ],
-          "commit": null
+          "commit": "13cd2f6"
         },
         {
           "id": "1.3",
