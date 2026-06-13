@@ -1,10 +1,10 @@
 {
   "plan": "workbench/docs/stage-4.5-plan.md",
   "status": {
-    "phase": "phase-4",
-    "task": "4.3",
+    "phase": "phase-5",
+    "task": "5.1",
     "overall": "in_progress",
-    "next_allowed_action": "Run git log --oneline -15 and npm run test -w @llm-wiki/graph-engine before implementing work unit 4.3."
+    "next_allowed_action": "Run git log --oneline -15 and npm run test -w @llm-wiki/graph-engine before implementing work unit 5.1."
   },
   "execution_rules": {
     "branch": "codex/feat-stage-4-5-graph-usability",
@@ -433,7 +433,7 @@
       "id": "phase-4",
       "title": "Slim Nodes And Hover Preview",
       "goal": "Reduce default node noise while preserving useful preview information on hover.",
-      "status": "pending",
+      "status": "completed",
       "acceptance": [
         "`npm run test -w @llm-wiki/graph-engine` exits 0.",
         "`bash tests/graph-html-density.regression-1.sh` exits 0.",
@@ -441,8 +441,16 @@
         "Browser check on dense fixture proves preview appears for card, compact, and point nodes.",
         "Browser checks at 1440 x 960 and 390 x 844 prove text does not overflow node cards or preview cards."
       ],
-      "evidence": [],
-      "commit": null,
+      "evidence": [
+        "npm run test -w @llm-wiki/graph-engine exited 0 with 138 tests passing.",
+        "bash tests/graph-html-density.regression-1.sh exited 0 and now includes Playwright preview assertions for compact and point nodes on a 240-node dense fixture while preserving the full-card downgrade check.",
+        "bash tests/graph-html-long-label.regression-1.sh exited 0 and proves default card text stays slim, hover/selected details remain available, hover preview opens/closes, and empty-content previews omit summary text.",
+        "bash tests/graph-browser-stage-4-5.regression-1.sh --target offline exited 0 and refreshed 1440 x 960 offline navigation/dense-wheel evidence.",
+        "bash tests/graph-browser-stage-4-5.regression-1.sh --target workbench exited 0 and refreshed workbench reader evidence including mobile drawer behavior.",
+        "npm run typecheck -w @llm-wiki/graph-engine exited 0.",
+        "npm run build -w @llm-wiki/graph-engine exited 0."
+      ],
+      "commit": "a3bf8eb",
       "tasks": [
         {
           "id": "4.1",
@@ -475,9 +483,17 @@
         {
           "id": "4.3",
           "title": "Preserve dense-mode behavior.",
-          "status": "pending",
-          "verification": [],
-          "commit": null
+          "status": "completed",
+          "verification": [
+            "npm run test -w @llm-wiki/graph-engine exited 0 with 138 tests passing before implementation verification.",
+            "bash tests/graph-html-density.regression-1.sh exited 0 and now builds a 240-node dense fixture to prove compact and point nodes open hover previews while the dense graph still avoids rendering every node as a full card.",
+            "bash tests/graph-html-long-label.regression-1.sh exited 0.",
+            "bash tests/graph-browser-stage-4-5.regression-1.sh --target offline exited 0.",
+            "bash tests/graph-browser-stage-4-5.regression-1.sh --target workbench exited 0.",
+            "npm run typecheck -w @llm-wiki/graph-engine exited 0.",
+            "npm run build -w @llm-wiki/graph-engine exited 0."
+          ],
+          "commit": "a3bf8eb"
         }
       ]
     },
@@ -607,6 +623,10 @@
     {
       "timestamp": "2026-06-13",
       "entry": "Work unit 4.2 added hover preview cards. Previews use existing markdown cleanup, pick the first useful paragraph after frontmatter and headings, show title/type with two to three lines of summary, and omit summary for empty content. Verification passed: graph-engine tests/typecheck/build, preview unit tests, long-label browser regression, and offline stage 4.5 browser regression."
+    },
+    {
+      "timestamp": "2026-06-13",
+      "entry": "Work unit 4.3 preserved dense-mode behavior for hover previews. Compact and point nodes now have repeatable browser coverage for preview open behavior, while dense fixtures still downgrade most nodes away from full cards. Verification passed: graph-engine tests/typecheck/build, density regression, long-label regression, and both offline/workbench stage 4.5 browser regressions. Phase 4 acceptance passed."
     }
   ]
 }
