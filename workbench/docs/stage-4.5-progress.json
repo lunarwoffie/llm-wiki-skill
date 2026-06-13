@@ -2,9 +2,9 @@
   "plan": "workbench/docs/stage-4.5-plan.md",
   "status": {
     "phase": "phase-1",
-    "task": "1.2",
+    "task": "1.3",
     "overall": "in_progress",
-    "next_allowed_action": "Run git log --oneline -15 and npm run test -w @llm-wiki/graph-engine before implementing work unit 1.2."
+    "next_allowed_action": "Run git log --oneline -15 and npm run test -w @llm-wiki/graph-engine before implementing work unit 1.3."
   },
   "execution_rules": {
     "branch": "codex/feat-stage-4-5-graph-usability",
@@ -202,8 +202,13 @@
         {
           "id": "1.2",
           "title": "Wire wheel zoom, blank drag pan, and blank double-click fit.",
-          "status": "pending",
-          "verification": [],
+          "status": "completed",
+          "verification": [
+            "RED: npm run test -w @llm-wiki/graph-engine failed because createViewportFrameCommitter and related viewport navigation helpers were not exported.",
+            "GREEN: npm run test -w @llm-wiki/graph-engine exited 0 with 122 tests passing, including wheel delta, pointer-centered zoom, pan, fit, and rAF coalescing checks.",
+            "npm run typecheck -w @llm-wiki/graph-engine exited 0.",
+            "bash tests/graph-browser-stage-4-5.regression-1.sh --target offline exited 0 and captured workbench/docs/stage-4.5-artifacts/stage-4.5-offline-navigation.png."
+          ],
           "commit": null
         },
         {
@@ -431,6 +436,10 @@
     {
       "timestamp": "2026-06-13",
       "entry": "Work unit 1.1 implemented renderer viewport state and a single graph content transform layer. Verification passed: npm run test -w @llm-wiki/graph-engine and npm run typecheck -w @llm-wiki/graph-engine."
+    },
+    {
+      "timestamp": "2026-06-13",
+      "entry": "Work unit 1.2 wired wheel zoom, blank drag pan, blank double-click fit, and rAF-coalesced viewport writes. Verification passed: npm run test -w @llm-wiki/graph-engine, npm run typecheck -w @llm-wiki/graph-engine, and bash tests/graph-browser-stage-4-5.regression-1.sh --target offline."
     }
   ]
 }

@@ -24,7 +24,12 @@ export type { StaticGraphRenderer } from "./static-renderer";
 export {
   DEFAULT_RENDERER_VIEWPORT,
   applyRendererViewportTransform,
+  createViewportFrameCommitter,
+  fitRendererViewportToPoints,
   normalizeRendererViewport,
-  rendererViewportToTransform
+  normalizeWheelDelta,
+  panRendererViewport,
+  rendererViewportToTransform,
+  viewportAfterWheelZoom
 } from "./viewport";
-export type { RendererViewport } from "./viewport";
+export type { RafScheduler, RendererPoint, RendererViewport, RendererViewportOptions, RendererViewportSize, WheelDeltaLike } from "./viewport";

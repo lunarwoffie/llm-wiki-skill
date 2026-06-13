@@ -1,6 +1,14 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { buildRenderableGraph, rendererViewportToTransform } from "../src/render";
+import {
+  buildRenderableGraph,
+  createViewportFrameCommitter,
+  fitRendererViewportToPoints,
+  normalizeWheelDelta,
+  panRendererViewport,
+  rendererViewportToTransform,
+  viewportAfterWheelZoom
+} from "../src/render";
 import type { GraphData, PinMap } from "../src/types";
 
 function sampleGraph(): GraphData {
@@ -43,5 +51,60 @@ describe("renderer viewport state", () => {
       beforeGraph.nodes.map((node) => [node.id, node.point])
     );
     assert.deepEqual(afterGraph.nodes.find((node) => node.id === "a")?.point, { x: 420, y: 210 });
+  });
+
+  it("normalizes pixel, line, and page wheel deltas separately", () => {
+    assert.equal(normalizeWheelDelta({ deltaY: 12, deltaMode: 0 }), 12);
+    assert.equal(normalizeWheelDelta({ deltaY: 2, deltaMode: 1 }), 36);
+    assert.equal(normalizeWheelDelta({ deltaY: 1, deltaMode: 2 }), 720);
+  });
+
+  it("zooms around the pointer and pans without changing scale", () => {
+    const viewport = { x: 0, y: 0, scale: 1 };
+    const zoomed = viewportAfterWheelZoom(
+      viewport,
+      { deltaY: -120, deltaMode: 0 },
+      { x: 250, y: 150 },
+      { width: 1000, height: 680 }
+    );
+    const panned = panRendererViewport(zoomed, { x: 40, y: -25 }, { width: 1000, height: 680 });
+
+    assert.ok(zoomed.scale > 1);
+    assert.ok(zoomed.x < 0, `zoom should move x around pointer, got ${zoomed.x}`);
+    assert.ok(zoomed.y < 0, `zoom should move y around pointer, got ${zoomed.y}`);
+    assert.equal(panned.scale, zoomed.scale);
+    assert.equal(panned.x, zoomed.x + 40);
+    assert.equal(panned.y, zoomed.y - 25);
+  });
+
+  it("fits graph points into the viewport", () => {
+    const fitted = fitRendererViewportToPoints(
+      [{ x: 120, y: 80 }, { x: 880, y: 600 }],
+      { width: 1000, height: 680 }
+    );
+
+    assert.ok(fitted.scale >= 0.5);
+    assert.ok(fitted.scale <= 4);
+    assert.notDeepEqual(fitted, { x: 0, y: 0, scale: 1 });
+  });
+
+  it("coalesces viewport writes to one requestAnimationFrame callback", () => {
+    const callbacks: Array<() => void> = [];
+    const writes: Array<{ x: number; y: number; scale: number }> = [];
+    const committer = createViewportFrameCommitter((viewport) => writes.push(viewport), {
+      requestAnimationFrame(callback) {
+        callbacks.push(callback);
+        return callbacks.length;
+      }
+    });
+
+    committer.schedule({ x: 10, y: 0, scale: 1 });
+    committer.schedule({ x: 20, y: 0, scale: 1 });
+    committer.schedule({ x: 30, y: 0, scale: 1 });
+
+    assert.equal(callbacks.length, 1);
+    assert.deepEqual(writes, []);
+    callbacks[0]();
+    assert.deepEqual(writes, [{ x: 30, y: 0, scale: 1 }]);
   });
 });

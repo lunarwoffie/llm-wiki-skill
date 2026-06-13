@@ -12,6 +12,10 @@ import {
 import {
   DEFAULT_RENDERER_VIEWPORT,
   applyRendererViewportTransform,
+  createViewportFrameCommitter,
+  fitRendererViewportToPoints,
+  panRendererViewport,
+  viewportAfterWheelZoom,
   type RendererViewport
 } from "./viewport";
 
@@ -72,9 +76,12 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
   root.dataset.llmWikiGraphRoot = "true";
   container.replaceChildren(root);
   ensureStaticRendererStyles(container.ownerDocument || document);
+  const viewportCommitter = createViewportFrameCommitter(commitViewport, root.ownerDocument.defaultView || undefined);
+  let blankPan: { pointerId: number; lastX: number; lastY: number } | null = null;
 
   let graph = buildRenderableGraph(data, { pins, theme, selectedNodeId, selection, pathCache });
   let pinState = new PinState(graph, pins);
+  bindViewportHandlers();
 
   function render(next: Partial<StaticRendererOptions> & { selectedNodeId?: string | null; selection?: SelectionInput | null } = {}): void {
     assertActive();
@@ -138,7 +145,7 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
         return true;
       }
     });
-    if (dom.contentLayer) applyRendererViewportTransform(dom.contentLayer, viewport);
+    commitViewport(viewport);
     if (activeDiff && root.dataset.diffState === "playing") markDiffElements(activeDiff);
     renderReader();
     restartSimulation();
@@ -255,6 +262,63 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
       element.classList.toggle("is-pinned", pinned.has(id));
       element.dataset.pinned = pinned.has(id) ? "true" : "false";
     }
+  }
+
+  function bindViewportHandlers(): void {
+    root.addEventListener("wheel", (event) => {
+      if (!isBlankViewportTarget(event.target)) return;
+      event.preventDefault();
+      const rect = root.getBoundingClientRect();
+      viewportCommitter.schedule(viewportAfterWheelZoom(
+        viewport,
+        { deltaY: event.deltaY, deltaMode: event.deltaMode },
+        {
+          x: event.clientX - rect.left,
+          y: event.clientY - rect.top
+        },
+        viewportSize()
+      ));
+    }, { passive: false });
+    root.addEventListener("pointerdown", (event) => {
+      if (event.button !== 0 || !isBlankViewportTarget(event.target)) return;
+      blankPan = { pointerId: event.pointerId, lastX: event.clientX, lastY: event.clientY };
+      root.dataset.viewportDragging = "true";
+      root.setPointerCapture(event.pointerId);
+    });
+    root.addEventListener("pointermove", (event) => {
+      if (!blankPan || event.pointerId !== blankPan.pointerId) return;
+      const dx = event.clientX - blankPan.lastX;
+      const dy = event.clientY - blankPan.lastY;
+      blankPan = { pointerId: event.pointerId, lastX: event.clientX, lastY: event.clientY };
+      viewportCommitter.schedule(panRendererViewport(viewport, { x: dx, y: dy }, viewportSize()));
+    });
+    const endPan = (event: PointerEvent) => {
+      if (!blankPan || event.pointerId !== blankPan.pointerId) return;
+      blankPan = null;
+      delete root.dataset.viewportDragging;
+      if (root.hasPointerCapture(event.pointerId)) root.releasePointerCapture(event.pointerId);
+    };
+    root.addEventListener("pointerup", endPan);
+    root.addEventListener("pointercancel", endPan);
+    root.addEventListener("dblclick", (event) => {
+      if (!isBlankViewportTarget(event.target)) return;
+      event.preventDefault();
+      viewportCommitter.schedule(fitRendererViewportToPoints(graph.nodes.map((node) => node.point), viewportSize()));
+    });
+  }
+
+  function commitViewport(nextViewport: RendererViewport): void {
+    viewport = nextViewport;
+    root.dataset.viewportScale = String(round(viewport.scale));
+    if (dom.contentLayer) applyRendererViewportTransform(dom.contentLayer, viewport);
+  }
+
+  function viewportSize(): { width: number; height: number } {
+    const rect = root.getBoundingClientRect();
+    return {
+      width: Math.max(1, rect.width || WORLD_WIDTH),
+      height: Math.max(1, rect.height || WORLD_HEIGHT)
+    };
   }
 
   async function animateDiff(diff: GraphDiff, animationOptions: { reducedMotion?: boolean; durationMs?: number }): Promise<void> {
@@ -533,7 +597,8 @@ function createNodeButton(node: RenderableNode, onOpenPage: ((path: WikiPath) =>
   button.style.top = `${node.y}%`;
   button.title = node.label;
   button.setAttribute("aria-pressed", node.selected ? "true" : "false");
-  button.addEventListener("dblclick", () => {
+  button.addEventListener("dblclick", (event) => {
+    event.stopPropagation();
     if (dragHandlers.onNodeDoubleClick(node.id)) return;
     if (node.sourcePath && onOpenPage) onOpenPage(node.sourcePath);
   });
@@ -617,6 +682,12 @@ function eventToGraphPoint(root: HTMLElement, event: PointerEvent): { x: number;
     x: clamp((event.clientX - rect.left) / Math.max(1, rect.width) * WORLD_WIDTH, 0, WORLD_WIDTH),
     y: clamp((event.clientY - rect.top) / Math.max(1, rect.height) * WORLD_HEIGHT, 0, WORLD_HEIGHT)
   };
+}
+
+function isBlankViewportTarget(target: EventTarget | null): boolean {
+  const element = target instanceof Element ? target : null;
+  if (!element) return false;
+  return !element.closest(".node, .mini-map, .graph-reader, .community-wash");
 }
 
 function emptyPaintedDom(): PaintedGraphDom {
