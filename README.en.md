@@ -21,7 +21,7 @@ Turn scattered information into a growing, interconnected knowledge base
 ## Preview
 
 <div align="center">
-<img src="docs/assets/graph-demo.gif" width="100%" alt="Knowledge Graph Demo">
+<img src="assets/graph-demo.gif" width="100%" alt="Knowledge Graph Demo">
 </div>
 
 Oriental editorial × digital landscape interactive knowledge graph — double-click the HTML file to explore in your browser. Search, community legend, focus filters, layered node grammar, hover previews, click-to-read, Shift multi-select, canvas zoom/pan, and minimap navigation all run offline.

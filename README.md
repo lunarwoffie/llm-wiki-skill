@@ -21,7 +21,7 @@
 ## 效果预览
 
 <div align="center">
-<img src="docs/assets/graph-demo.gif?v=20260428" width="100%" alt="知识图谱演示">
+<img src="assets/graph-demo.gif?v=20260428" width="100%" alt="知识图谱演示">
 </div>
 
 东方编辑部 × 数字山水风交互式知识图谱 — 双击 HTML 文件即可在浏览器中探索。搜索、社区图例、聚焦筛选、节点视觉分层、悬停预览、点击阅读、Shift 多选、画布缩放拖拽和小地图定位，全部离线运行，不依赖服务器。
@@ -96,7 +96,6 @@ bash install.sh --platform claude --with-optional-adapters
 - [Codex](platforms/codex/AGENTS.md)
 - [OpenClaw](platforms/openclaw/README.md)
 - [Hermes](platforms/hermes/README.md)
-- [Obsidian Integration Guide](docs/obsidian.md)
 
 ---
 

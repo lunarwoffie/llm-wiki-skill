@@ -28,3 +28,10 @@ deps/baoyu-url-to-markdown/scripts/bun.lock
 .omx/
 .codex
 .codex-review-stamp
+
+# Local-only planning, research, and verification notes.
+/docs/
+/workbench/docs/
+/PLAN.md
+/TODOS.md
+/test-report.md

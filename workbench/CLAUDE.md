@@ -21,17 +21,17 @@
 
 ## 项目当前阶段
 
-**阶段 4.5 设计完成，待实施** 🚧（图谱可用性收尾：P0 画布导航 + P0 点击语义重构 + P1 搜索/图例 + P2 节点瘦身）。设计文档：[docs/stage-4.5-design.md](docs/stage-4.5-design.md)；决策：PRODUCT.md ADR-22。
+**阶段 4.5 已合入**（图谱可用性收尾：P0 画布导航 + P0 点击语义重构 + P1 搜索/图例 + P2 节点瘦身）。决策：PRODUCT.md ADR-22。
 
 ❗ 开发主场已在**主仓库 monorepo**（本目录是其 `workbench/` 子目录）：引擎在 `packages/graph-engine/`，`npm run dev` 从 monorepo 根执行。原独立 llm-wiki-agent 仓库已进入只读过渡状态（不 archive，处置留品牌阶段，见 ADR-20）。
 
 阶段一 / 二 / 三 / 四已完成（详见 PRODUCT.md §10）：
 
 - 阶段一 ✅ 2026-05-26（主干打通）
-- 阶段二 ✅ 2026-05-27（@、/、结晶、消化）—— `docs/stage-2-design.md`
-- 阶段三 ✅ 2026-05-27（5 个导出按钮 + 4 个 vendored anthropics Skills + 产物右抽屉 + HTML iframe + 下载渲染器 + Skill 可见性开关）—— `docs/stage-3-design.md`
-- 阶段 3.5 ✅ 2026-05-27 至 2026-05-28（导航、多模型、批量消化、当前知识库检索、工作台视觉、可调预览、设置面板滚动修复）—— `docs/stage-3.5-design.md`
-- 阶段四 ✅ 2026-06-12（monorepo 合并 + 共享图谱引擎 + 活地图：钉扎/选区/生长动画 + 离线 HTML 切引擎产物）—— `docs/stage-4-design.md`
+- 阶段二 ✅ 2026-05-27（@、/、结晶、消化）
+- 阶段三 ✅ 2026-05-27（5 个导出按钮 + 4 个 vendored anthropics Skills + 产物右抽屉 + HTML iframe + 下载渲染器 + Skill 可见性开关）
+- 阶段 3.5 ✅ 2026-05-27 至 2026-05-28（导航、多模型、批量消化、当前知识库检索、工作台视觉、可调预览、设置面板滚动修复）
+- 阶段四 ✅ 2026-06-12（monorepo 合并 + 共享图谱引擎 + 活地图：钉扎/选区/生长动画 + 离线 HTML 切引擎产物）
 
 ## 关键路径速查
 

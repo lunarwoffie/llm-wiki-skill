@@ -39,10 +39,6 @@ bash install.sh --platform claude --with-optional-adapters
 
 设计文档或 plan 写完准备动手改代码时，也先开分支再开始实现。
 
-## 已记录的解决方案
-
-`docs/solutions/` 存放过去解决问题的文档（bug、最佳实践、工作流改进），按类别分目录，每份有 YAML frontmatter（`module`、`tags`、`problem_type`）。涉及已记录领域时（graph、cache、install、lint 等），先搜一下有没有现成经验。
-
 ## 推送前测试规则
 
 每次 `git push` 前必须验证，按改动范围选深度：
@@ -53,14 +49,14 @@ bash install.sh --platform claude --with-optional-adapters
 
 1. `bash install.sh --dry-run --platform codex` — 安装脚本不报错
 2. 改过的脚本如果有 `tests/fixtures/`，跑一下 diff 预期输出
-3. `grep -r '/Users/kangjiaqi\|康佳琦' scripts/ templates/ tests/ SKILL.md` — 没泄露隐私路径
+3. `grep -r '本机用户路径\\|真实姓名\\|私有素材路径' scripts/ templates/ tests/ SKILL.md` — 没泄露隐私路径
 
 ### 第二/三层：工作流测试（你在 codex 终端手动跑）
 
 - **第二层**（只改了 SKILL.md 里个别工作流）：Claude Code 生成测试提示词写到文件，告诉你路径，你复制到 codex 跑涉及的工作流
 - **第三层**（多工作流改动 / 版本号升级）：Claude Code 生成全量回归提示词，你在 codex 跑完整流程（init → ingest → lint → digest → graph）
 
-素材复用 `~/Desktop/llm-wiki-cowork-test/raw-input/` 里的 3 篇文章，不用每次重新找。
+素材复用本机私有测试素材，不上传到远端。
 
 codex 跑完后把 `test-report.md` 发回来，Claude Code 确认无阻塞问题后才执行 `git push`。
 

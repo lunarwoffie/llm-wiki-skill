@@ -72,7 +72,7 @@ cp "$REPO_ROOT/tests/fixtures/graph-interactive-dense/wiki/graph-data.json" "$de
 bash "$REPO_ROOT/scripts/build-graph-html.sh" "$tmp_dir/dense" > /dev/null 2>&1 \
   || fail "build-graph-html.sh should succeed on dense stage 4.5 browser fixture"
 
-artifact_dir="$REPO_ROOT/workbench/docs/stage-4.5-artifacts"
+artifact_dir="$tmp_dir/stage-4.5-artifacts"
 mkdir -p "$artifact_dir"
 
 if [ "$target" = "workbench" ]; then
