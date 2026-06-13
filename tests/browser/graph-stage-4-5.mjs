@@ -11,15 +11,26 @@ const target = process.env.GRAPH_STAGE_4_5_TARGET || "offline";
 const offlineHtml = process.env.GRAPH_STAGE_4_5_OFFLINE_HTML || "";
 const denseHtml = process.env.GRAPH_STAGE_4_5_DENSE_HTML || "";
 const artifactDir = process.env.GRAPH_STAGE_4_5_ARTIFACT_DIR || "";
+const workbenchUrl = process.env.GRAPH_STAGE_4_5_WORKBENCH_URL || "";
 
-if (target !== "offline") {
-  throw new Error(`Only the offline target is available for this stage 4.5 navigation slice: ${target}`);
+if (target !== "offline" && target !== "workbench") {
+  throw new Error(`Unknown stage 4.5 browser target: ${target}`);
 }
 assert.notEqual(offlineHtml, "", "GRAPH_STAGE_4_5_OFFLINE_HTML must point at generated HTML");
 assert.notEqual(denseHtml, "", "GRAPH_STAGE_4_5_DENSE_HTML must point at generated dense HTML");
 
 const browser = await chromium.launch();
 try {
+  if (target === "workbench") {
+    await runWorkbenchChecks(browser);
+  } else {
+    await runOfflineChecks(browser);
+  }
+} finally {
+  await browser.close();
+}
+
+async function runOfflineChecks(browser) {
   const page = await browser.newPage({ viewport: { width: 1440, height: 960 } });
   await page.goto(pathToFileURL(offlineHtml).href);
 
@@ -129,8 +140,6 @@ try {
       }, null, 2)}\n`
     );
   }
-} finally {
-  await browser.close();
 }
 
 async function layerTransform(page) {
@@ -153,4 +162,36 @@ async function waitForLayerTransform(page, previous) {
 async function expectNoPressedNodes(page, message) {
   const pressed = await page.locator(".node[aria-pressed='true']").count();
   assert.equal(pressed, 0, message);
+}
+
+async function runWorkbenchChecks(browser) {
+  assert.notEqual(workbenchUrl, "", "GRAPH_STAGE_4_5_WORKBENCH_URL must point at the workbench dev server");
+  const page = await browser.newPage({ viewport: { width: 1440, height: 960 } });
+  await page.goto(workbenchUrl);
+  await page.waitForSelector(".app-shell");
+
+  await page.getByRole("button", { name: /Stage 4\.5 Workbench Test|workbench-kb/ }).click();
+  await page.getByRole("button", { name: /图谱/ }).click();
+  await page.waitForSelector("[data-llm-wiki-graph-root='true']");
+  await page.locator(".node[data-id='A']").click();
+
+  await page.waitForSelector(".drawer-panel-open");
+  const drawer = page.locator(".drawer-panel-open");
+  await drawer.locator(".drawer-title", { hasText: "节点A" }).waitFor();
+  await drawer.getByText("这是节点A的正文").waitFor();
+  await drawer.getByRole("button", { name: "在对话中引用" }).waitFor();
+  await drawer.getByRole("button", { name: "它和谁有关" }).waitFor();
+  assert.equal(await drawer.getByText("学习队列").count(), 0, "graph reader should not show learning queue");
+  assert.equal(await drawer.getByText("摘要").count(), 0, "graph reader should not show a summary block");
+  assert.equal(await drawer.getByText("相邻节点").count(), 0, "graph reader should not show a neighbor section");
+
+  await drawer.getByRole("link", { name: "wiki/entities/B.md" }).click();
+  await drawer.locator(".drawer-title", { hasText: "wiki/entities/B.md" }).waitFor();
+  await drawer.getByText("这是节点B的正文").waitFor();
+  const focused = await page.locator(".node[aria-pressed='true']").count();
+  assert.equal(focused, 1, "wikilink navigation should keep one graph node highlighted");
+
+  if (artifactDir) {
+    await page.screenshot({ path: path.join(artifactDir, "stage-4.5-workbench-reader.png"), fullPage: true });
+  }
 }

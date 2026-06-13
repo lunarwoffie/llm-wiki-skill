@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { GraphDiff } from "@llm-wiki/graph-engine";
+import type { GraphDiff, GraphOpenPagePayload } from "@llm-wiki/graph-engine";
 
 import { BatchDigestPanel, type BatchDigestJob } from "@/components/BatchDigestPanel";
 import { ChatPanel } from "@/components/ChatPanel";
@@ -28,6 +28,13 @@ import {
 	type GraphEvent,
 	type UIMessage,
 } from "@/lib/api";
+import {
+	artifactDrawer,
+	closedDrawer,
+	type DrawerState,
+	graphReaderDrawer,
+	wikiDrawer,
+} from "@/lib/drawer-state";
 import { WIKI_LINK_SEEN_EVENT } from "@/lib/wiki-links";
 
 type ThemeMode = "dark" | "light";
@@ -106,13 +113,8 @@ function App() {
 	const [chatKey, setChatKey] = useState(0);
 	const [initialMessages, setInitialMessages] = useState<UIMessage[]>([]);
 	const [settingsOpen, setSettingsOpen] = useState(false);
-	const [drawerMode, setDrawerMode] = useState<"closed" | "wiki" | "artifacts">("closed");
-	const [drawerPage, setDrawerPage] = useState<string | null>(null);
-	const [drawerContent, setDrawerContent] = useState("");
-	const [drawerLoading, setDrawerLoading] = useState(false);
-	const [drawerError, setDrawerError] = useState<string | null>(null);
+	const [drawer, setDrawer] = useState<DrawerState>(() => closedDrawer());
 	const [artifacts, setArtifacts] = useState<ArtifactManifest[]>([]);
-	const [activeArtifactId, setActiveArtifactId] = useState<string | null>(null);
 	const [drawerFullscreen, setDrawerFullscreen] = useState(false);
 	const [batchJob, setBatchJob] = useState<BatchDigestJob | null>(null);
 	const [pendingGraphPrompt, setPendingGraphPrompt] = useState<{
@@ -219,7 +221,7 @@ function App() {
 				setInitialMessages([]);
 				setConversations([]);
 				setArtifacts([]);
-				setActiveArtifactId(null);
+				setDrawer(closedDrawer());
 			}
 		} catch (err) {
 			setSidebarError(err instanceof Error ? err.message : String(err));
@@ -238,12 +240,14 @@ function App() {
 		listArtifacts(activeConversationId)
 			.then((items) => {
 				if (cancelled) return;
-				setArtifacts(items);
-				setActiveArtifactId((current) =>
-					current && items.some((item) => item.id === current)
-						? current
-						: items.at(-1)?.id ?? null,
-				);
+			setArtifacts(items);
+			setDrawer((current) => {
+				if (current.mode !== "artifacts") return current;
+				const activeArtifactId = current.activeArtifactId && items.some((item) => item.id === current.activeArtifactId)
+					? current.activeArtifactId
+					: items.at(-1)?.id ?? null;
+				return artifactDrawer(items, activeArtifactId);
+			});
 			})
 			.catch((err) => {
 				if (!cancelled) setSidebarError(err instanceof Error ? err.message : String(err));
@@ -257,8 +261,7 @@ function App() {
 		setActive(ctx);
 		setInitialMessages(ctx.conversation.messages);
 		setChatKey((k) => k + 1);
-		setDrawerMode("closed");
-		setActiveArtifactId(null);
+		setDrawer(closedDrawer());
 		setArtifacts([]);
 		setPendingGraphDiff(null);
 		setGraphHasPendingUpdate(false);
@@ -346,17 +349,33 @@ function App() {
 		if (!active) return;
 		const normalizedPagePath = toRelativePagePath(pagePath, active.kb.path) ?? pagePath;
 		if (normalizedPagePath.startsWith("wiki/")) setGraphFocusPath(normalizedPagePath);
-		setDrawerMode("wiki");
-		setDrawerPage(normalizedPagePath);
-		setDrawerLoading(true);
-		setDrawerError(null);
+		setDrawer(wikiDrawer(normalizedPagePath, { loading: true }));
 		try {
-			setDrawerContent(await readPage(active.kb.path, normalizedPagePath));
+			const content = await readPage(active.kb.path, normalizedPagePath);
+			setDrawer(wikiDrawer(normalizedPagePath, { content }));
 		} catch (err) {
-			setDrawerContent("");
-			setDrawerError(err instanceof Error ? err.message : String(err));
-		} finally {
-			setDrawerLoading(false);
+			setDrawer(wikiDrawer(normalizedPagePath, { error: err instanceof Error ? err.message : String(err) }));
+		}
+	};
+
+	const handleOpenGraphPage = async (payload: GraphOpenPagePayload) => {
+		if (!active) return;
+		const normalizedPagePath = toRelativePagePath(payload.path, active.kb.path) ?? payload.path;
+		const normalizedPayload = {
+			...payload,
+			path: normalizedPagePath,
+			node: {
+				...payload.node,
+				sourcePath: toRelativePagePath(payload.node.sourcePath, active.kb.path) ?? payload.node.sourcePath,
+			},
+		};
+		if (normalizedPagePath.startsWith("wiki/")) setGraphFocusPath(normalizedPagePath);
+		setDrawer(graphReaderDrawer(normalizedPayload, { loading: true }));
+		try {
+			const content = await readPage(active.kb.path, normalizedPagePath);
+			setDrawer(graphReaderDrawer(normalizedPayload, { content }));
+		} catch (err) {
+			setDrawer(graphReaderDrawer(normalizedPayload, { error: err instanceof Error ? err.message : String(err) }));
 		}
 	};
 
@@ -367,18 +386,16 @@ function App() {
 	const refreshArtifacts = async (conversationId: string, focusId?: string) => {
 		const items = await listArtifacts(conversationId);
 		setArtifacts(items);
-		setActiveArtifactId(focusId ?? items.at(-1)?.id ?? null);
-		setDrawerMode("artifacts");
+		setDrawer(artifactDrawer(items, focusId ?? items.at(-1)?.id ?? null));
 	};
 
 	const handleOpenArtifacts = () => {
 		if (artifacts.length === 0) return;
-		setActiveArtifactId((current) =>
-			current && artifacts.some((item) => item.id === current)
-				? current
-				: artifacts.at(-1)?.id ?? null,
-		);
-		setDrawerMode("artifacts");
+		const current = drawer.mode === "artifacts" ? drawer.activeArtifactId : null;
+		setDrawer(artifactDrawer(
+			artifacts,
+			current && artifacts.some((item) => item.id === current) ? current : artifacts.at(-1)?.id ?? null,
+		));
 	};
 
 	const handleArtifactCreated = async (id: string) => {
@@ -506,17 +523,12 @@ function App() {
 		if (!batchJob) return;
 		const rel = toRelativePagePath(outputPath, batchJob.kbPath);
 		if (!rel) return;
-		setDrawerMode("wiki");
-		setDrawerPage(rel);
-		setDrawerLoading(true);
-		setDrawerError(null);
+		setDrawer(wikiDrawer(rel, { loading: true }));
 		try {
-			setDrawerContent(await readPage(batchJob.kbPath, rel));
+			const content = await readPage(batchJob.kbPath, rel);
+			setDrawer(wikiDrawer(rel, { content }));
 		} catch (err) {
-			setDrawerContent("");
-			setDrawerError(err instanceof Error ? err.message : String(err));
-		} finally {
-			setDrawerLoading(false);
+			setDrawer(wikiDrawer(rel, { error: err instanceof Error ? err.message : String(err) }));
 		}
 	};
 
@@ -563,7 +575,7 @@ function App() {
 							currentKnowledgeBasePath={active?.kb.path ?? null}
 							theme={theme}
 							onToggleTheme={() => setTheme((value) => (value === "dark" ? "light" : "dark"))}
-							onOpenPage={handleOpenPage}
+							onOpenPage={handleOpenGraphPage}
 							onAskSelection={handleAskSelection}
 							focusPath={graphFocusPath}
 							pendingDiff={pendingGraphDiff}
@@ -593,22 +605,16 @@ function App() {
 					)}
 				</main>
 				<RightDrawer
-					mode={drawerMode}
-					wiki={{
-						path: drawerPage,
-						content: drawerContent,
-						loading: drawerLoading,
-						error: drawerError,
-					}}
-					artifacts={artifacts}
-					activeArtifactId={activeArtifactId}
+					drawer={drawer}
 					fullscreen={drawerFullscreen}
 					width={drawerWidth}
 					defaultWidth={DEFAULT_DRAWER_WIDTH}
-					onSelectArtifact={setActiveArtifactId}
+					onSelectArtifact={(id) => setDrawer(artifactDrawer(artifacts, id))}
+					onOpenPage={handleOpenPage}
+					onWikiLinkSeen={handleWikiLinkSeen}
 					onResize={setDrawerWidth}
 					onToggleFullscreen={() => setDrawerFullscreen((value) => !value)}
-					onClose={() => setDrawerMode("closed")}
+					onClose={() => setDrawer(closedDrawer())}
 				/>
 				<SettingsPanel
 					open={settingsOpen}

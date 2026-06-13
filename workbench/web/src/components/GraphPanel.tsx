@@ -6,6 +6,7 @@ import {
 	type GraphData,
 	type GraphDiff,
 	type GraphEngine,
+	type GraphOpenPagePayload,
 	type PinMap,
 	type Selection,
 	type SelectionAction,
@@ -26,7 +27,7 @@ interface Props {
 	currentKnowledgeBasePath: string | null;
 	theme: "dark" | "light";
 	onToggleTheme?: () => void;
-	onOpenPage?: (path: string) => void;
+	onOpenPage?: (payload: GraphOpenPagePayload) => void;
 	onAskSelection?: (input: { message: string; displayText: string; newConversation: boolean }) => void;
 	focusPath?: string | null;
 	pendingDiff?: GraphDiff | null;
@@ -262,7 +263,7 @@ export function GraphPanel({
 			pins: layoutPinsRef.current,
 			theme: graphThemeRef.current,
 			capabilities: {
-				onOpenPage: (payload) => onOpenPageRef.current?.(payload.path),
+				onOpenPage: (payload) => onOpenPageRef.current?.(payload),
 				onSelectionChange: setSelection,
 				persistPins,
 				onDragStateChange: (dragging) => {

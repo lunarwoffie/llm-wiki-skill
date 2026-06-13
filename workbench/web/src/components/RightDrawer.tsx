@@ -3,24 +3,20 @@ import { type CSSProperties, useEffect, useRef } from "react";
 import { Download, FileText, Maximize2, Minimize2, X } from "lucide-react";
 
 import { ArtifactView } from "@/components/ArtifactView";
+import { GraphReader } from "@/components/GraphReader";
 import { MarkdownView } from "@/components/MarkdownView";
+import type { DrawerState } from "@/lib/drawer-state";
 import { getArtifactFileUrl, type ArtifactManifest } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 interface Props {
-	mode: "closed" | "wiki" | "artifacts";
-	wiki: {
-		path: string | null;
-		content: string;
-		loading: boolean;
-		error: string | null;
-	};
-	artifacts: ArtifactManifest[];
-	activeArtifactId: string | null;
+	drawer: DrawerState;
 	fullscreen: boolean;
 	width: number;
 	defaultWidth: number;
 	onSelectArtifact: (id: string) => void;
+	onOpenPage: (path: string) => void;
+	onWikiLinkSeen: (path: string) => void;
 	onResize: (width: number) => void;
 	onToggleFullscreen: () => void;
 	onClose: () => void;
@@ -35,14 +31,13 @@ const KIND_ICON: Record<ArtifactManifest["kind"], string> = {
 };
 
 export function RightDrawer({
-	mode,
-	wiki,
-	artifacts,
-	activeArtifactId,
+	drawer,
 	fullscreen,
 	width,
 	defaultWidth,
 	onSelectArtifact,
+	onOpenPage,
+	onWikiLinkSeen,
 	onResize,
 	onToggleFullscreen,
 	onClose,
@@ -56,7 +51,7 @@ export function RightDrawer({
 	}, []);
 
 	useEffect(() => {
-		if (mode === "closed") return;
+		if (drawer.mode === "closed") return;
 
 		const handleKeyDown = (event: KeyboardEvent) => {
 			if (event.key === "Escape") onClose();
@@ -64,10 +59,13 @@ export function RightDrawer({
 
 		window.addEventListener("keydown", handleKeyDown);
 		return () => window.removeEventListener("keydown", handleKeyDown);
-	}, [mode, onClose]);
+	}, [drawer.mode, onClose]);
 
-	if (mode === "closed") return null;
-	const activeArtifact = artifacts.find((item) => item.id === activeArtifactId) ?? null;
+	if (drawer.mode === "closed") return null;
+	const activeArtifact = drawer.mode === "artifacts"
+		? drawer.artifacts.find((item) => item.id === drawer.activeArtifactId) ?? null
+		: null;
+	const title = drawerTitle(drawer, activeArtifact);
 	return (
 		<aside
 			className={cn("drawer-panel drawer-panel-open", fullscreen && "drawer-panel-fullscreen")}
@@ -125,7 +123,7 @@ export function RightDrawer({
 			)}
 			<header className="drawer-header">
 				<div className="drawer-title">
-					{mode === "wiki" ? wiki.path : activeArtifact?.metadata.title ?? "产物"}
+					{title}
 				</div>
 				<div className="flex items-center gap-1">
 					{activeArtifact && (
@@ -151,14 +149,14 @@ export function RightDrawer({
 					</button>
 				</div>
 			</header>
-			{mode === "artifacts" && (
+			{drawer.mode === "artifacts" && (
 				<div className="drawer-tabs">
-					{artifacts.map((item) => (
+					{drawer.artifacts.map((item) => (
 						<button
 							key={item.id}
 							type="button"
 							onClick={() => onSelectArtifact(item.id)}
-							className={cn("drawer-tab", item.id === activeArtifactId && "drawer-tab-active")}
+							className={cn("drawer-tab", item.id === drawer.activeArtifactId && "drawer-tab-active")}
 						>
 							{KIND_ICON[item.kind]} {item.metadata.title.slice(0, 12)}
 						</button>
@@ -166,14 +164,24 @@ export function RightDrawer({
 				</div>
 			)}
 			<div className="drawer-content">
-				{mode === "wiki" && (
+				{drawer.mode === "wiki" && (
 					<>
-						{wiki.loading && <div className="text-muted-foreground">加载中...</div>}
-						{wiki.error && <div className="whitespace-pre-wrap text-destructive">{wiki.error}</div>}
-						{!wiki.loading && !wiki.error && <MarkdownView content={wiki.content} />}
+						{drawer.loading && <div className="text-muted-foreground">加载中...</div>}
+						{drawer.error && <div className="whitespace-pre-wrap text-destructive">{drawer.error}</div>}
+						{!drawer.loading && !drawer.error && <MarkdownView content={drawer.content} onOpenPage={onOpenPage} />}
 					</>
 				)}
-				{mode === "artifacts" && (
+				{drawer.mode === "graph-reader" && (
+					<GraphReader
+						payload={drawer.payload}
+						content={drawer.content}
+						loading={drawer.loading}
+						error={drawer.error}
+						onOpenPage={onOpenPage}
+						onWikiLinkSeen={onWikiLinkSeen}
+					/>
+				)}
+				{drawer.mode === "artifacts" && (
 					activeArtifact ? (
 						<ArtifactView manifest={activeArtifact} />
 					) : (
@@ -186,4 +194,11 @@ export function RightDrawer({
 			</div>
 		</aside>
 	);
+}
+
+function drawerTitle(drawer: DrawerState, activeArtifact: ArtifactManifest | null): string {
+	if (drawer.mode === "wiki") return drawer.path ?? "页面";
+	if (drawer.mode === "graph-reader") return drawer.payload.node.title;
+	if (drawer.mode === "artifacts") return activeArtifact?.metadata.title ?? "产物";
+	return "";
 }

@@ -1,0 +1,40 @@
+import type { GraphOpenPagePayload } from "@llm-wiki/graph-engine";
+
+import { MarkdownView } from "./MarkdownView";
+import { graphReaderActionLabels, graphReaderMetaItems } from "@/lib/graph-reader";
+
+export { graphReaderActionLabels, graphReaderMetaItems } from "@/lib/graph-reader";
+
+interface Props {
+	payload: GraphOpenPagePayload;
+	content: string;
+	loading: boolean;
+	error: string | null;
+	onOpenPage: (path: string) => void;
+	onWikiLinkSeen: (path: string) => void;
+}
+
+export function GraphReader({ payload, content, loading, error, onOpenPage, onWikiLinkSeen }: Props) {
+	const metaItems = graphReaderMetaItems(payload);
+	return (
+		<article className="graph-reader-drawer">
+			<div className="graph-reader-meta-row">
+				{metaItems.map((item) => (
+					<span key={item}>{item}</span>
+				))}
+			</div>
+			<div className="graph-reader-actions">
+				{graphReaderActionLabels(payload).map((label) => (
+					<button key={label} type="button" className="graph-reader-action">
+						{label}
+					</button>
+				))}
+			</div>
+			{loading && <div className="text-muted-foreground">加载中...</div>}
+			{error && <div className="whitespace-pre-wrap text-destructive">{error}</div>}
+			{!loading && !error && (
+				<MarkdownView content={content} onOpenPage={onOpenPage} onWikiLinkSeen={onWikiLinkSeen} />
+			)}
+		</article>
+	);
+}
