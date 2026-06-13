@@ -725,20 +725,10 @@
     background: var(--app-accent-soft);
   }
 
-  .graph-selection-panel {
-    position: absolute;
-    top: 60px;
-    right: 16px;
-    z-index: 8;
-    width: min(340px, calc(100% - 32px));
+  .graph-selection-drawer {
     display: flex;
     flex-direction: column;
-    gap: 10px;
-    border: 1px solid var(--app-border);
-    border-radius: 8px;
-    background: color-mix(in oklch, var(--app-bg) 94%, transparent);
-    padding: 12px;
-    box-shadow: var(--soft-shadow);
+    gap: 12px;
   }
 
   .graph-selection-head {
@@ -752,6 +742,15 @@
     color: var(--app-muted);
     font-family: var(--font-mono);
     font-size: 10px;
+  }
+
+  .graph-selection-hint {
+    border: 1px solid var(--app-border);
+    border-radius: 6px;
+    background: var(--app-raised);
+    padding: 8px 10px;
+    color: var(--app-muted);
+    font-size: 12px;
   }
 
   .graph-selection-title {

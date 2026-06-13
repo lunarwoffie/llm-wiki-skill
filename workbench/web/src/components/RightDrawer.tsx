@@ -4,6 +4,7 @@ import { Download, FileText, Maximize2, Minimize2, X } from "lucide-react";
 
 import { ArtifactView } from "@/components/ArtifactView";
 import { GraphReader } from "@/components/GraphReader";
+import { GraphSelection } from "@/components/GraphSelection";
 import { MarkdownView } from "@/components/MarkdownView";
 import type { DrawerState } from "@/lib/drawer-state";
 import { getArtifactFileUrl, type ArtifactManifest } from "@/lib/api";
@@ -17,6 +18,9 @@ interface Props {
 	onSelectArtifact: (id: string) => void;
 	onOpenPage: (path: string) => void;
 	onWikiLinkSeen: (path: string) => void;
+	onGraphSelectionTextChange: (value: string) => void;
+	onGraphSelectionNeighbors: () => void;
+	onGraphSelectionAsk: (actionId: string | null, newConversation: boolean) => void;
 	onResize: (width: number) => void;
 	onToggleFullscreen: () => void;
 	onClose: () => void;
@@ -38,6 +42,9 @@ export function RightDrawer({
 	onSelectArtifact,
 	onOpenPage,
 	onWikiLinkSeen,
+	onGraphSelectionTextChange,
+	onGraphSelectionNeighbors,
+	onGraphSelectionAsk,
 	onResize,
 	onToggleFullscreen,
 	onClose,
@@ -57,8 +64,8 @@ export function RightDrawer({
 			if (event.key === "Escape") onClose();
 		};
 
-		window.addEventListener("keydown", handleKeyDown);
-		return () => window.removeEventListener("keydown", handleKeyDown);
+		window.addEventListener("keydown", handleKeyDown, { capture: true });
+		return () => window.removeEventListener("keydown", handleKeyDown, { capture: true });
 	}, [drawer.mode, onClose]);
 
 	if (drawer.mode === "closed") return null;
@@ -181,6 +188,17 @@ export function RightDrawer({
 						onWikiLinkSeen={onWikiLinkSeen}
 					/>
 				)}
+				{drawer.mode === "graph-selection" && (
+					<GraphSelection
+						title={drawer.title}
+						selection={drawer.selection}
+						freeText={drawer.freeText}
+						onFreeTextChange={onGraphSelectionTextChange}
+						onNeighbors={onGraphSelectionNeighbors}
+						onAsk={(action) => onGraphSelectionAsk(action?.id ?? null, false)}
+						onAskInNewConversation={(action) => onGraphSelectionAsk(action?.id ?? null, true)}
+					/>
+				)}
 				{drawer.mode === "artifacts" && (
 					activeArtifact ? (
 						<ArtifactView manifest={activeArtifact} />
@@ -199,6 +217,7 @@ export function RightDrawer({
 function drawerTitle(drawer: DrawerState, activeArtifact: ArtifactManifest | null): string {
 	if (drawer.mode === "wiki") return drawer.path ?? "页面";
 	if (drawer.mode === "graph-reader") return drawer.payload.node.title;
+	if (drawer.mode === "graph-selection") return "选区";
 	if (drawer.mode === "artifacts") return activeArtifact?.metadata.title ?? "产物";
 	return "";
 }

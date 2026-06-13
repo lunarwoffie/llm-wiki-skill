@@ -1,4 +1,4 @@
-import type { GraphOpenPagePayload } from "@llm-wiki/graph-engine";
+import type { GraphOpenPagePayload, Selection } from "@llm-wiki/graph-engine";
 import type { ArtifactManifest } from "@/lib/api";
 
 interface PageState {
@@ -28,7 +28,12 @@ export type DrawerState =
 			loading: boolean;
 			error: string | null;
 		}
-	| { mode: "graph-selection" };
+	| {
+			mode: "graph-selection";
+			title: string;
+			selection: Selection;
+			freeText: string;
+		};
 
 export function closedDrawer(): DrawerState {
 	return { mode: "closed" };
@@ -55,5 +60,14 @@ export function graphReaderDrawer(payload: GraphOpenPagePayload, state: PageStat
 		content: state.content ?? "",
 		loading: state.loading ?? false,
 		error: state.error ?? null,
+	};
+}
+
+export function graphSelectionDrawer(selection: Selection, title: string, freeText = ""): DrawerState {
+	return {
+		mode: "graph-selection",
+		title,
+		selection,
+		freeText,
 	};
 }

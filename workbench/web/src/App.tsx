@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { GraphDiff, GraphOpenPagePayload } from "@llm-wiki/graph-engine";
+import type { GraphData, GraphDiff, GraphOpenPagePayload, Selection } from "@llm-wiki/graph-engine";
 
 import { BatchDigestPanel, type BatchDigestJob } from "@/components/BatchDigestPanel";
 import { ChatPanel } from "@/components/ChatPanel";
@@ -33,8 +33,10 @@ import {
 	closedDrawer,
 	type DrawerState,
 	graphReaderDrawer,
+	graphSelectionDrawer,
 	wikiDrawer,
 } from "@/lib/drawer-state";
+import { buildSelectionPromptPayload, selectionTitle } from "@/lib/graph-selection";
 import { WIKI_LINK_SEEN_EVENT } from "@/lib/wiki-links";
 
 type ThemeMode = "dark" | "light";
@@ -126,6 +128,8 @@ function App() {
 	const [pendingGraphDiff, setPendingGraphDiff] = useState<GraphDiff | null>(null);
 	const [graphRefreshToken, setGraphRefreshToken] = useState(0);
 	const [graphHasPendingUpdate, setGraphHasPendingUpdate] = useState(false);
+	const [graphData, setGraphData] = useState<GraphData | null>(null);
+	const [selectionCommand, setSelectionCommand] = useState<{ id: string; type: "clear" | "neighbors" } | undefined>();
 	const [mainView, setMainView] = useState<MainView>(() => {
 		if (typeof window === "undefined") return "chat";
 		return window.localStorage.getItem(MAIN_VIEW_STORAGE_KEY) === "graph" ? "graph" : "chat";
@@ -265,6 +269,8 @@ function App() {
 		setArtifacts([]);
 		setPendingGraphDiff(null);
 		setGraphHasPendingUpdate(false);
+		setGraphData(null);
+		setSelectionCommand({ id: Math.random().toString(36).slice(2, 10), type: "clear" });
 		setGraphFocusPath(null);
 	};
 
@@ -327,6 +333,59 @@ function App() {
 			setSidebarError(err instanceof Error ? err.message : String(err));
 		}
 	};
+
+	const handleGraphSelectionChange = useCallback((selection: Selection | null) => {
+		if (!selection) {
+			setDrawer((current) => current.mode === "graph-selection" ? closedDrawer() : current);
+			return;
+		}
+		setDrawer((current) => {
+			const freeText = current.mode === "graph-selection" ? current.freeText : "";
+			const title = graphData ? selectionTitle(graphData, selection) : "选区";
+			return graphSelectionDrawer(selection, title, freeText);
+		});
+	}, [graphData]);
+
+	const handleGraphSelectionTextChange = useCallback((value: string) => {
+		setDrawer((current) => (
+			current.mode === "graph-selection"
+				? graphSelectionDrawer(current.selection, current.title, value)
+				: current
+		));
+	}, []);
+
+	const handleGraphSelectionNeighbors = useCallback(() => {
+		if (drawer.mode !== "graph-selection" || drawer.selection.nodeIds.length !== 1) return;
+		setSelectionCommand({
+			id: drawer.selection.nodeIds[0],
+			type: "neighbors",
+		});
+	}, [drawer]);
+
+	const handleGraphSelectionAsk = useCallback((actionId: string | null, newConversation: boolean) => {
+		if (!graphData || drawer.mode !== "graph-selection") return;
+		const action = actionId
+			? drawer.selection.actions?.find((item) => item.id === actionId) ?? null
+			: null;
+		const payload = buildSelectionPromptPayload(graphData, drawer.selection, action, drawer.freeText);
+		void handleAskSelection({
+			message: payload.expandedText,
+			displayText: payload.displayText,
+			newConversation,
+		});
+		setDrawer(closedDrawer());
+		setSelectionCommand({ id: Math.random().toString(36).slice(2, 10), type: "clear" });
+	}, [drawer, graphData]);
+
+	const handleCloseDrawer = useCallback(() => {
+		setDrawer((current) => {
+			if (current.mode === "graph-reader" || current.mode === "graph-selection") {
+				setSelectionCommand({ id: Math.random().toString(36).slice(2, 10), type: "clear" });
+				setGraphFocusPath(null);
+			}
+			return closedDrawer();
+		});
+	}, []);
 
 	const handleAddExternal = async (path: string) => {
 		const { info } = await registerExternalKnowledgeBase(path);
@@ -576,7 +635,9 @@ function App() {
 							theme={theme}
 							onToggleTheme={() => setTheme((value) => (value === "dark" ? "light" : "dark"))}
 							onOpenPage={handleOpenGraphPage}
-							onAskSelection={handleAskSelection}
+							onGraphDataChange={setGraphData}
+							onSelectionChange={handleGraphSelectionChange}
+							selectionCommand={selectionCommand}
 							focusPath={graphFocusPath}
 							pendingDiff={pendingGraphDiff}
 							refreshToken={graphRefreshToken}
@@ -612,9 +673,12 @@ function App() {
 					onSelectArtifact={(id) => setDrawer(artifactDrawer(artifacts, id))}
 					onOpenPage={handleOpenPage}
 					onWikiLinkSeen={handleWikiLinkSeen}
+					onGraphSelectionTextChange={handleGraphSelectionTextChange}
+					onGraphSelectionNeighbors={handleGraphSelectionNeighbors}
+					onGraphSelectionAsk={handleGraphSelectionAsk}
 					onResize={setDrawerWidth}
 					onToggleFullscreen={() => setDrawerFullscreen((value) => !value)}
-					onClose={() => setDrawer(closedDrawer())}
+					onClose={handleCloseDrawer}
 				/>
 				<SettingsPanel
 					open={settingsOpen}

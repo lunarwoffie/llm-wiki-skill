@@ -170,7 +170,10 @@ async function runWorkbenchChecks(browser) {
   await page.goto(workbenchUrl);
   await page.waitForSelector(".app-shell");
 
-  await page.getByRole("button", { name: /Stage 4\.5 Workbench Test|workbench-kb/ }).click();
+  const kbButton = page.getByRole("button", { name: /Stage 4\.5 Workbench Test|workbench-kb/ });
+  if (await kbButton.count()) {
+    await kbButton.click();
+  }
   await page.getByRole("button", { name: /图谱/ }).click();
   await page.waitForSelector("[data-llm-wiki-graph-root='true']");
   await page.locator(".node[data-id='A']").click();
@@ -190,8 +193,66 @@ async function runWorkbenchChecks(browser) {
   await drawer.getByText("这是节点B的正文").waitFor();
   const focused = await page.locator(".node[aria-pressed='true']").count();
   assert.equal(focused, 1, "wikilink navigation should keep one graph node highlighted");
+  assert.equal(await page.locator(".graph-selection-panel").count(), 0, "selection should not use the old floating canvas panel");
 
   if (artifactDir) {
     await page.screenshot({ path: path.join(artifactDir, "stage-4.5-workbench-reader.png"), fullPage: true });
   }
+
+  await page.keyboard.press("Escape");
+  await page.waitForSelector(".drawer-panel-open", { state: "detached" });
+  await expectNoPressedNodes(page, "closing the graph reader should clear the graph highlight");
+
+  await page.keyboard.down("Shift");
+  await page.locator(".node[data-id='A']").click();
+  await page.keyboard.up("Shift");
+  await page.waitForSelector(".drawer-panel-open");
+  await drawer.locator(".drawer-title", { hasText: "选区" }).waitFor();
+  await drawer.getByText("Shift+点击 增删节点").waitFor();
+  assert.equal(await drawer.locator(".graph-selection-fact").count(), 0, "single-node selection should hide structural facts");
+  assert.equal(await drawer.getByText("探索潜在联系").count(), 0, "single-node selection should not show group exploration");
+
+  await page.keyboard.down("Shift");
+  await page.locator(".node[data-id='B']").click();
+  await page.keyboard.up("Shift");
+  await drawer.getByText("Shift+点击 增删节点").waitFor();
+  await drawer.getByText("总结这一组").waitFor();
+  assert.ok(await drawer.locator(".graph-selection-fact").count() >= 3, "multi-node selection should show structural facts");
+
+  await page.keyboard.press("Escape");
+  await page.waitForSelector(".drawer-panel-open", { state: "detached" });
+  await expectNoPressedNodes(page, "Escape should clear the workbench selection drawer and graph highlights");
+  await runWorkbenchMobileChecks(browser);
+}
+
+async function runWorkbenchMobileChecks(browser) {
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  await page.addInitScript(() => {
+    window.localStorage.setItem("llm-wiki-agent-main-view", "graph");
+  });
+  await page.goto(workbenchUrl);
+  await page.waitForSelector(".app-shell");
+  await page.waitForSelector("[data-llm-wiki-graph-root='true']");
+  await page.locator(".node[data-id='A']").click();
+
+  await page.waitForSelector(".drawer-panel-open");
+  const drawer = page.locator(".drawer-panel-open");
+  await drawer.locator(".drawer-title", { hasText: "节点A" }).waitFor();
+  await drawer.getByText("这是节点A的正文").waitFor();
+  assert.equal(await page.locator(".graph-selection-panel").count(), 0, "mobile should not use the old floating canvas panel");
+
+  await page.keyboard.press("Escape");
+  await page.waitForSelector(".drawer-panel-open", { state: "detached" });
+  await expectNoPressedNodes(page, "mobile Escape should clear the graph reader highlight");
+
+  await page.keyboard.down("Shift");
+  await page.locator(".node[data-id='A']").click();
+  await page.keyboard.up("Shift");
+  await page.waitForSelector(".drawer-panel-open");
+  await drawer.locator(".drawer-title", { hasText: "选区" }).waitFor();
+  await drawer.getByText("Shift+点击 增删节点").waitFor();
+
+  await page.keyboard.press("Escape");
+  await page.waitForSelector(".drawer-panel-open", { state: "detached" });
+  await expectNoPressedNodes(page, "mobile Escape should clear the selection drawer and graph highlights");
 }
