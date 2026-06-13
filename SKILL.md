@@ -1,6 +1,6 @@
 ---
 name: llm-wiki
-version: 3.6.2
+version: 3.6.3
 author: sdyckjq-lab
 license: MIT
 description: |
