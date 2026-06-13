@@ -116,6 +116,27 @@ test_graph_html_builds_large_density_fixture_as_single_file() {
     rm -rf "$tmp_dir"
 }
 
+test_graph_html_density_preview_for_compact_and_point_nodes() {
+    local tmp_dir output_dir html playwright_node_path
+    tmp_dir="$(mktemp -d)"
+    output_dir="$tmp_dir/wiki"
+    mkdir -p "$output_dir"
+
+    write_density_fixture "$output_dir/graph-data.json" 240
+    ensure_graph_engine_dist
+    bash "$REPO_ROOT/scripts/build-graph-html.sh" "$tmp_dir" > /dev/null 2>&1 \
+        || fail "build-graph-html.sh should succeed on density preview fixture"
+    html="$output_dir/knowledge-graph.html"
+
+    playwright_node_path="$(
+        npx --yes -p playwright -c 'node -e "const path=require(\"path\"); console.log(path.dirname(process.env.PATH.split(\":\")[0]))"'
+    )"
+    GRAPH_DENSITY_PREVIEW_HTML="$html" NODE_PATH="$playwright_node_path" node "$REPO_ROOT/tests/browser/graph-density-preview.mjs" \
+        || fail "density preview browser regression should pass"
+
+    rm -rf "$tmp_dir"
+}
+
 test_graph_density_thresholds_and_budgets() {
     ensure_graph_engine_dist
     node --input-type=module - <<'NODE' "$REPO_ROOT" || fail "density thresholds and budgets should hold"
@@ -198,6 +219,7 @@ main() {
         || fail "graph-engine build should succeed before density regression"
     test_graph_engine_exports_density_rules
     test_graph_html_builds_large_density_fixture_as_single_file
+    test_graph_html_density_preview_for_compact_and_point_nodes
     test_graph_density_thresholds_and_budgets
     [ -f "$REPO_ROOT/tests/fixtures/graph-interactive-dense/wiki/graph-data.json" ] || fail "dense fixture should exist"
     echo "PASS: graph HTML density regression coverage"
