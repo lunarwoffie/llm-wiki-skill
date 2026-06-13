@@ -164,7 +164,9 @@ export function buildRenderableGraph(data: GraphData, options: BuildRenderableGr
     communityById: Record<string, AtlasCommunity>;
   };
   const layout = deriveAtlasLayout(model) as Record<string, unknown>;
-  const selectedNodeId = resolveSelectedNodeId(model, options);
+  const selectedNodeIds = resolveSelectedNodeIds(model, options);
+  const selectedNodeSet = new Set(selectedNodeIds);
+  const selectedNodeId = selectedNodeIds.length === 1 ? selectedNodeIds[0] : null;
   const visible = resolveAtlasVisibleSnapshot(model, layout, { selectedNodeId }) as {
     nodes: AtlasNode[];
     edges: AtlasEdge[];
@@ -187,7 +189,10 @@ export function buildRenderableGraph(data: GraphData, options: BuildRenderableGr
   const startIds = visible.startNodeIds || {};
 
   const nodes = visible.nodes.map((node) => {
-    const displayMode = nodeDisplayMode(node, visible.densityMode, selectedNodeId, previewNodeId, labelIds, importantIds);
+    const isSelected = selectedNodeSet.has(node.id);
+    const displayMode = isSelected
+      ? "card"
+      : nodeDisplayMode(node, visible.densityMode, selectedNodeId, previewNodeId, labelIds, importantIds);
     const point = renderPointForNode(node, options.positions);
     return {
       id: node.id,
@@ -200,11 +205,11 @@ export function buildRenderableGraph(data: GraphData, options: BuildRenderableGr
       y: pointToPercentY(point.y),
       point,
       displayMode,
-      visualRole: nodeVisualRole(node, displayMode, selectedNodeId, previewNodeId, importantIds),
+      visualRole: nodeVisualRole(node, displayMode, isSelected ? node.id : selectedNodeId, previewNodeId, importantIds),
       priority: Number(node.priority || 0),
       weight: Number(node.weight || 0),
       unavailable: node.unavailable === true,
-      selected: node.id === selectedNodeId,
+      selected: isSelected,
       startNode: startIds[node.id] === true,
       previewStart: node.id === previewNodeId,
       labelVisible: labelIds[node.id] === true
@@ -384,13 +389,17 @@ function normalizePinnedY(value: number): number {
   return value > 100 ? clamp(value / WORLD_HEIGHT * 100, 0, 100) : clamp(value, 0, 100);
 }
 
-function resolveSelectedNodeId(
+function resolveSelectedNodeIds(
   model: { byId: Record<string, AtlasNode>; nodes: AtlasNode[] },
   options: BuildRenderableGraphOptions
-): string | null {
-  if (options.selection?.kind === "node" && model.byId[options.selection.id]) return options.selection.id;
-  if (options.selectedNodeId && model.byId[options.selectedNodeId]) return options.selectedNodeId;
-  return null;
+): string[] {
+  if (options.selection?.kind === "node" && model.byId[options.selection.id]) return [options.selection.id];
+  if (options.selection?.kind === "nodes") {
+    const selected = new Set(options.selection.ids);
+    return model.nodes.map((node) => node.id).filter((id) => selected.has(id));
+  }
+  if (options.selectedNodeId && model.byId[options.selectedNodeId]) return [options.selectedNodeId];
+  return [];
 }
 
 function firstPreviewNodeId(visible: { starts: Array<{ node: AtlasNode }>; nodes: AtlasNode[] }): string | null {

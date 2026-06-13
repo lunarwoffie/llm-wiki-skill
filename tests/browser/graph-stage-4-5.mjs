@@ -44,6 +44,13 @@ try {
   const fitted = await waitForLayerTransform(page, panned);
   assert.notEqual(fitted, panned, "blank double-click should fit the graph through the content layer transform");
 
+  await page.keyboard.down("Shift");
+  await page.locator(".node").nth(0).click();
+  await page.locator(".node").nth(1).click();
+  await page.keyboard.up("Shift");
+  const selectedAfterShiftClick = await page.locator(".node[aria-pressed='true']").count();
+  assert.equal(selectedAfterShiftClick, 2, "Shift-clicking two nodes should keep both nodes selected in the graph");
+
   if (artifactDir) {
     await page.screenshot({ path: path.join(artifactDir, "stage-4.5-offline-navigation.png"), fullPage: true });
   }

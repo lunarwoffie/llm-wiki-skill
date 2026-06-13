@@ -138,6 +138,19 @@ describe("buildRenderableGraph", () => {
     assert.equal(graph.minimap.nodes.find((node) => node.id === "source")?.selected, true);
   });
 
+  it("marks shift-style multi-node selections", () => {
+    const graph = buildRenderableGraph(sampleGraph(), {
+      theme: "shan-shui",
+      selection: { kind: "nodes", ids: ["topic", "source"] }
+    });
+
+    const selected = graph.nodes.filter((node) => node.selected).map((node) => node.id);
+    assert.deepEqual(selected, ["topic", "source"]);
+    assert.equal(graph.nodes.find((node) => node.id === "topic")?.displayMode, "card");
+    assert.equal(graph.nodes.find((node) => node.id === "source")?.visualRole, "cinnabar-note");
+    assert.equal(graph.minimap.nodes.filter((node) => node.selected).length, 2);
+  });
+
   it("keeps community wash around the member cluster instead of chasing an outlier", () => {
     const graph = buildRenderableGraph(outlierCommunityGraph(), { theme: "shan-shui" });
     const community = graph.communities.find((item) => item.id === "c1");
