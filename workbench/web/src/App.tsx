@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { GraphData, GraphDiff, GraphOpenPagePayload, Selection } from "@llm-wiki/graph-engine";
+import { resolveSelection, type GraphData, type GraphDiff, type GraphOpenPagePayload, type Selection } from "@llm-wiki/graph-engine";
 
 import { BatchDigestPanel, type BatchDigestJob } from "@/components/BatchDigestPanel";
 import { ChatPanel } from "@/components/ChatPanel";
@@ -34,8 +34,10 @@ import {
 	type DrawerState,
 	graphReaderDrawer,
 	graphSelectionDrawer,
+	shouldApplyGraphReaderResult,
 	wikiDrawer,
 } from "@/lib/drawer-state";
+import type { GraphReaderActionId } from "@/lib/graph-reader";
 import { buildSelectionPromptPayload, selectionTitle } from "@/lib/graph-selection";
 import { WIKI_LINK_SEEN_EVENT } from "@/lib/wiki-links";
 
@@ -362,7 +364,7 @@ function App() {
 		});
 	}, [drawer]);
 
-	const handleGraphSelectionAsk = useCallback((actionId: string | null, newConversation: boolean) => {
+	const handleGraphSelectionAsk = (actionId: string | null, newConversation: boolean) => {
 		if (!graphData || drawer.mode !== "graph-selection") return;
 		const action = actionId
 			? drawer.selection.actions?.find((item) => item.id === actionId) ?? null
@@ -375,7 +377,29 @@ function App() {
 		});
 		setDrawer(closedDrawer());
 		setSelectionCommand({ id: Math.random().toString(36).slice(2, 10), type: "clear" });
-	}, [drawer, graphData]);
+	};
+
+	const handleGraphReaderAction = (actionId: GraphReaderActionId) => {
+		if (drawer.mode !== "graph-reader") return;
+		if (actionId === "find_related_pages") {
+			setSelectionCommand({
+				id: drawer.payload.node.id,
+				type: "neighbors",
+			});
+			return;
+		}
+		if (!graphData) return;
+		const selection = resolveSelection(graphData, { kind: "node", id: drawer.payload.node.id });
+		const action = selection.actions?.find((item) => item.id === actionId) ?? null;
+		const payload = buildSelectionPromptPayload(graphData, selection, action, "");
+		void handleAskSelection({
+			message: payload.expandedText,
+			displayText: payload.displayText,
+			newConversation: false,
+		});
+		setDrawer(closedDrawer());
+		setSelectionCommand({ id: Math.random().toString(36).slice(2, 10), type: "clear" });
+	};
 
 	const handleCloseDrawer = useCallback(() => {
 		setDrawer((current) => {
@@ -432,9 +456,17 @@ function App() {
 		setDrawer(graphReaderDrawer(normalizedPayload, { loading: true }));
 		try {
 			const content = await readPage(active.kb.path, normalizedPagePath);
-			setDrawer(graphReaderDrawer(normalizedPayload, { content }));
+			setDrawer((current) => (
+				shouldApplyGraphReaderResult(current, normalizedPayload)
+					? graphReaderDrawer(normalizedPayload, { content })
+					: current
+			));
 		} catch (err) {
-			setDrawer(graphReaderDrawer(normalizedPayload, { error: err instanceof Error ? err.message : String(err) }));
+			setDrawer((current) => (
+				shouldApplyGraphReaderResult(current, normalizedPayload)
+					? graphReaderDrawer(normalizedPayload, { error: err instanceof Error ? err.message : String(err) })
+					: current
+			));
 		}
 	};
 
@@ -673,6 +705,7 @@ function App() {
 					onSelectArtifact={(id) => setDrawer(artifactDrawer(artifacts, id))}
 					onOpenPage={handleOpenPage}
 					onWikiLinkSeen={handleWikiLinkSeen}
+					onGraphReaderAction={handleGraphReaderAction}
 					onGraphSelectionTextChange={handleGraphSelectionTextChange}
 					onGraphSelectionNeighbors={handleGraphSelectionNeighbors}
 					onGraphSelectionAsk={handleGraphSelectionAsk}

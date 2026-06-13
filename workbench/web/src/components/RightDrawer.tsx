@@ -8,6 +8,7 @@ import { GraphSelection } from "@/components/GraphSelection";
 import { MarkdownView } from "@/components/MarkdownView";
 import type { DrawerState } from "@/lib/drawer-state";
 import { getArtifactFileUrl, type ArtifactManifest } from "@/lib/api";
+import type { GraphReaderActionId } from "@/lib/graph-reader";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -18,6 +19,7 @@ interface Props {
 	onSelectArtifact: (id: string) => void;
 	onOpenPage: (path: string) => void;
 	onWikiLinkSeen: (path: string) => void;
+	onGraphReaderAction: (actionId: GraphReaderActionId) => void;
 	onGraphSelectionTextChange: (value: string) => void;
 	onGraphSelectionNeighbors: () => void;
 	onGraphSelectionAsk: (actionId: string | null, newConversation: boolean) => void;
@@ -42,6 +44,7 @@ export function RightDrawer({
 	onSelectArtifact,
 	onOpenPage,
 	onWikiLinkSeen,
+	onGraphReaderAction,
 	onGraphSelectionTextChange,
 	onGraphSelectionNeighbors,
 	onGraphSelectionAsk,
@@ -186,6 +189,7 @@ export function RightDrawer({
 						error={drawer.error}
 						onOpenPage={onOpenPage}
 						onWikiLinkSeen={onWikiLinkSeen}
+						onAction={onGraphReaderAction}
 					/>
 				)}
 				{drawer.mode === "graph-selection" && (

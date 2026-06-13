@@ -2,7 +2,11 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
 import type { GraphOpenPagePayload } from "@llm-wiki/graph-engine";
-import { graphReaderActionLabels, graphReaderMetaItems } from "../src/lib/graph-reader";
+import {
+	graphReaderActionLabels,
+	graphReaderActions,
+	graphReaderMetaItems,
+} from "../src/lib/graph-reader";
 
 describe("graph reader", () => {
 	it("uses graph metadata for reader meta and actions without legacy reading sections", () => {
@@ -26,6 +30,10 @@ describe("graph reader", () => {
 			"2026-06-13",
 			"Archive",
 			"wiki/sources/source-a.md",
+		]);
+		assert.deepEqual(graphReaderActions(), [
+			{ id: "quote_page", label: "在对话中引用" },
+			{ id: "find_related_pages", label: "它和谁有关" },
 		]);
 		assert.deepEqual(graphReaderActionLabels(payload), ["在对话中引用", "它和谁有关"]);
 		assert.equal(graphReaderActionLabels(payload).includes("学习队列"), false);

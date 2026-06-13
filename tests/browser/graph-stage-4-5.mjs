@@ -343,6 +343,26 @@ async function runWorkbenchChecks(browser) {
   await drawer.getByText("这是节点A的正文").waitFor();
   await drawer.getByRole("button", { name: "在对话中引用" }).waitFor();
   await drawer.getByRole("button", { name: "它和谁有关" }).waitFor();
+  await drawer.getByRole("button", { name: "它和谁有关" }).click();
+  await drawer.locator(".drawer-title", { hasText: "选区" }).waitFor();
+  await drawer.getByText("Shift+点击 增删节点").waitFor();
+  const readerNeighborFacts = await drawer.locator(".graph-selection-fact").count();
+  assert.ok(readerNeighborFacts >= 3, "reader related action should upgrade the page to a neighbor selection");
+  await page.keyboard.press("Escape");
+  await page.waitForSelector(".drawer-panel-open", { state: "detached" });
+  await expectNoPressedNodes(page, "Escape should clear the reader related selection");
+
+  await page.locator(".node[data-id='A']").click();
+  await page.waitForSelector(".drawer-panel-open");
+  await drawer.locator(".drawer-title", { hasText: "节点A" }).waitFor();
+  await drawer.getByRole("button", { name: "在对话中引用" }).click();
+  await page.getByText("@[选区:节点A · 1页] 在对话中引用").waitFor();
+  await page.waitForSelector(".drawer-panel-open", { state: "detached" });
+  await page.getByRole("button", { name: /图谱/ }).click();
+  await page.waitForSelector("[data-llm-wiki-graph-root='true']");
+  await page.locator(".node[data-id='A']").click();
+  await page.waitForSelector(".drawer-panel-open");
+  await drawer.locator(".drawer-title", { hasText: "节点A" }).waitFor();
   assert.equal(await drawer.getByText("学习队列").count(), 0, "graph reader should not show learning queue");
   assert.equal(await drawer.getByText("摘要").count(), 0, "graph reader should not show a summary block");
   assert.equal(await drawer.getByText("相邻节点").count(), 0, "graph reader should not show a neighbor section");

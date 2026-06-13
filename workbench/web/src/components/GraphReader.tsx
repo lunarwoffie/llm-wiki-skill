@@ -1,9 +1,11 @@
 import type { GraphOpenPagePayload } from "@llm-wiki/graph-engine";
 
 import { MarkdownView } from "./MarkdownView";
-import { graphReaderActionLabels, graphReaderMetaItems } from "@/lib/graph-reader";
-
-export { graphReaderActionLabels, graphReaderMetaItems } from "@/lib/graph-reader";
+import {
+	graphReaderActions,
+	graphReaderMetaItems,
+	type GraphReaderActionId,
+} from "@/lib/graph-reader";
 
 interface Props {
 	payload: GraphOpenPagePayload;
@@ -12,9 +14,10 @@ interface Props {
 	error: string | null;
 	onOpenPage: (path: string) => void;
 	onWikiLinkSeen: (path: string) => void;
+	onAction: (actionId: GraphReaderActionId) => void;
 }
 
-export function GraphReader({ payload, content, loading, error, onOpenPage, onWikiLinkSeen }: Props) {
+export function GraphReader({ payload, content, loading, error, onOpenPage, onWikiLinkSeen, onAction }: Props) {
 	const metaItems = graphReaderMetaItems(payload);
 	return (
 		<article className="graph-reader-drawer">
@@ -24,9 +27,14 @@ export function GraphReader({ payload, content, loading, error, onOpenPage, onWi
 				))}
 			</div>
 			<div className="graph-reader-actions">
-				{graphReaderActionLabels(payload).map((label) => (
-					<button key={label} type="button" className="graph-reader-action">
-						{label}
+				{graphReaderActions().map((action) => (
+					<button
+						key={action.id}
+						type="button"
+						className="graph-reader-action"
+						onClick={() => onAction(action.id)}
+					>
+						{action.label}
 					</button>
 				))}
 			</div>

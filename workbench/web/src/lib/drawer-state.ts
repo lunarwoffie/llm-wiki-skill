@@ -63,6 +63,12 @@ export function graphReaderDrawer(payload: GraphOpenPagePayload, state: PageStat
 	};
 }
 
+export function shouldApplyGraphReaderResult(current: DrawerState, payload: GraphOpenPagePayload): boolean {
+	return current.mode === "graph-reader"
+		&& current.payload.path === payload.path
+		&& current.payload.node.id === payload.node.id;
+}
+
 export function graphSelectionDrawer(selection: Selection, title: string, freeText = ""): DrawerState {
 	return {
 		mode: "graph-selection",
