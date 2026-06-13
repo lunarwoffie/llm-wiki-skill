@@ -1432,6 +1432,8 @@ test_skill_md_step12_does_not_call_cache_update
 GRAPH_DATA_SAMPLE="tests/fixtures/graph-data-sample-wiki"
 GRAPH_DATA_EMPTY="tests/fixtures/graph-data-empty-wiki"
 GRAPH_HTML_BASIC="tests/fixtures/graph-interactive-basic"
+trap - RETURN
+source "$REPO_ROOT/tests/lib/graph-html-engine-helpers.sh"
 
 test_graph_data_sample_wiki_matches_expected() {
     local tmp_dir
@@ -1564,16 +1566,12 @@ test_graph_html_basic_assembly() {
     assert_file_contains "$output_dir/knowledge-graph.html" "3"
     assert_file_contains "$output_dir/knowledge-graph.html" "2"
 
-    # wash vendor 资产已复制
-    assert_path_exists "$output_dir/d3.min.js"
-    assert_path_exists "$output_dir/rough.min.js"
-    assert_path_exists "$output_dir/marked.min.js"
-    assert_path_exists "$output_dir/purify.min.js"
-    assert_path_exists "$output_dir/graph-wash.js"
-    assert_path_exists "$output_dir/LICENSE-d3.txt"
-    assert_path_exists "$output_dir/LICENSE-roughjs.txt"
-    assert_path_exists "$output_dir/LICENSE-marked.txt"
-    assert_path_exists "$output_dir/LICENSE-purify.txt"
+    # 共享 graph-engine 单文件产物：旧 wash/vendor 外部资产不再复制
+    assert_single_file_engine_output "$output_dir"
+    assert_file_contains "$output_dir/knowledge-graph.html" "国风知识库·数字山水图"
+    assert_file_contains "$output_dir/knowledge-graph.html" "graph-reader"
+    assert_file_contains "$output_dir/knowledge-graph.html" "node-layer"
+    assert_file_contains "$output_dir/knowledge-graph.html" "mini-map"
 }
 
 test_graph_html_escapes_script_tag_in_content() {
@@ -1594,6 +1592,27 @@ test_graph_html_escapes_script_tag_in_content() {
     assert_text_contains "$html" '<\/script> 标签'
 }
 
+test_graph_html_escapes_title_text() {
+    local tmp_dir output_dir html
+    tmp_dir="$(mktemp -d)"
+    trap 'rm -rf "$tmp_dir"' RETURN
+
+    output_dir="$tmp_dir/wiki"
+    mkdir -p "$output_dir"
+    jq '.meta.wiki_title = "<img src=x onerror=alert(1)>"' \
+        "$REPO_ROOT/$GRAPH_HTML_BASIC/wiki/graph-data.json" \
+        > "$output_dir/graph-data.json"
+
+    bash "$REPO_ROOT/scripts/build-graph-html.sh" \
+        "$tmp_dir" > /dev/null 2>&1 \
+        || fail "build-graph-html.sh should succeed with HTML-like title text"
+
+    html=$(cat "$output_dir/knowledge-graph.html")
+    assert_text_contains "$html" '<title>知识图谱 · &lt;img src=x onerror=alert(1)&gt;</title>'
+    assert_text_contains "$html" '<h1>&lt;img src=x onerror=alert(1)&gt; 知识舆图</h1>'
+    assert_text_not_contains "$html" '<h1><img src=x onerror=alert(1)> 知识舆图</h1>'
+}
+
 test_graph_html_missing_data_exits_with_error() {
     local tmp_dir
     tmp_dir="$(mktemp -d)"
@@ -1606,7 +1625,7 @@ test_graph_html_missing_data_exits_with_error() {
     fi
 }
 
-test_graph_html_missing_template_exits_with_error() {
+test_graph_html_missing_engine_assets_exits_with_error() {
     local tmp_dir
     tmp_dir="$(mktemp -d)"
     trap 'rm -rf "$tmp_dir"' RETURN
@@ -1614,12 +1633,12 @@ test_graph_html_missing_template_exits_with_error() {
     mkdir -p "$tmp_dir/wiki/scripts" "$tmp_dir/wiki"
     printf '{}' > "$tmp_dir/wiki/graph-data.json"
 
-    # 把脚本复制到临时目录，让它找不到 templates/
+    # 把脚本复制到临时目录，让它找不到 graph-engine/deps 产物
     cp "$REPO_ROOT/scripts/build-graph-html.sh" "$tmp_dir/wiki/scripts/"
     chmod +x "$tmp_dir/wiki/scripts/build-graph-html.sh"
 
     if bash "$tmp_dir/wiki/scripts/build-graph-html.sh" "$tmp_dir/wiki" > /dev/null 2>&1; then
-        fail "build-graph-html.sh should fail when templates are missing"
+        fail "build-graph-html.sh should fail when engine assets are missing"
     fi
 }
 
@@ -1695,7 +1714,7 @@ test_graph_data_empty_wiki_has_zero_nodes_and_edges
 test_graph_html_basic_assembly
 test_graph_html_escapes_script_tag_in_content
 test_graph_html_missing_data_exits_with_error
-test_graph_html_missing_template_exits_with_error
+test_graph_html_missing_engine_assets_exits_with_error
 bash "$REPO_ROOT/tests/graph-analysis-helper.regression-1.sh" || fail "graph-analysis-helper.regression-1.sh 测试失败"
 bash "$REPO_ROOT/tests/graph-build-failures.regression-1.sh" || fail "graph-build-failures.regression-1.sh 测试失败"
 bash "$REPO_ROOT/tests/graph-data-confidence-merge.regression-1.sh" || fail "graph-data-confidence-merge.regression-1.sh 测试失败"

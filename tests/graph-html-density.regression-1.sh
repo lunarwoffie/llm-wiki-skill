@@ -1,23 +1,10 @@
 #!/bin/bash
-# Regression: oriental graph runtime must include density controls for larger real graphs
+# Regression: engine graph HTML should keep density contracts for larger graphs
 
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-
-fail() {
-    echo "FAIL: $1" >&2
-    exit 1
-}
-
-assert_file_contains() {
-    local file="$1"
-    local text="$2"
-
-    if ! grep -F -- "$text" "$file" > /dev/null; then
-        fail "Expected $file to contain: $text"
-    fi
-}
+source "$REPO_ROOT/tests/lib/graph-html-engine-helpers.sh"
 
 write_density_fixture() {
     local output="$1"
@@ -70,7 +57,7 @@ const graph = {
     entry: { recommended_start_node_id: "node-0" },
     views: {
       path: { enabled: true, degraded: false, node_ids: ["node-0", "node-1", "node-2"] },
-      community: { enabled: true, degraded: false, node_ids: communities[0].node_count ? nodes.filter((node) => node.community === "0").map((node) => node.id) : [] },
+      community: { enabled: true, degraded: false, node_ids: nodes.filter((node) => node.community === "0").map((node) => node.id) },
       global: { enabled: true, degraded: false, node_ids: nodes.map((node) => node.id) }
     },
     communities
@@ -87,52 +74,85 @@ fs.writeFileSync(output, JSON.stringify(graph, null, 2));
 NODE
 }
 
-test_graph_runtime_has_density_rules() {
-    assert_file_contains "$REPO_ROOT/templates/graph-styles/wash/graph-wash.js" "const DENSITY_SMALL_LIMIT = 80;"
-    assert_file_contains "$REPO_ROOT/templates/graph-styles/wash/graph-wash.js" "const DENSITY_MEDIUM_LIMIT = 200;"
-    assert_file_contains "$REPO_ROOT/templates/graph-styles/wash/graph-wash.js" "const DENSITY_LARGE_LIMIT = 500;"
-    assert_file_contains "$REPO_ROOT/templates/graph-styles/wash/graph-wash.js" "function currentDensityMode()"
-    assert_file_contains "$REPO_ROOT/templates/graph-styles/wash/graph-wash.js" "function nodeDisplayMode(node, previewNodeId)"
-    assert_file_contains "$REPO_ROOT/templates/graph-styles/wash/graph-wash.js" "function nodeVisualRole(node, displayMode, previewNodeId)"
-    assert_file_contains "$REPO_ROOT/templates/graph-styles/wash/graph-wash.js" "dataset.densityMode"
-    assert_file_contains "$REPO_ROOT/templates/graph-styles/wash/graph-wash.js" "dataset.visualRole"
-    assert_file_contains "$REPO_ROOT/templates/graph-styles/wash/graph-wash-helpers.js" "function getAtlasDensityMode(count)"
-    assert_file_contains "$REPO_ROOT/templates/graph-styles/wash/graph-wash-helpers.js" "function atlasLabelBudget(mode, count)"
-    assert_file_contains "$REPO_ROOT/templates/graph-styles/wash/graph-wash-helpers.js" "function atlasEdgeBudget(mode, count)"
-    assert_file_contains "$REPO_ROOT/templates/graph-styles/wash/header.html" 'data-visual-role="landmark"'
-    assert_file_contains "$REPO_ROOT/templates/graph-styles/wash/header.html" 'data-visual-role="index-slip"'
-    assert_file_contains "$REPO_ROOT/templates/graph-styles/wash/header.html" 'data-visual-role="cinnabar-note"'
+test_graph_engine_exports_density_rules() {
+    local tmp_dir html
+    tmp_dir="$(mktemp -d)"
+
+    build_graph_html_fixture "$tmp_dir"
+    html="$tmp_dir/wiki/knowledge-graph.html"
+
+    assert_file_contains "$html" "e.getAtlasDensityMode="
+    assert_file_contains "$html" "screenEffectiveDensityMode"
+    assert_file_contains "$html" "nodeDisplayModeForDensity"
+    assert_file_contains "$html" "e.resolveAtlasVisibleSnapshot="
+    assert_file_contains "$html" "e.edgeStrokeWidth="
+    assert_file_contains "$html" "e.cardDims="
+    assert_file_contains "$html" ".node.is-overview"
+    assert_file_contains "$html" ".node[data-visual-role=\"map-pin\"]"
+    assert_file_contains "$html" "dataset.densityMode"
+    assert_file_contains "$html" "dataset.effectiveDensity"
+
+    rm -rf "$tmp_dir"
 }
 
-test_graph_html_builds_large_density_fixture() {
+test_graph_html_builds_large_density_fixture_as_single_file() {
     local tmp_dir output_dir html
     tmp_dir="$(mktemp -d)"
     output_dir="$tmp_dir/wiki"
     mkdir -p "$output_dir"
 
     write_density_fixture "$output_dir/graph-data.json" 200
+    ensure_graph_engine_dist
     bash "$REPO_ROOT/scripts/build-graph-html.sh" "$tmp_dir" > /dev/null 2>&1 \
         || fail "build-graph-html.sh should succeed on 200-node density fixture"
 
     html="$output_dir/knowledge-graph.html"
+    assert_single_file_engine_output "$output_dir"
     assert_file_contains "$html" "密度测试知识库"
     assert_file_contains "$html" "Density Node 199"
-    assert_file_contains "$output_dir/graph-wash.js" "point-plus-focus"
-    assert_file_contains "$output_dir/graph-wash.js" "overview"
+    assert_file_contains "$html" "200 节点"
+    assert_file_contains "$html" "199 关联"
+
+    rm -rf "$tmp_dir"
+}
+
+test_graph_html_density_preview_for_compact_and_point_nodes() {
+    local tmp_dir output_dir html playwright_node_path
+    tmp_dir="$(mktemp -d)"
+    output_dir="$tmp_dir/wiki"
+    mkdir -p "$output_dir"
+
+    write_density_fixture "$output_dir/graph-data.json" 240
+    ensure_graph_engine_dist
+    bash "$REPO_ROOT/scripts/build-graph-html.sh" "$tmp_dir" > /dev/null 2>&1 \
+        || fail "build-graph-html.sh should succeed on density preview fixture"
+    html="$output_dir/knowledge-graph.html"
+
+    playwright_node_path="$(
+        npx --yes -p playwright -c 'node -e "const path=require(\"path\"); console.log(path.dirname(process.env.PATH.split(\":\")[0]))"'
+    )"
+    GRAPH_DENSITY_PREVIEW_HTML="$html" NODE_PATH="$playwright_node_path" node "$REPO_ROOT/tests/browser/graph-density-preview.mjs" \
+        || fail "density preview browser regression should pass"
 
     rm -rf "$tmp_dir"
 }
 
 test_graph_density_thresholds_and_budgets() {
-    node - <<'NODE' "$REPO_ROOT" || fail "density thresholds and budgets should hold"
-const assert = require("node:assert/strict");
-const path = require("node:path");
+    ensure_graph_engine_dist
+    node --input-type=module - <<'NODE' "$REPO_ROOT" || fail "density thresholds and budgets should hold"
+import assert from "node:assert/strict";
+import { pathToFileURL } from "node:url";
+import path from "node:path";
+
 const repoRoot = process.argv[2];
+const engine = await import(pathToFileURL(path.join(repoRoot, "packages/graph-engine/dist/engine.esm.js")).href);
 const {
   buildAtlasModel,
   deriveAtlasLayout,
-  resolveAtlasVisibleSnapshot
-} = require(path.join(repoRoot, "templates/graph-styles/wash/graph-wash-helpers.js"));
+  resolveAtlasVisibleSnapshot,
+  nodeDisplayModeForDensity,
+  screenEffectiveDensityMode
+} = engine;
 
 function makeGraph(count, edgeCount) {
   const nodes = Array.from({ length: count }, (_, index) => ({
@@ -172,23 +192,34 @@ function snapshotFor(count, edgeCount, selectedNodeId) {
 
 const pointSnapshot = snapshotFor(201, 900, "node-200");
 assert.equal(pointSnapshot.densityMode, "point-plus-focus");
-assert.ok(Object.keys(pointSnapshot.labelNodeIds).length <= 61, "201-node mode should cap labels while allowing the selected node");
-assert.ok(pointSnapshot.labelNodeIds["node-200"], "selected node should stay readable in point mode");
-assert.ok(pointSnapshot.importantNodeIds["node-0"], "recommended starts should remain important in point mode");
-assert.ok(pointSnapshot.edges.length <= 800, "point mode should cap edges at 800");
+assert.ok(Object.keys(pointSnapshot.labelNodeIds).length <= 61);
+assert.ok(pointSnapshot.labelNodeIds["node-200"]);
+assert.ok(pointSnapshot.importantNodeIds["node-0"]);
+assert.ok(pointSnapshot.edges.length <= 800);
 
 const overviewSnapshot = snapshotFor(501, 1500, "node-500");
 assert.equal(overviewSnapshot.densityMode, "overview");
-assert.ok(Object.keys(overviewSnapshot.labelNodeIds).length <= 41, "501-node mode should cap labels while allowing the selected node");
-assert.ok(overviewSnapshot.labelNodeIds["node-500"], "selected node should stay readable in overview mode");
-assert.ok(overviewSnapshot.importantNodeIds["node-0"], "recommended starts should remain important in overview mode");
-assert.ok(overviewSnapshot.edges.length <= 1000, "overview mode should cap edges at 1000");
+assert.ok(Object.keys(overviewSnapshot.labelNodeIds).length <= 41);
+assert.ok(overviewSnapshot.labelNodeIds["node-500"]);
+assert.ok(overviewSnapshot.importantNodeIds["node-0"]);
+assert.ok(overviewSnapshot.edges.length <= 1000);
+
+assert.equal(screenEffectiveDensityMode(120, 1), "compact-card");
+assert.equal(screenEffectiveDensityMode(120, 2), "card");
+assert.equal(screenEffectiveDensityMode(120, 0.5), "point-plus-focus");
+assert.equal(nodeDisplayModeForDensity({ selected: false, labelVisible: false, visualRole: "map-pin" }, "card"), "card");
+assert.equal(nodeDisplayModeForDensity({ selected: false, labelVisible: false, visualRole: "map-pin" }, "compact-card"), "compact-card");
+assert.equal(nodeDisplayModeForDensity({ selected: false, labelVisible: false, visualRole: "map-pin" }, "point-plus-focus"), "point");
+assert.equal(nodeDisplayModeForDensity({ selected: true, labelVisible: false, visualRole: "map-pin" }, "overview"), "card");
 NODE
 }
 
 main() {
-    test_graph_runtime_has_density_rules
-    test_graph_html_builds_large_density_fixture
+    npm run build -w @llm-wiki/graph-engine > /dev/null 2>&1 \
+        || fail "graph-engine build should succeed before density regression"
+    test_graph_engine_exports_density_rules
+    test_graph_html_builds_large_density_fixture_as_single_file
+    test_graph_html_density_preview_for_compact_and_point_nodes
     test_graph_density_thresholds_and_budgets
     [ -f "$REPO_ROOT/tests/fixtures/graph-interactive-dense/wiki/graph-data.json" ] || fail "dense fixture should exist"
     echo "PASS: graph HTML density regression coverage"

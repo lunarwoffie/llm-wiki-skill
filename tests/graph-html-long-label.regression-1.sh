@@ -4,99 +4,89 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-GRAPH_HTML_BASIC="tests/fixtures/graph-interactive-basic"
-
-fail() {
-    echo "FAIL: $1" >&2
-    exit 1
-}
-
-assert_file_contains() {
-    local file="$1"
-    local text="$2"
-
-    if ! grep -F -- "$text" "$file" > /dev/null; then
-        fail "Expected $file to contain: $text"
-    fi
-}
-
-build_graph_html_fixture() {
-    local tmp_dir="$1"
-    local output_dir="$tmp_dir/wiki"
-
-    mkdir -p "$output_dir"
-    cp "$REPO_ROOT/$GRAPH_HTML_BASIC/wiki/graph-data.json" "$output_dir/graph-data.json"
-
-    bash "$REPO_ROOT/scripts/build-graph-html.sh" \
-        "$tmp_dir" > /dev/null 2>&1 \
-        || fail "build-graph-html.sh should succeed on basic fixture"
-}
+source "$REPO_ROOT/tests/lib/graph-html-engine-helpers.sh"
 
 test_graph_html_has_truncate_label_markup_hooks() {
-    local tmp_dir output_dir
+    local tmp_dir html
     tmp_dir="$(mktemp -d)"
-    output_dir="$tmp_dir/wiki"
 
     build_graph_html_fixture "$tmp_dir"
-    local html="$output_dir/knowledge-graph.html"
+    html="$tmp_dir/wiki/knowledge-graph.html"
 
-    assert_file_contains "$output_dir/graph-wash.js" "button.title = node.label;"
-    assert_file_contains "$output_dir/graph-wash.js" "dataset.densityMode"
-    assert_file_contains "$output_dir/graph-wash.js" "queue-item"
-    assert_file_contains "$html" ".node-name {"
-    assert_file_contains "$html" ".queue-item__copy strong"
-    assert_file_contains "$html" ".knowledge-card pre"
-    assert_file_contains "$html" ".drawer-subtitle"
+    assert_file_contains "$html" ".node-name"
     assert_file_contains "$html" "text-overflow: ellipsis;"
+    assert_file_contains "$html" "white-space: nowrap;"
+    assert_file_contains "$html" "title=e.label"
+    assert_file_contains "$html" "node-kind"
+    assert_file_contains "$html" "node-meta"
+    assert_file_contains "$html" "display: none;"
+    assert_file_contains "$html" ".node:hover .node-kind"
+    assert_file_contains "$html" ".node:hover .node-meta"
+    assert_file_contains "$html" "graph-hover-preview"
+    assert_file_contains "$html" "graph-hover-preview-summary"
+    assert_file_contains "$html" "-webkit-line-clamp: 3;"
+    assert_file_contains "$html" "graph-reader-body pre"
     assert_file_contains "$html" "overflow-wrap: anywhere;"
-    assert_file_contains "$html" "word-break: break-word;"
-
-    # helpers file copied to output
-    [ -f "$output_dir/graph-wash-helpers.js" ] || fail "helpers file should be copied to output"
-
-    # helpers loads before wash in HTML
-    local helpers_line wash_line
-    helpers_line=$(grep -n 'graph-wash-helpers.js' "$html" | head -1 | cut -d: -f1)
-    wash_line=$(grep -n 'src="graph-wash.js"' "$html" | head -1 | cut -d: -f1)
-    [ -n "$helpers_line" ] || fail "HTML should reference graph-wash-helpers.js"
-    [ -n "$wash_line" ] || fail "HTML should reference graph-wash.js"
-    [ "$helpers_line" -lt "$wash_line" ] || fail "helpers.js must load before wash.js in HTML"
 
     rm -rf "$tmp_dir"
 }
 
-test_graph_html_truncate_label_runtime_behavior() {
-    local tmp_dir output_dir
+test_default_nodes_hide_details_until_hover_or_selection() {
+    local tmp_dir html playwright_node_path
     tmp_dir="$(mktemp -d)"
-    output_dir="$tmp_dir/wiki"
+
+    npm run build -w @llm-wiki/graph-engine > /dev/null 2>&1 \
+        || fail "graph-engine build should succeed before node slim browser regression"
+    build_graph_html_fixture "$tmp_dir"
+    html="$tmp_dir/wiki/knowledge-graph.html"
+    node - "$tmp_dir/wiki/graph-data.json" <<'NODE'
+const fs = require("fs");
+const file = process.argv[2];
+const graph = JSON.parse(fs.readFileSync(file, "utf8"));
+graph.nodes.push({
+  id: "empty-preview",
+  label: "空内容节点",
+  type: "topic",
+  community: "t1",
+  content: "",
+  source_path: "/fake/wiki/topics/empty-preview.md"
+});
+graph.meta.total_nodes = graph.nodes.length;
+fs.writeFileSync(file, `${JSON.stringify(graph, null, 2)}\n`);
+NODE
+    bash "$REPO_ROOT/scripts/build-graph-html.sh" "$tmp_dir" > /dev/null 2>&1 \
+        || fail "build-graph-html.sh should succeed on node preview fixture"
+    playwright_node_path="$(
+        npx --yes -p playwright -c 'node -e "const path=require(\"path\"); console.log(path.dirname(process.env.PATH.split(\":\")[0]))"'
+    )"
+
+    GRAPH_NODE_SLIM_HTML="$html" NODE_PATH="$playwright_node_path" node "$REPO_ROOT/tests/browser/graph-node-slim.mjs" \
+        || fail "default node slim browser regression should pass"
+
+    rm -rf "$tmp_dir"
+}
+
+test_label_truncation_helpers_are_carried_by_engine_bundle() {
+    local tmp_dir html
+    tmp_dir="$(mktemp -d)"
 
     build_graph_html_fixture "$tmp_dir"
+    html="$tmp_dir/wiki/knowledge-graph.html"
 
-    # Use extracted helpers module directly (no vm extraction)
-    node - <<'NODE' "$output_dir/graph-wash-helpers.js" || exit 1
-const path = require('path');
-const helpers = require(path.resolve(process.argv[2]));
-
-const { truncateLabel, cardDims } = helpers;
-
-const wide = cardDims({ id: '1', label: '超级超级超级超级超级超级长标签AlphaBeta', type: 'entity' });
-if (wide.w > 180) throw new Error('cardDims should respect max width');
-if (wide.w < 72) throw new Error('cardDims should respect min width');
-
-const truncated = truncateLabel('节点A👨‍👩‍👧‍👦AlphaBeta超长标签', 120);
-if (!truncated.truncated) throw new Error('expected long label to truncate');
-if (!truncated.text.endsWith('…')) throw new Error('truncated label should end with ellipsis');
-if (truncated.text.includes('undefined')) throw new Error('truncate output corrupted');
-if (/\uD800(?![\uDC00-\uDFFF])|(?:^|[^\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(truncated.text)) throw new Error('truncate should not emit unmatched surrogate halves');
-NODE
+    assert_file_contains "$html" "truncateLabel"
+    assert_file_contains "$html" "splitLabelGraphemes"
+    assert_file_contains "$html" "cardDims"
 
     rm -rf "$tmp_dir"
 }
 
 main() {
+    npm run build -w @llm-wiki/graph-engine > /dev/null 2>&1 \
+        || fail "graph-engine build should succeed before long-label regression"
     test_graph_html_has_truncate_label_markup_hooks
-    test_graph_html_truncate_label_runtime_behavior
-    echo "PASS: graph HTML long label regression coverage"
+    test_label_truncation_helpers_are_carried_by_engine_bundle
+    test_default_nodes_hide_details_until_hover_or_selection
+    echo "PASS: graph HTML long-label regression coverage"
 }
 
 main "$@"

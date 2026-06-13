@@ -1,0 +1,746 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+import { resolveSelection, type GraphData, type GraphDiff, type GraphOpenPagePayload, type Selection } from "@llm-wiki/graph-engine";
+
+import { BatchDigestPanel, type BatchDigestJob } from "@/components/BatchDigestPanel";
+import { ChatPanel } from "@/components/ChatPanel";
+import { GraphPanel } from "@/components/GraphPanel";
+import { RightDrawer } from "@/components/RightDrawer";
+import { SettingsPanel } from "@/components/SettingsPanel";
+import { Sidebar, type MainView } from "@/components/Sidebar";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import {
+	type ActiveContext,
+	type ConversationInfo,
+	createNewConversation,
+	createKnowledgeBase,
+	type ArtifactManifest,
+	getActiveContext,
+	type KnowledgeBaseInfo,
+	listArtifacts,
+	listConversations,
+	listKnowledgeBases,
+	type ModelRef,
+	registerExternalKnowledgeBase,
+	readPage,
+	selectConversation,
+	selectKnowledgeBase,
+	streamBatchDigest,
+	type GraphEvent,
+	type UIMessage,
+} from "@/lib/api";
+import {
+	artifactDrawer,
+	closedDrawer,
+	type DrawerState,
+	graphReaderDrawer,
+	graphSelectionDrawer,
+	shouldApplyGraphReaderResult,
+	wikiDrawer,
+} from "@/lib/drawer-state";
+import type { GraphReaderActionId } from "@/lib/graph-reader";
+import { buildSelectionPromptPayload, selectionTitle } from "@/lib/graph-selection";
+import { WIKI_LINK_SEEN_EVENT } from "@/lib/wiki-links";
+
+type ThemeMode = "dark" | "light";
+const THEME_STORAGE_KEY = "llm-wiki-agent-theme";
+const SIDEBAR_COLLAPSED_STORAGE_KEY = "llm-wiki-agent-sidebar-collapsed";
+const DRAWER_WIDTH_STORAGE_KEY = "llm-wiki-agent-drawer-width";
+const MAIN_VIEW_STORAGE_KEY = "llm-wiki-agent-main-view";
+const DEFAULT_DRAWER_WIDTH = 420;
+const MIN_DRAWER_WIDTH = 360;
+const MIN_CHAT_WIDTH = 420;
+const MAX_DRAWER_RATIO = 0.7;
+const FULL_SIDEBAR_WIDTH = 270;
+const COMPACT_SIDEBAR_WIDTH = 230;
+const COLLAPSED_SIDEBAR_WIDTH = 52;
+const MOBILE_BREAKPOINT = 768;
+const COMPACT_BREAKPOINT = 1024;
+
+function getSidebarLayoutWidth(collapsed: boolean): number {
+	if (typeof window === "undefined") return 0;
+	if (window.innerWidth <= MOBILE_BREAKPOINT) return 0;
+	if (collapsed) return COLLAPSED_SIDEBAR_WIDTH;
+	return window.innerWidth <= COMPACT_BREAKPOINT ? COMPACT_SIDEBAR_WIDTH : FULL_SIDEBAR_WIDTH;
+}
+
+function clampDrawerWidth(width: number, sidebarCollapsed: boolean): number {
+	if (typeof window === "undefined") return DEFAULT_DRAWER_WIDTH;
+	const sidebarWidth = getSidebarLayoutWidth(sidebarCollapsed);
+	const maxByRatio = Math.floor(window.innerWidth * MAX_DRAWER_RATIO);
+	const maxByChat = Math.max(0, window.innerWidth - sidebarWidth - MIN_CHAT_WIDTH);
+	const maxWidth = Math.max(0, Math.min(maxByRatio, maxByChat));
+	const minWidth = Math.min(MIN_DRAWER_WIDTH, maxWidth);
+	return Math.min(Math.max(width, minWidth), maxWidth);
+}
+
+/**
+ * 阶段一 step 8 - 阶段一完结
+ *
+ * Layout:
+ *   [Sidebar 知识库 + 对话列表] [ChatPanel 对话主区]
+ *
+ * 切库联动：
+ *   1. POST /api/knowledge-base → 后端自动选/新建该库最近对话
+ *   2. 拿到 active 后刷新 conversations 列表
+ *   3. chatKey++ 让 ChatPanel 重挂载（载入历史消息）
+ *
+ * 切对话联动：
+ *   1. POST /api/conversations { kbPath, conversationId }
+ *   2. ChatPanel 重挂载
+ *
+ * 新建对话：
+ *   1. POST /api/conversations/new
+ *   2. 刷新 conversations 列表（含合成 stub）
+ *   3. ChatPanel 重挂载
+ */
+function App() {
+	const [theme, setTheme] = useState<ThemeMode>(() => {
+		if (typeof window === "undefined") return "dark";
+		return window.localStorage.getItem(THEME_STORAGE_KEY) === "light" ? "light" : "dark";
+	});
+	const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+		if (typeof window === "undefined") return false;
+		return window.localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === "true";
+	});
+	const [drawerWidth, setDrawerWidthState] = useState(() => {
+		if (typeof window === "undefined") return DEFAULT_DRAWER_WIDTH;
+		const stored = window.localStorage.getItem(DRAWER_WIDTH_STORAGE_KEY);
+		if (!stored) return DEFAULT_DRAWER_WIDTH;
+		const raw = Number(stored);
+		return Number.isFinite(raw) ? clampDrawerWidth(raw, sidebarCollapsed) : DEFAULT_DRAWER_WIDTH;
+	});
+	const [kbs, setKbs] = useState<KnowledgeBaseInfo[]>([]);
+	const [active, setActive] = useState<ActiveContext | null>(null);
+	const [conversations, setConversations] = useState<ConversationInfo[]>([]);
+	const [sidebarError, setSidebarError] = useState<string | null>(null);
+	const [loading, setLoading] = useState(false);
+	const [chatKey, setChatKey] = useState(0);
+	const [initialMessages, setInitialMessages] = useState<UIMessage[]>([]);
+	const [settingsOpen, setSettingsOpen] = useState(false);
+	const [drawer, setDrawer] = useState<DrawerState>(() => closedDrawer());
+	const [artifacts, setArtifacts] = useState<ArtifactManifest[]>([]);
+	const [drawerFullscreen, setDrawerFullscreen] = useState(false);
+	const [batchJob, setBatchJob] = useState<BatchDigestJob | null>(null);
+	const [pendingGraphPrompt, setPendingGraphPrompt] = useState<{
+		id: string;
+		message: string;
+		displayText: string;
+	} | null>(null);
+	const [graphFocusPath, setGraphFocusPath] = useState<string | null>(null);
+	const [pendingGraphDiff, setPendingGraphDiff] = useState<GraphDiff | null>(null);
+	const [graphRefreshToken, setGraphRefreshToken] = useState(0);
+	const [graphHasPendingUpdate, setGraphHasPendingUpdate] = useState(false);
+	const [graphData, setGraphData] = useState<GraphData | null>(null);
+	const [selectionCommand, setSelectionCommand] = useState<{ id: string; type: "clear" | "neighbors" } | undefined>();
+	const [mainView, setMainView] = useState<MainView>(() => {
+		if (typeof window === "undefined") return "chat";
+		return window.localStorage.getItem(MAIN_VIEW_STORAGE_KEY) === "graph" ? "graph" : "chat";
+	});
+	const mainViewRef = useRef(mainView);
+	const activeConversationId = active?.conversation.id ?? null;
+
+	useEffect(() => {
+		const root = document.documentElement;
+		root.dataset.theme = theme;
+		root.classList.toggle("dark", theme === "dark");
+		window.localStorage.setItem(THEME_STORAGE_KEY, theme);
+	}, [theme]);
+
+	useEffect(() => {
+		window.localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, String(sidebarCollapsed));
+	}, [sidebarCollapsed]);
+
+	useEffect(() => {
+		window.localStorage.setItem(MAIN_VIEW_STORAGE_KEY, mainView);
+		mainViewRef.current = mainView;
+	}, [mainView]);
+
+	useEffect(() => {
+		if (!active?.kb.path) return;
+		const events = new EventSource("/api/events");
+		events.addEventListener("graph_updated", (message) => {
+			const event = JSON.parse((message as MessageEvent).data) as GraphEvent;
+			if (event.type !== "graph_updated" || event.kbPath !== active.kb.path) return;
+			setGraphRefreshToken((token) => token + 1);
+			setPendingGraphDiff(event.diff);
+			if (mainViewRef.current !== "graph" && event.diff) setGraphHasPendingUpdate(true);
+		});
+		events.addEventListener("graph_error", (message) => {
+			const event = JSON.parse((message as MessageEvent).data) as GraphEvent;
+			if (event.type === "graph_error" && event.kbPath === active.kb.path) {
+				setSidebarError(event.message);
+			}
+		});
+		return () => events.close();
+	}, [active?.kb.path]);
+
+	useEffect(() => {
+		if (mainView === "graph") setGraphHasPendingUpdate(false);
+	}, [mainView]);
+
+	useEffect(() => {
+		const handleWikiLinkSeenEvent = (event: Event) => {
+			const path = (event as CustomEvent<string>).detail;
+			if (typeof path === "string" && path.startsWith("wiki/")) setGraphFocusPath(path);
+		};
+		window.addEventListener(WIKI_LINK_SEEN_EVENT, handleWikiLinkSeenEvent);
+		return () => window.removeEventListener(WIKI_LINK_SEEN_EVENT, handleWikiLinkSeenEvent);
+	}, []);
+
+	useEffect(() => {
+		const handleResize = () => setDrawerWidthState((width) => clampDrawerWidth(width, sidebarCollapsed));
+		window.addEventListener("resize", handleResize);
+		return () => window.removeEventListener("resize", handleResize);
+	}, [sidebarCollapsed]);
+
+	const setDrawerWidth = useCallback((width: number) => {
+		setDrawerWidthState(() => {
+			const next = clampDrawerWidth(width, sidebarCollapsed);
+			window.localStorage.setItem(DRAWER_WIDTH_STORAGE_KEY, String(next));
+			return next;
+		});
+	}, [sidebarCollapsed]);
+
+	const refreshConversations = useCallback(async (kbPath: string) => {
+		try {
+			const items = await listConversations(kbPath);
+			setConversations(items);
+		} catch (err) {
+			setSidebarError(err instanceof Error ? err.message : String(err));
+		}
+	}, []);
+
+	const refreshAll = useCallback(async () => {
+		setLoading(true);
+		setSidebarError(null);
+		try {
+			const [items, currentActive] = await Promise.all([
+				listKnowledgeBases(),
+				getActiveContext(),
+			]);
+			setKbs(items);
+			setActive(currentActive);
+			if (currentActive) {
+				setInitialMessages(currentActive.conversation.messages);
+				await refreshConversations(currentActive.kb.path);
+			} else {
+				setInitialMessages([]);
+				setConversations([]);
+				setArtifacts([]);
+				setDrawer(closedDrawer());
+			}
+		} catch (err) {
+			setSidebarError(err instanceof Error ? err.message : String(err));
+		} finally {
+			setLoading(false);
+		}
+	}, [refreshConversations]);
+
+	useEffect(() => {
+		refreshAll();
+	}, [refreshAll]);
+
+	useEffect(() => {
+		if (!activeConversationId) return;
+		let cancelled = false;
+		listArtifacts(activeConversationId)
+			.then((items) => {
+				if (cancelled) return;
+			setArtifacts(items);
+			setDrawer((current) => {
+				if (current.mode !== "artifacts") return current;
+				const activeArtifactId = current.activeArtifactId && items.some((item) => item.id === current.activeArtifactId)
+					? current.activeArtifactId
+					: items.at(-1)?.id ?? null;
+				return artifactDrawer(items, activeArtifactId);
+			});
+			})
+			.catch((err) => {
+				if (!cancelled) setSidebarError(err instanceof Error ? err.message : String(err));
+			});
+		return () => {
+			cancelled = true;
+		};
+	}, [activeConversationId]);
+
+	const applyActive = (ctx: ActiveContext) => {
+		setActive(ctx);
+		setInitialMessages(ctx.conversation.messages);
+		setChatKey((k) => k + 1);
+		setDrawer(closedDrawer());
+		setArtifacts([]);
+		setPendingGraphDiff(null);
+		setGraphHasPendingUpdate(false);
+		setGraphData(null);
+		setSelectionCommand({ id: Math.random().toString(36).slice(2, 10), type: "clear" });
+		setGraphFocusPath(null);
+	};
+
+	const handleSelectKb = async (item: KnowledgeBaseInfo) => {
+		if (!item.valid) return;
+		if (item.path === active?.kb.path) return;
+
+		setSidebarError(null);
+		try {
+			const ctx = await selectKnowledgeBase(item.path);
+			applyActive(ctx);
+			await refreshConversations(item.path);
+		} catch (err) {
+			setSidebarError(err instanceof Error ? err.message : String(err));
+		}
+	};
+
+	const handleSelectConversation = async (item: ConversationInfo) => {
+		if (!active) return;
+		if (item.id === active.conversation.id) return;
+
+		setSidebarError(null);
+		try {
+			const ctx = await selectConversation(active.kb.path, item.id);
+			applyActive(ctx);
+			await refreshConversations(active.kb.path);
+		} catch (err) {
+			setSidebarError(err instanceof Error ? err.message : String(err));
+		}
+	};
+
+	const handleNewConversation = async () => {
+		if (!active) return;
+		setSidebarError(null);
+		try {
+			const ctx = await createNewConversation(active.kb.path);
+			applyActive(ctx);
+			await refreshConversations(active.kb.path);
+		} catch (err) {
+			setSidebarError(err instanceof Error ? err.message : String(err));
+		}
+	};
+
+	const handleAskSelection = async (input: { message: string; displayText: string; newConversation: boolean }) => {
+		if (!active) return;
+		setSidebarError(null);
+		try {
+			if (input.newConversation) {
+				const ctx = await createNewConversation(active.kb.path);
+				applyActive(ctx);
+				await refreshConversations(active.kb.path);
+			}
+			setMainView("chat");
+			setPendingGraphPrompt({
+				id: Math.random().toString(36).slice(2, 10),
+				message: input.message,
+				displayText: input.displayText,
+			});
+		} catch (err) {
+			setSidebarError(err instanceof Error ? err.message : String(err));
+		}
+	};
+
+	const handleGraphSelectionChange = useCallback((selection: Selection | null) => {
+		if (!selection) {
+			setDrawer((current) => current.mode === "graph-selection" ? closedDrawer() : current);
+			return;
+		}
+		setDrawer((current) => {
+			const freeText = current.mode === "graph-selection" ? current.freeText : "";
+			const title = graphData ? selectionTitle(graphData, selection) : "选区";
+			return graphSelectionDrawer(selection, title, freeText);
+		});
+	}, [graphData]);
+
+	const handleGraphSelectionTextChange = useCallback((value: string) => {
+		setDrawer((current) => (
+			current.mode === "graph-selection"
+				? graphSelectionDrawer(current.selection, current.title, value)
+				: current
+		));
+	}, []);
+
+	const handleGraphSelectionNeighbors = useCallback(() => {
+		if (drawer.mode !== "graph-selection" || drawer.selection.nodeIds.length !== 1) return;
+		setSelectionCommand({
+			id: drawer.selection.nodeIds[0],
+			type: "neighbors",
+		});
+	}, [drawer]);
+
+	const handleGraphSelectionAsk = (actionId: string | null, newConversation: boolean) => {
+		if (!graphData || drawer.mode !== "graph-selection") return;
+		const action = actionId
+			? drawer.selection.actions?.find((item) => item.id === actionId) ?? null
+			: null;
+		const payload = buildSelectionPromptPayload(graphData, drawer.selection, action, drawer.freeText);
+		void handleAskSelection({
+			message: payload.expandedText,
+			displayText: payload.displayText,
+			newConversation,
+		});
+		setDrawer(closedDrawer());
+		setSelectionCommand({ id: Math.random().toString(36).slice(2, 10), type: "clear" });
+	};
+
+	const handleGraphReaderAction = (actionId: GraphReaderActionId) => {
+		if (drawer.mode !== "graph-reader") return;
+		if (actionId === "find_related_pages") {
+			setSelectionCommand({
+				id: drawer.payload.node.id,
+				type: "neighbors",
+			});
+			return;
+		}
+		if (!graphData) return;
+		const selection = resolveSelection(graphData, { kind: "node", id: drawer.payload.node.id });
+		const action = selection.actions?.find((item) => item.id === actionId) ?? null;
+		const payload = buildSelectionPromptPayload(graphData, selection, action, "");
+		void handleAskSelection({
+			message: payload.expandedText,
+			displayText: payload.displayText,
+			newConversation: false,
+		});
+		setDrawer(closedDrawer());
+		setSelectionCommand({ id: Math.random().toString(36).slice(2, 10), type: "clear" });
+	};
+
+	const handleCloseDrawer = useCallback(() => {
+		setDrawer((current) => {
+			if (current.mode === "graph-reader" || current.mode === "graph-selection") {
+				setSelectionCommand({ id: Math.random().toString(36).slice(2, 10), type: "clear" });
+				setGraphFocusPath(null);
+			}
+			return closedDrawer();
+		});
+	}, []);
+
+	const handleAddExternal = async (path: string) => {
+		const { info } = await registerExternalKnowledgeBase(path);
+		await refreshAll();
+		if (info.valid) await handleSelectKb(info);
+	};
+
+	const handleCreateWiki = async (name: string, purpose: string) => {
+		const info = await createKnowledgeBase(name, purpose);
+		await refreshAll();
+		await handleSelectKb(info);
+	};
+
+	const handleMessageSent = async () => {
+		// 用户发了一次消息后，刷新对话列表，把 "(新对话)" stub 替换为带 firstMessage 的真实条目
+		if (active) await refreshConversations(active.kb.path);
+	};
+
+	const handleOpenPage = async (pagePath: string) => {
+		if (!active) return;
+		const normalizedPagePath = toRelativePagePath(pagePath, active.kb.path) ?? pagePath;
+		if (normalizedPagePath.startsWith("wiki/")) setGraphFocusPath(normalizedPagePath);
+		setDrawer(wikiDrawer(normalizedPagePath, { loading: true }));
+		try {
+			const content = await readPage(active.kb.path, normalizedPagePath);
+			setDrawer(wikiDrawer(normalizedPagePath, { content }));
+		} catch (err) {
+			setDrawer(wikiDrawer(normalizedPagePath, { error: err instanceof Error ? err.message : String(err) }));
+		}
+	};
+
+	const handleOpenGraphPage = async (payload: GraphOpenPagePayload) => {
+		if (!active) return;
+		const normalizedPagePath = toRelativePagePath(payload.path, active.kb.path) ?? payload.path;
+		const normalizedPayload = {
+			...payload,
+			path: normalizedPagePath,
+			node: {
+				...payload.node,
+				sourcePath: toRelativePagePath(payload.node.sourcePath, active.kb.path) ?? payload.node.sourcePath,
+			},
+		};
+		if (normalizedPagePath.startsWith("wiki/")) setGraphFocusPath(normalizedPagePath);
+		setDrawer(graphReaderDrawer(normalizedPayload, { loading: true }));
+		try {
+			const content = await readPage(active.kb.path, normalizedPagePath);
+			setDrawer((current) => (
+				shouldApplyGraphReaderResult(current, normalizedPayload)
+					? graphReaderDrawer(normalizedPayload, { content })
+					: current
+			));
+		} catch (err) {
+			setDrawer((current) => (
+				shouldApplyGraphReaderResult(current, normalizedPayload)
+					? graphReaderDrawer(normalizedPayload, { error: err instanceof Error ? err.message : String(err) })
+					: current
+			));
+		}
+	};
+
+	const handleWikiLinkSeen = useCallback((pagePath: string) => {
+		setGraphFocusPath(pagePath);
+	}, []);
+
+	const refreshArtifacts = async (conversationId: string, focusId?: string) => {
+		const items = await listArtifacts(conversationId);
+		setArtifacts(items);
+		setDrawer(artifactDrawer(items, focusId ?? items.at(-1)?.id ?? null));
+	};
+
+	const handleOpenArtifacts = () => {
+		if (artifacts.length === 0) return;
+		const current = drawer.mode === "artifacts" ? drawer.activeArtifactId : null;
+		setDrawer(artifactDrawer(
+			artifacts,
+			current && artifacts.some((item) => item.id === current) ? current : artifacts.at(-1)?.id ?? null,
+		));
+	};
+
+	const handleArtifactCreated = async (id: string) => {
+		if (!active) return;
+		try {
+			await refreshArtifacts(active.conversation.id, id);
+		} catch (err) {
+			setSidebarError(err instanceof Error ? err.message : String(err));
+		}
+	};
+
+	const handleStartBatchDigest = (input: {
+		kbPath: string;
+		filePaths: string[];
+		sourceScanId?: string;
+		digestModel?: ModelRef | null;
+		concurrency: 1 | 3 | 5;
+	}) => {
+		const jobId = Math.random().toString(36).slice(2, 10);
+		setBatchJob({
+			id: jobId,
+			kbPath: input.kbPath,
+			status: "running",
+			total: input.filePaths.length,
+			completed: 0,
+			failed: 0,
+			files: input.filePaths.map((filePath, index) => ({
+				index,
+				filePath,
+				status: "queued",
+			})),
+			events: [],
+		});
+		void (async () => {
+			try {
+				const stream = await streamBatchDigest(input);
+				for await (const message of stream) {
+					if (message.event === "error") {
+						const payload = JSON.parse(message.data) as { message: string };
+						throw new Error(payload.message);
+					}
+					const event = JSON.parse(message.data);
+					setBatchJob((current) => {
+						if (!current || current.id !== jobId) return current;
+						if (event.type === "start") {
+							return {
+								...current,
+								total: event.total,
+								outputDir: event.outputDir,
+								events: [...current.events, event],
+							};
+						}
+						if (event.type === "file_start") {
+							return {
+								...current,
+								current: event.filePath,
+								files: updateBatchFile(current.files, event.index, {
+									status: "running",
+								}),
+								events: [...current.events, event],
+							};
+						}
+						if (event.type === "file_progress") {
+							return {
+								...current,
+								files: updateBatchFile(current.files, event.index, {
+									status: "running",
+									chars: event.chars,
+								}),
+								events: [...current.events, event],
+							};
+						}
+						if (event.type === "file_complete") {
+							return {
+								...current,
+								completed: current.completed + 1,
+								current: event.filePath,
+								files: updateBatchFile(current.files, event.index, {
+									status: "done",
+									outputPath: event.outputPath,
+								}),
+								events: [...current.events, event],
+							};
+						}
+						if (event.type === "file_error") {
+							return {
+								...current,
+								failed: current.failed + 1,
+								current: event.filePath,
+								files: updateBatchFile(current.files, event.index, {
+									status: "error",
+									error: event.error,
+								}),
+								events: [...current.events, event],
+							};
+						}
+						if (event.type === "done") {
+							return {
+								...current,
+								status: "done",
+								completed: event.completed,
+								failed: event.failed,
+								outputDir: event.outputDir,
+								events: [...current.events, event],
+							};
+						}
+						return current;
+					});
+				}
+			} catch (err) {
+				setBatchJob((current) =>
+					current && current.id === jobId
+						? {
+								...current,
+								status: "error",
+								error: err instanceof Error ? err.message : String(err),
+							}
+						: current,
+				);
+			}
+		})();
+	};
+
+	const handleOpenBatchOutput = async (outputPath: string) => {
+		if (!batchJob) return;
+		const rel = toRelativePagePath(outputPath, batchJob.kbPath);
+		if (!rel) return;
+		setDrawer(wikiDrawer(rel, { loading: true }));
+		try {
+			const content = await readPage(batchJob.kbPath, rel);
+			setDrawer(wikiDrawer(rel, { content }));
+		} catch (err) {
+			setDrawer(wikiDrawer(rel, { error: err instanceof Error ? err.message : String(err) }));
+		}
+	};
+
+	const handleConfigChanged = async () => {
+		try {
+			const currentActive = await getActiveContext();
+			setActive(currentActive);
+			if (currentActive) {
+				setInitialMessages(currentActive.conversation.messages);
+			}
+		} catch (err) {
+			setSidebarError(err instanceof Error ? err.message : String(err));
+		}
+	};
+
+	return (
+		<TooltipProvider delayDuration={200}>
+			<div className="app-shell">
+				<Sidebar
+					knowledgeBases={kbs}
+					currentKbPath={active?.kb.path ?? null}
+					conversations={conversations}
+					currentConversationId={active?.conversation.id ?? null}
+					loading={loading}
+					error={sidebarError}
+					collapsed={sidebarCollapsed}
+					activeView={mainView}
+					onSelectKb={handleSelectKb}
+					onSelectConversation={handleSelectConversation}
+					onSelectView={setMainView}
+					onNewConversation={handleNewConversation}
+					onRefresh={refreshAll}
+					onOpenSettings={() => setSettingsOpen(true)}
+					onToggleCollapsed={() => setSidebarCollapsed((value) => !value)}
+					graphHasPendingUpdate={graphHasPendingUpdate}
+					onAddExternal={handleAddExternal}
+					onCreateWiki={handleCreateWiki}
+					onStartBatchDigest={handleStartBatchDigest}
+				/>
+				<main className="shell-main">
+					{mainView === "graph" ? (
+						<GraphPanel
+							currentKnowledgeBaseName={active?.kb.name ?? null}
+							currentKnowledgeBasePath={active?.kb.path ?? null}
+							theme={theme}
+							onToggleTheme={() => setTheme((value) => (value === "dark" ? "light" : "dark"))}
+							onOpenPage={handleOpenGraphPage}
+							onGraphDataChange={setGraphData}
+							onSelectionChange={handleGraphSelectionChange}
+							selectionCommand={selectionCommand}
+							focusPath={graphFocusPath}
+							pendingDiff={pendingGraphDiff}
+							refreshToken={graphRefreshToken}
+							onDiffConsumed={() => setPendingGraphDiff(null)}
+						/>
+					) : (
+						<ChatPanel
+							key={chatKey}
+							currentKnowledgeBaseName={active?.kb.name ?? null}
+							model={active?.model ?? null}
+							initialMessages={initialMessages}
+							onMessageSent={handleMessageSent}
+							onOpenSettings={() => setSettingsOpen(true)}
+							currentKnowledgeBasePath={active?.kb.path ?? null}
+							onOpenPage={handleOpenPage}
+							onWikiLinkSeen={handleWikiLinkSeen}
+							onArtifactCreated={handleArtifactCreated}
+							artifactCount={artifacts.length}
+							onOpenArtifacts={handleOpenArtifacts}
+							onStartBatchDigest={handleStartBatchDigest}
+							theme={theme}
+							onToggleTheme={() => setTheme((value) => (value === "dark" ? "light" : "dark"))}
+							pendingPrompt={pendingGraphPrompt}
+							onPendingPromptConsumed={() => setPendingGraphPrompt(null)}
+						/>
+					)}
+				</main>
+				<RightDrawer
+					drawer={drawer}
+					fullscreen={drawerFullscreen}
+					width={drawerWidth}
+					defaultWidth={DEFAULT_DRAWER_WIDTH}
+					onSelectArtifact={(id) => setDrawer(artifactDrawer(artifacts, id))}
+					onOpenPage={handleOpenPage}
+					onWikiLinkSeen={handleWikiLinkSeen}
+					onGraphReaderAction={handleGraphReaderAction}
+					onGraphSelectionTextChange={handleGraphSelectionTextChange}
+					onGraphSelectionNeighbors={handleGraphSelectionNeighbors}
+					onGraphSelectionAsk={handleGraphSelectionAsk}
+					onResize={setDrawerWidth}
+					onToggleFullscreen={() => setDrawerFullscreen((value) => !value)}
+					onClose={handleCloseDrawer}
+				/>
+				<SettingsPanel
+					open={settingsOpen}
+					onOpenChange={setSettingsOpen}
+					onConfigChanged={handleConfigChanged}
+				/>
+				<BatchDigestPanel
+					job={batchJob}
+					onClose={() => setBatchJob(null)}
+					onOpenOutput={handleOpenBatchOutput}
+				/>
+			</div>
+		</TooltipProvider>
+	);
+}
+
+function updateBatchFile<T extends { index: number }>(
+	files: T[],
+	index: number,
+	patch: Partial<T>,
+): T[] {
+	return files.map((file) => (file.index === index ? { ...file, ...patch } : file));
+}
+
+function toRelativePagePath(outputPath: string, kbPath: string): string | null {
+	const normalizedKb = kbPath.endsWith("/") ? kbPath : `${kbPath}/`;
+	if (outputPath.startsWith(normalizedKb)) return outputPath.slice(normalizedKb.length);
+	if (outputPath.startsWith("wiki/")) return outputPath;
+	return null;
+}
+
+export default App;

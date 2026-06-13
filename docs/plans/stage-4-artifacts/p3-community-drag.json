@@ -1,0 +1,33 @@
+{
+  "checkedAt": "2026-06-12T17:42:00+08:00",
+  "sourceBefore": {
+    "id": "context-window",
+    "title": "Context Window",
+    "community": "agent-runtime",
+    "x": 572.97900390625,
+    "y": 350.3973693847656
+  },
+  "targetBefore": {
+    "id": "retrieval",
+    "title": "Retrieval",
+    "community": "knowledge-base",
+    "x": 697.9281005859375,
+    "y": 416.4737548828125
+  },
+  "sourceAfter": {
+    "community": "agent-runtime",
+    "pinned": "true",
+    "liveX": "457.355",
+    "liveY": "347.425",
+    "x": 731.921875,
+    "y": 440.46875,
+    "dragging": null,
+    "washCount": 4
+  },
+  "assertions": {
+    "sourceCommunityUnchanged": true,
+    "dragStateCleared": true,
+    "screenshot": "docs/plans/stage-4-artifacts/p3-community-drag.png",
+    "originalLayoutRestored": true
+  }
+}

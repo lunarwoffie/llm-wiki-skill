@@ -1,80 +1,49 @@
 #!/bin/bash
-# Regression: oriental atlas design grammar hooks must survive HTML generation
+# Regression: oriental atlas design grammar hooks must survive engine HTML generation
 
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-GRAPH_HTML_BASIC="tests/fixtures/graph-interactive-basic"
-
-fail() {
-    echo "FAIL: $1" >&2
-    exit 1
-}
-
-assert_file_contains() {
-    local file="$1"
-    local text="$2"
-
-    if ! grep -F -- "$text" "$file" > /dev/null; then
-        fail "Expected $file to contain: $text"
-    fi
-}
-
-build_graph_html_fixture() {
-    local tmp_dir="$1"
-    local output_dir="$tmp_dir/wiki"
-
-    mkdir -p "$output_dir"
-    cp "$REPO_ROOT/$GRAPH_HTML_BASIC/wiki/graph-data.json" "$output_dir/graph-data.json"
-
-    bash "$REPO_ROOT/scripts/build-graph-html.sh" "$tmp_dir" > /dev/null 2>&1 \
-        || fail "build-graph-html.sh should succeed on basic fixture"
-}
+source "$REPO_ROOT/tests/lib/graph-html-engine-helpers.sh"
 
 test_oriental_design_contract_hooks() {
-    local tmp_dir output_dir html js helpers
+    local tmp_dir html
     tmp_dir="$(mktemp -d)"
-    output_dir="$tmp_dir/wiki"
 
     build_graph_html_fixture "$tmp_dir"
-    html="$output_dir/knowledge-graph.html"
-    js="$output_dir/graph-wash.js"
-    helpers="$output_dir/graph-wash-helpers.js"
+    html="$tmp_dir/wiki/knowledge-graph.html"
 
-    assert_file_contains "$html" 'data-visual-role="landmark"'
-    assert_file_contains "$html" 'data-visual-role="index-slip"'
-    assert_file_contains "$html" 'data-visual-role="cinnabar-note"'
-    assert_file_contains "$html" '.node.is-preview-start'
-    assert_file_contains "$html" '.start-card[data-preview-start="true"]'
-    assert_file_contains "$html" '.drawer[data-state="start-preview"]'
-    assert_file_contains "$html" '.queue-item__marker'
-    assert_file_contains "$html" '.mini-map .mini-map-viewport'
-
-    assert_file_contains "$js" "function getPreviewStartEntry"
-    assert_file_contains "$js" "function nodeVisualRole(node, displayMode, previewNodeId)"
-    assert_file_contains "$js" "dataset.visualRole"
-    assert_file_contains "$js" "dataset.previewStart"
-    assert_file_contains "$js" "drawer.dataset.state"
-    assert_file_contains "$js" "从这里开始"
-    assert_file_contains "$js" "focusNode(previewEntry.node.id, true)"
-
-    assert_file_contains "$helpers" "importantNodeIds"
-    assert_file_contains "$helpers" "startNodeIds"
-    assert_file_contains "$helpers" "return null;"
+    assert_file_contains "$html" "node-layer"
+    assert_file_contains "$html" "edge-layer"
+    assert_file_contains "$html" "community-wash"
+    assert_file_contains "$html" ".node[data-visual-role=\"landmark\"]"
+    assert_file_contains "$html" ".node[data-visual-role=\"index-slip\"],"
+    assert_file_contains "$html" ".node[data-visual-role=\"cinnabar-note\"]"
+    assert_file_contains "$html" "dataset.visualRole"
+    assert_file_contains "$html" "dataset.startNode"
+    assert_file_contains "$html" "dataset.previewStart"
+    assert_file_contains "$html" "node-kind"
+    assert_file_contains "$html" "node-name"
+    assert_file_contains "$html" "node-meta"
+    assert_file_contains "$html" "var(--cinnabar)"
 
     rm -rf "$tmp_dir"
 }
 
 test_first_open_selection_contract() {
-    node - <<'NODE' "$REPO_ROOT" || fail "first-open selection contract should hold"
-const assert = require("node:assert/strict");
-const path = require("node:path");
+    ensure_graph_engine_dist
+    node --input-type=module - <<'NODE' "$REPO_ROOT" || fail "first-open selection contract should hold"
+import assert from "node:assert/strict";
+import { pathToFileURL } from "node:url";
+import path from "node:path";
+
+const repoRoot = process.argv[2];
 const {
   buildAtlasModel,
   deriveAtlasLayout,
   resolveAtlasVisibleSnapshot,
   resolveAtlasSelectedNodeId
-} = require(path.join(process.argv[2], "templates/graph-styles/wash/graph-wash-helpers.js"));
+} = await import(pathToFileURL(path.join(repoRoot, "packages/graph-engine/dist/engine.esm.js")).href);
 
 const graph = {
   meta: { wiki_title: "首屏预览测试" },

@@ -1,4 +1,5 @@
 const { describe, it } = require("node:test");
+// DEPRECATED: Covers the legacy wash template; remove in the same retirement cycle as templates/graph-styles/wash/.
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");

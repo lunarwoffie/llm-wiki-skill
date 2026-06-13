@@ -1,66 +1,36 @@
 #!/bin/bash
-# Regression: generated graph HTML must keep the approved oriental atlas shell
+# Regression: generated graph HTML must keep the approved engine atlas shell
 
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-GRAPH_HTML_BASIC="tests/fixtures/graph-interactive-basic"
+source "$REPO_ROOT/tests/lib/graph-html-engine-helpers.sh"
 
-fail() {
-    echo "FAIL: $1" >&2
-    exit 1
-}
-
-assert_file_contains() {
-    local file="$1"
-    local text="$2"
-
-    if ! grep -F -- "$text" "$file" > /dev/null; then
-        fail "Expected $file to contain: $text"
-    fi
-}
-
-assert_file_not_contains() {
-    local file="$1"
-    local text="$2"
-
-    if grep -F -- "$text" "$file" > /dev/null; then
-        fail "Expected $file to not contain: $text"
-    fi
-}
-
-build_graph_html_fixture() {
-    local tmp_dir="$1"
-    local output_dir="$tmp_dir/wiki"
-
-    mkdir -p "$output_dir"
-    cp "$REPO_ROOT/$GRAPH_HTML_BASIC/wiki/graph-data.json" "$output_dir/graph-data.json"
-
-    bash "$REPO_ROOT/scripts/build-graph-html.sh" "$tmp_dir" > /dev/null 2>&1 \
-        || fail "build-graph-html.sh should succeed on basic fixture"
-}
-
-test_oriental_atlas_has_approved_shell() {
+test_oriental_atlas_has_approved_engine_shell() {
     local tmp_dir html
     tmp_dir="$(mktemp -d)"
+
     build_graph_html_fixture "$tmp_dir"
     html="$tmp_dir/wiki/knowledge-graph.html"
 
-    assert_file_contains "$html" 'id="app"'
-    assert_file_contains "$html" 'class="topbar"'
-    assert_file_contains "$html" 'class="sidebar"'
-    assert_file_contains "$html" 'class="canvas-card"'
-    assert_file_contains "$html" 'class="canvas-footer"'
-    assert_file_contains "$html" 'class="drawer" id="drawer"'
-    assert_file_contains "$html" 'id="node-layer"'
-    assert_file_contains "$html" 'id="edge-layer"'
+    assert_file_contains "$html" 'class="offline-shell"'
+    assert_file_contains "$html" 'class="offline-header"'
+    assert_file_contains "$html" 'class="offline-badges"'
+    assert_file_contains "$html" 'id="graph-root"'
+    assert_file_contains "$html" "llm-wiki-graph-engine"
+    assert_file_contains "$html" "community-wash-layer"
+    assert_file_contains "$html" "edge-layer"
+    assert_file_contains "$html" "node-layer"
+    assert_file_contains "$html" ".mini-map"
+    assert_file_contains "$html" ".graph-reader"
 
     rm -rf "$tmp_dir"
 }
 
-test_oriental_atlas_rejects_old_learning_cockpit_shell() {
+test_oriental_atlas_rejects_old_template_shell() {
     local tmp_dir html
     tmp_dir="$(mktemp -d)"
+
     build_graph_html_fixture "$tmp_dir"
     html="$tmp_dir/wiki/knowledge-graph.html"
 
@@ -69,7 +39,11 @@ test_oriental_atlas_rejects_old_learning_cockpit_shell() {
     assert_file_not_contains "$html" 'id="nav-close"'
     assert_file_not_contains "$html" 'id="secondary-panel"'
     assert_file_not_contains "$html" 'id="dr-close"'
-    assert_file_not_contains "$html" '学习驾驶舱'
+    assert_file_not_contains "$html" 'class="drawer" id="drawer"'
+    assert_file_not_contains "$html" 'id="node-layer"'
+    assert_file_not_contains "$html" 'id="edge-layer"'
+    assert_file_not_contains "$html" "学习驾驶舱"
+    assert_file_not_contains "$html" "GitHub"
 
     rm -rf "$tmp_dir"
 }
@@ -77,42 +51,43 @@ test_oriental_atlas_rejects_old_learning_cockpit_shell() {
 test_oriental_atlas_has_required_copy() {
     local tmp_dir html
     tmp_dir="$(mktemp -d)"
+
     build_graph_html_fixture "$tmp_dir"
     html="$tmp_dir/wiki/knowledge-graph.html"
 
+    assert_file_contains "$html" "HTML测试知识库 知识舆图"
     assert_file_contains "$html" "国风知识库·数字山水图"
-    assert_file_contains "$html" "文献索引"
-    assert_file_contains "$html" "社区"
-    assert_file_contains "$html" "聚焦"
-    assert_file_contains "$html" "关系置信度"
-    assert_file_contains "$html" "直接提取"
-    assert_file_contains "$html" "推断关联"
-    assert_file_contains "$html" "存在歧义"
-    assert_file_contains "$html" "未核实"
-    assert_file_contains "$html" "GitHub"
+    assert_file_contains "$html" "3 节点"
+    assert_file_contains "$html" "2 关联"
+    assert_file_contains "$html" 'data-llm-wiki-offline-graph="engine"'
+    assert_file_contains "$html" "选择一个节点查看内容"
 
     rm -rf "$tmp_dir"
 }
 
-test_oriental_atlas_runtime_uses_shared_state() {
-    local tmp_dir js
+test_oriental_atlas_runtime_uses_shared_engine_state() {
+    local tmp_dir html
     tmp_dir="$(mktemp -d)"
-    build_graph_html_fixture "$tmp_dir"
-    js="$tmp_dir/wiki/graph-wash.js"
 
-    assert_file_contains "$js" "buildAtlasModel(DATA)"
-    assert_file_contains "$js" "deriveAtlasLayout(atlasModel)"
-    assert_file_contains "$js" "resolveAtlasVisibleSnapshot(state.atlasModel, state.atlasLayout, state.ui)"
-    assert_file_contains "$js" "renderAtlasView()"
+    build_graph_html_fixture "$tmp_dir"
+    html="$tmp_dir/wiki/knowledge-graph.html"
+
+    assert_file_contains "$html" "window.LlmWikiGraphEngine.createGraphEngine"
+    assert_file_contains "$html" "window.__LLM_WIKI_GRAPH_ENGINE__"
+    assert_file_contains "$html" "window.__LLM_WIKI_GRAPH_PINS_KEY__"
+    assert_file_contains "$html" "persistPins: function"
+    assert_file_contains "$html" "localStorage.setItem"
+    assert_file_not_contains "$html" "graph-wash.js"
+    assert_file_not_contains "$html" "graph-wash-helpers.js"
 
     rm -rf "$tmp_dir"
 }
 
 main() {
-    test_oriental_atlas_has_approved_shell
-    test_oriental_atlas_rejects_old_learning_cockpit_shell
+    test_oriental_atlas_has_approved_engine_shell
+    test_oriental_atlas_rejects_old_template_shell
     test_oriental_atlas_has_required_copy
-    test_oriental_atlas_runtime_uses_shared_state
+    test_oriental_atlas_runtime_uses_shared_engine_state
     echo "PASS: oriental atlas HTML contract regression coverage"
 }
 

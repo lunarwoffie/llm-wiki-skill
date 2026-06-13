@@ -1,3 +1,4 @@
+/* DEPRECATED: Legacy wash helpers retained for one release cycle after Stage 4 engine HTML migration. Do not extend; use packages/graph-engine instead. */
 (function (root) {
   "use strict";
 

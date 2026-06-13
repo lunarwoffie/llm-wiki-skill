@@ -1,71 +1,69 @@
 #!/bin/bash
-# Regression: oriental atlas should expose footer insights and weighted relationship cues
+# Regression: engine atlas should keep weighted relationship cues
 
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-GRAPH_HTML_BASIC="tests/fixtures/graph-interactive-basic"
+source "$REPO_ROOT/tests/lib/graph-html-engine-helpers.sh"
 
-fail() {
-    echo "FAIL: $1" >&2
-    exit 1
-}
-
-assert_file_contains() {
-    local file="$1"
-    local text="$2"
-
-    if ! grep -F -- "$text" "$file" > /dev/null; then
-        fail "Expected $file to contain: $text"
-    fi
-}
-
-build_graph_html_fixture() {
-    local tmp_dir="$1"
-    local output_dir="$tmp_dir/wiki"
-
-    mkdir -p "$output_dir"
-    cp "$REPO_ROOT/$GRAPH_HTML_BASIC/wiki/graph-data.json" "$output_dir/graph-data.json"
-
-    bash "$REPO_ROOT/scripts/build-graph-html.sh" "$tmp_dir" > /dev/null 2>&1 \
-        || fail "build-graph-html.sh should succeed on basic fixture"
-}
-
-test_graph_html_has_footer_insight_shell() {
-    local tmp_dir html js
+test_graph_html_has_weighted_edge_hooks() {
+    local tmp_dir html
     tmp_dir="$(mktemp -d)"
+
     build_graph_html_fixture "$tmp_dir"
     html="$tmp_dir/wiki/knowledge-graph.html"
-    js="$tmp_dir/wiki/graph-wash.js"
 
-    assert_file_contains "$html" 'class="insight"'
-    assert_file_contains "$html" 'id="insight-title"'
-    assert_file_contains "$html" 'id="insight-copy"'
-    assert_file_contains "$js" 'renderInsights()'
-    assert_file_contains "$js" 'focusNode(nodeId, openDrawer)'
-    assert_file_contains "$js" 'state.atlasModel.insights'
+    assert_file_contains "$html" "edgeStrokeWidth"
+    assert_file_contains "$html" "edgeOpacity"
+    assert_file_contains "$html" "strokeWidth"
+    assert_file_contains "$html" "opacity"
+    assert_file_contains "$html" "atlasConfidenceLabel"
 
     rm -rf "$tmp_dir"
 }
 
-test_graph_html_has_weighted_edge_and_neighbor_hooks() {
-    local tmp_dir js
+test_graph_html_has_structural_selection_actions_without_offline_ask_ui() {
+    local tmp_dir html
     tmp_dir="$(mktemp -d)"
-    build_graph_html_fixture "$tmp_dir"
-    js="$tmp_dir/wiki/graph-wash.js"
 
-    assert_file_contains "$js" 'edgeStrokeWidth(edge)'
-    assert_file_contains "$js" 'edgeOpacity(edge)'
-    assert_file_contains "$js" 'edgeStrengthSize(edge)'
-    assert_file_contains "$js" 'clampWeight(edge && edge.weight)'
-    assert_file_contains "$js" 'atlasConfidenceLabel(entry.edge.type)'
+    build_graph_html_fixture "$tmp_dir"
+    html="$tmp_dir/wiki/knowledge-graph.html"
+
+    assert_file_contains "$html" "why_no_connection"
+    assert_file_contains "$html" "find_potential_bridges"
+    assert_file_contains "$html" "resolveSelectionForCapabilities"
+    assert_file_contains "$html" "graph-selection-panel"
+    assert_file_contains "$html" "graph-selection-facts"
+    assert_file_contains "$html" "Shift+点击 增删节点"
+    assert_file_not_contains "$html" "提问选区"
+    assert_file_not_contains "$html" "onAsk:"
+
+    rm -rf "$tmp_dir"
+}
+
+test_graph_html_offline_selection_panel_behaves_in_browser() {
+    local tmp_dir html
+    tmp_dir="$(mktemp -d)"
+
+    build_graph_html_fixture "$tmp_dir"
+    html="$tmp_dir/wiki/knowledge-graph.html"
+
+    local playwright_node_path
+    playwright_node_path="$(
+        npx --yes -p playwright -c 'node -e "const path=require(\"path\"); console.log(path.dirname(process.env.PATH.split(\":\")[0]))"'
+    )"
+    GRAPH_HTML_INSIGHTS_HTML="$html" NODE_PATH="$playwright_node_path" node "$REPO_ROOT/tests/browser/graph-html-insights.mjs" \
+        || fail "offline graph selection browser regression should pass"
 
     rm -rf "$tmp_dir"
 }
 
 main() {
-    test_graph_html_has_footer_insight_shell
-    test_graph_html_has_weighted_edge_and_neighbor_hooks
+    npm run build -w @llm-wiki/graph-engine > /dev/null 2>&1 \
+        || fail "graph-engine build should succeed before insights regression"
+    test_graph_html_has_weighted_edge_hooks
+    test_graph_html_has_structural_selection_actions_without_offline_ask_ui
+    test_graph_html_offline_selection_panel_behaves_in_browser
     echo "PASS: graph HTML insights regression coverage"
 }
 
