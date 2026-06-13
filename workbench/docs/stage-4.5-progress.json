@@ -2,9 +2,9 @@
   "plan": "workbench/docs/stage-4.5-plan.md",
   "status": {
     "phase": "phase-2",
-    "task": "2.2",
+    "task": "2.3",
     "overall": "in_progress",
-    "next_allowed_action": "Run git log --oneline -15 and npm run test -w @llm-wiki/graph-engine before implementing work unit 2.2."
+    "next_allowed_action": "Run git log --oneline -15 and npm run test -w @llm-wiki/graph-engine before implementing work unit 2.3."
   },
   "execution_rules": {
     "branch": "codex/feat-stage-4-5-graph-usability",
@@ -277,9 +277,14 @@
         {
           "id": "2.2",
           "title": "Fix selection action mapping.",
-          "status": "pending",
-          "verification": [],
-          "commit": null
+          "status": "completed",
+          "verification": [
+            "RED: packages/graph-engine/test/select.test.ts now covers all six stage 4.5 action-table scenarios, including linked single page, isolated single page, single community, two-community neighbor selection, linked manual multi-select, and unlinked multi-select.",
+            "GREEN: npm run test -w @llm-wiki/graph-engine exited 0 with 128 tests passing.",
+            "npm run typecheck -w @llm-wiki/graph-engine exited 0.",
+            "Selection action mapping now gives single nodes 总结这一页 / 它和谁有关 / 在对话中引用, isolated single nodes also get 把它链入知识库, single nodes never get 探索潜在联系, and linked manual multi-select gets 总结这一组 / 探索它们的关系 instead of community-cluster actions."
+          ],
+          "commit": "09c8805"
         },
         {
           "id": "2.3",
@@ -481,6 +486,10 @@
     {
       "timestamp": "2026-06-13",
       "entry": "Work unit 2.1 reproduced Shift multi-select in Chromium: first Shift-click selected one node, second Shift-click cleared graph highlights. Root cause was renderer selection state ignoring selection kind nodes, not drag capture or event target. Verification passed: npm run test -w @llm-wiki/graph-engine, npm run typecheck -w @llm-wiki/graph-engine, and bash tests/graph-browser-stage-4-5.regression-1.sh --target offline."
+    },
+    {
+      "timestamp": "2026-06-13",
+      "entry": "Work unit 2.2 fixed graph selection action mapping for all six design scenarios. Verification passed: npm run test -w @llm-wiki/graph-engine and npm run typecheck -w @llm-wiki/graph-engine."
     }
   ]
 }
