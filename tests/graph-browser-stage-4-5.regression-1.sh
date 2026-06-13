@@ -37,6 +37,34 @@ trap cleanup EXIT
 npm run build -w @llm-wiki/graph-engine > /dev/null 2>&1 \
   || fail "graph-engine build should succeed before stage 4.5 browser regression"
 build_graph_html_fixture "$tmp_dir"
+node - "$tmp_dir/wiki/graph-data.json" <<'NODE'
+const fs = require("fs");
+const file = process.argv[2];
+const data = JSON.parse(fs.readFileSync(file, "utf8"));
+for (const node of data.nodes) {
+  if (node.id === "A") {
+    node.date = "2026-01-02";
+    node.source_title = "不应作为实体来源链接";
+  }
+}
+data.nodes.push({
+  id: "S",
+  label: "节点来源S",
+  type: "source",
+  community: "t2",
+  content: "# 来源S\n\n这是来源S的内容。\n",
+  source_path: "/fake/wiki/sources/S.md",
+  date: "2026-01-03",
+  source_title: "原始文章S"
+});
+data.edges.push({ id: "e3", from: "A", to: "S", type: "EXTRACTED" });
+data.meta.total_nodes = data.nodes.length;
+data.meta.total_edges = data.edges.length;
+data.meta.initial_view = Array.from(new Set([...(data.meta.initial_view || []), "S"]));
+fs.writeFileSync(file, `${JSON.stringify(data, null, 2)}\n`);
+NODE
+bash "$REPO_ROOT/scripts/build-graph-html.sh" "$tmp_dir" > /dev/null 2>&1 \
+  || fail "build-graph-html.sh should succeed after augmenting stage 4.5 browser fixture"
 
 dense_dir="$tmp_dir/dense/wiki"
 mkdir -p "$dense_dir"

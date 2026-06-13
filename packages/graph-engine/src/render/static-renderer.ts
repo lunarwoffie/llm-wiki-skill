@@ -714,9 +714,14 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
     const title = document.createElement("div");
     title.className = "graph-reader-title";
     title.textContent = selected.label;
+    const payload = openPagePayloadForNode(data, selected.id);
     const meta = document.createElement("div");
     meta.className = "graph-reader-meta";
-    meta.textContent = `${selected.kind} · ${selected.sourcePath}`;
+    for (const item of graphReaderMetaItems(payload.node)) {
+      const tag = document.createElement("span");
+      tag.textContent = item;
+      meta.appendChild(tag);
+    }
     const close = document.createElement("button");
     close.type = "button";
     close.className = "graph-reader-close";
@@ -732,6 +737,13 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
 
     const body = document.createElement("div");
     body.className = "graph-reader-body";
+    if (payload.node.type === "source" && payload.node.sourcePath) {
+      const sourceLink = document.createElement("a");
+      sourceLink.className = "graph-reader-source";
+      sourceLink.href = payload.node.sourcePath;
+      sourceLink.textContent = payload.node.sourcePath;
+      body.appendChild(sourceLink);
+    }
     const content = String(rawNode.content || rawNode.summary || selected.label);
     const rendered = renderMarkdown(content);
     if (rendered) {
@@ -1197,6 +1209,13 @@ function dateForNode(node: GraphNode): string | null {
 function sourceForNode(node: GraphNode): string | null {
   const value = node.source_title || node.source_url || node.url || node.author || node.source_name;
   return value == null || value === "" ? null : String(value);
+}
+
+function graphReaderMetaItems(node: GraphOpenPagePayload["node"]): string[] {
+  const items = [node.typeLabel];
+  if (node.date) items.push(node.date);
+  if (node.source) items.push(node.source);
+  return items;
 }
 
 function eventToGraphPoint(root: HTMLElement, event: PointerEvent): { x: number; y: number } {
@@ -2052,11 +2071,18 @@ const STATIC_RENDERER_CSS = `
 }
 .graph-reader-meta {
   margin-top: 4px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 11px;
+}
+.graph-reader-meta span {
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--muted);
-  font-size: 11px;
 }
 .graph-reader-close {
   position: absolute;
@@ -2073,6 +2099,17 @@ const STATIC_RENDERER_CSS = `
   min-height: 0;
   overflow: auto;
   padding: 12px 14px 14px;
+}
+.graph-reader-source {
+  display: inline-block;
+  max-width: 100%;
+  margin-bottom: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: top;
+  white-space: nowrap;
+  color: var(--cinnabar);
+  font-size: 12px;
 }
 .graph-reader-body pre {
   margin: 0;

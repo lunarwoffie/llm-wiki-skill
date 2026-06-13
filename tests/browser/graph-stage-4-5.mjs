@@ -68,15 +68,17 @@ async function runOfflineChecks(browser) {
   await expectNoPressedNodes(page, "Escape should clear Shift-click selections");
 
   const transformBeforeReader = await layerTransform(page);
-  await page.locator(".node").nth(0).click();
+  await page.locator(".node[data-id='A']").click();
   await page.waitForSelector(".graph-reader[data-state='open']");
   const pressedAfterPlainClick = await page.locator(".node[aria-pressed='true']").count();
   assert.equal(pressedAfterPlainClick, 1, "plain node click should highlight one readable node");
-  assert.match(
-    await page.locator(".graph-reader .graph-reader-title").innerText(),
-    /\S/,
-    "plain node click should open the internal reader with a title"
-  );
+  await assertOfflineReaderMeta(page, {
+    title: "节点A",
+    typeLabel: "实体",
+    date: "2026-01-02",
+    source: "不应作为实体来源链接",
+    sourceLink: null
+  });
   await page.keyboard.press("Escape");
   await page.waitForSelector(".graph-reader[data-state='closed']");
   await expectNoPressedNodes(page, "Escape should clear the reader highlight");
@@ -86,8 +88,22 @@ async function runOfflineChecks(browser) {
     "clearing graph interaction should not reset the viewport transform"
   );
 
+  await page.locator(".node[data-id='S']").click();
+  await page.waitForSelector(".graph-reader[data-state='open']");
+  await assertOfflineReaderMeta(page, {
+    title: "节点来源S",
+    typeLabel: "来源",
+    date: "2026-01-03",
+    source: "原始文章S",
+    sourceLink: "/fake/wiki/sources/S.md"
+  });
+  await page.keyboard.press("Escape");
+  await page.waitForSelector(".graph-reader[data-state='closed']");
+  await expectNoPressedNodes(page, "Escape should clear source reader highlight");
+
   await runSearchKeyboardChecks(page, "offline graph search should support shortcut, cycling, focus, and Escape");
   await runLegendChecks(page, { persistReload: true, expectWorkbenchDrawer: false });
+  await runOfflinePinReloadCheck(page);
 
   if (artifactDir) {
     await page.screenshot({ path: path.join(artifactDir, "stage-4.5-offline-navigation.png"), fullPage: true });
@@ -167,6 +183,36 @@ async function waitForLayerTransform(page, previous) {
 async function expectNoPressedNodes(page, message) {
   const pressed = await page.locator(".node[aria-pressed='true']").count();
   assert.equal(pressed, 0, message);
+}
+
+async function assertOfflineReaderMeta(page, expected) {
+  const reader = page.locator(".graph-reader[data-state='open']");
+  await reader.locator(".graph-reader-title", { hasText: expected.title }).waitFor();
+  const meta = reader.locator(".graph-reader-meta");
+  const metaItems = await meta.locator("span").allInnerTexts();
+  assert.ok(metaItems.includes(expected.typeLabel), `offline reader meta should include type ${expected.typeLabel}`);
+  assert.ok(metaItems.includes(expected.date), `offline reader meta should include date ${expected.date}`);
+  assert.ok(metaItems.includes(expected.source), `offline reader meta should include source ${expected.source}`);
+  if (expected.sourceLink) {
+    const sourceLink = reader.locator(".graph-reader-source");
+    await sourceLink.waitFor();
+    assert.equal(await sourceLink.innerText(), expected.sourceLink, "source pages should expose their source path as a reader link");
+  } else {
+    assert.equal(await reader.locator(".graph-reader-source").count(), 0, "non-source pages should not expose source path reader links");
+  }
+}
+
+async function runOfflinePinReloadCheck(page) {
+  await page.evaluate(() => {
+    const key = window.__LLM_WIKI_GRAPH_PINS_KEY__;
+    if (!key) throw new Error("offline graph pins key should be published");
+    window.localStorage.setItem(key, JSON.stringify({ "/fake/wiki/entities/A.md": { x: 333, y: 222 } }));
+  });
+  await page.reload();
+  await page.waitForSelector("[data-llm-wiki-graph-root='true']");
+  await page.waitForSelector(".node[data-id='A'][data-pinned='true']");
+  const pinnedCount = await page.locator("[data-llm-wiki-graph-root='true']").evaluate((element) => element.dataset.pinnedCount);
+  assert.equal(pinnedCount, "1", "offline localStorage pins should survive reload");
 }
 
 async function runSearchKeyboardChecks(page, message) {
