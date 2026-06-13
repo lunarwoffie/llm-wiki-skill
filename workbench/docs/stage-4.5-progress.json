@@ -2,9 +2,9 @@
   "plan": "workbench/docs/stage-4.5-plan.md",
   "status": {
     "phase": "phase-2",
-    "task": "2.1",
+    "task": "2.2",
     "overall": "in_progress",
-    "next_allowed_action": "Run git log --oneline -15 and npm run test -w @llm-wiki/graph-engine before implementing work unit 2.1."
+    "next_allowed_action": "Run git log --oneline -15 and npm run test -w @llm-wiki/graph-engine before implementing work unit 2.2."
   },
   "execution_rules": {
     "branch": "codex/feat-stage-4-5-graph-usability",
@@ -261,9 +261,18 @@
         {
           "id": "2.1",
           "title": "Reproduce and pin down Shift multi-select behavior.",
-          "status": "pending",
-          "verification": [],
-          "commit": null
+          "status": "completed",
+          "verification": [
+            "Repro path: generated current offline graph HTML, opened it in Chromium at 1440 x 960, held Shift, clicked the first node, then clicked the second node.",
+            "Observed failure before the fix: selected node count changed from 1 after the first Shift-click to 0 after the second Shift-click.",
+            "Root cause: drag capture and event target were not the issue; selection kind nodes reached the renderer, but buildRenderableGraph only marked a single selectedNodeId and ignored multi-node selection for node highlights.",
+            "Regression assertion: packages/graph-engine/test/render-model.test.ts now asserts shift-style multi-node selections mark both nodes and minimap entries selected.",
+            "Regression assertion: tests/browser/graph-stage-4-5.mjs now asserts two Shift-clicked nodes remain aria-pressed in the graph.",
+            "GREEN: npm run test -w @llm-wiki/graph-engine exited 0 with 126 tests passing.",
+            "npm run typecheck -w @llm-wiki/graph-engine exited 0.",
+            "bash tests/graph-browser-stage-4-5.regression-1.sh --target offline exited 0."
+          ],
+          "commit": "8123720"
         },
         {
           "id": "2.2",
@@ -468,6 +477,10 @@
     {
       "timestamp": "2026-06-13",
       "entry": "Phase 1 acceptance passed. Verification passed: npm run test -w @llm-wiki/graph-engine, bash tests/graph-html-minimap.regression-1.sh, bash tests/graph-html-density.regression-1.sh, and bash tests/graph-browser-stage-4-5.regression-1.sh --target offline. Dense wheel evidence recorded 179 frames over 3009ms, 59.5fps."
+    },
+    {
+      "timestamp": "2026-06-13",
+      "entry": "Work unit 2.1 reproduced Shift multi-select in Chromium: first Shift-click selected one node, second Shift-click cleared graph highlights. Root cause was renderer selection state ignoring selection kind nodes, not drag capture or event target. Verification passed: npm run test -w @llm-wiki/graph-engine, npm run typecheck -w @llm-wiki/graph-engine, and bash tests/graph-browser-stage-4-5.regression-1.sh --target offline."
     }
   ]
 }
