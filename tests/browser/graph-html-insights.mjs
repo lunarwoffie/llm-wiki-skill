@@ -29,6 +29,8 @@ try {
   await page.keyboard.press("Escape");
   await page.waitForSelector(".graph-selection-panel[data-state='closed']");
 
+  await page.getByRole("button", { name: "筛选" }).click();
+  await page.waitForSelector('.graph-toolbar-panel[data-state="filters"] .community-legend-row');
   await page.locator(".community-legend-row").first().click();
   await page.waitForSelector(".graph-selection-panel[data-state='open']");
   await panel.getByText(/社区选区/).waitFor();

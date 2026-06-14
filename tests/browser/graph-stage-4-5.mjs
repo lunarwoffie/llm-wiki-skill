@@ -279,20 +279,23 @@ async function waitForSearchState(page, state) {
 }
 
 async function runLegendChecks(page, options) {
-  await page.waitForSelector(".community-legend-row");
+  await waitForToolbarPanel(page, "closed");
+  await openToolbarFilters(page);
   const row = page.locator(".community-legend-row").first();
   await row.hover();
   await page.waitForSelector('.node[data-community-state="faded"]');
   await page.mouse.move(900, 120);
 
   if (options.persistReload) {
-    await page.locator(".community-legend-toggle").click();
-    await waitForLegendState(page, "collapsed");
     await page.reload();
     await page.waitForSelector("[data-llm-wiki-graph-root='true']");
-    await waitForLegendState(page, "collapsed");
-    await page.locator(".community-legend-toggle").click();
-    await waitForLegendState(page, "open");
+    await waitForToolbarPanel(page, "filters");
+    await closeToolbarWithBlankClick(page);
+    await waitForToolbarPanel(page, "closed");
+    await page.reload();
+    await page.waitForSelector("[data-llm-wiki-graph-root='true']");
+    await waitForToolbarPanel(page, "closed");
+    await openToolbarFilters(page);
   }
 
   const beforeClick = await layerTransform(page);
@@ -325,9 +328,20 @@ async function assertOfflineSelectionPanel(page, expectedMode) {
   }
 }
 
-async function waitForLegendState(page, state) {
+async function openToolbarFilters(page) {
+  await page.getByRole("button", { name: "筛选" }).click();
+  await waitForToolbarPanel(page, "filters");
+  await page.waitForSelector('.graph-toolbar-panel[data-state="filters"] .community-legend-row');
+}
+
+async function closeToolbarWithBlankClick(page) {
+  const root = page.locator("[data-llm-wiki-graph-root='true']");
+  await root.click({ position: { x: 24, y: 96 } });
+}
+
+async function waitForToolbarPanel(page, state) {
   await page.waitForFunction((state) => {
-    return document.querySelector(".community-legend")?.dataset.state === state;
+    return document.querySelector(".llm-wiki-graph-engine")?.dataset.toolbarPanel === state;
   }, state);
 }
 
@@ -449,9 +463,12 @@ async function runWorkbenchThemeViewportMatrix(browser) {
 async function runWorkbenchThemeViewportChecks(page, item) {
   await runPreviewCheck(page, `${item.name} hover preview should open`);
   await runSearchKeyboardChecks(page, `${item.name} workbench graph search should work`);
+  await openToolbarFilters(page);
   await page.locator(".community-legend-row").first().hover();
   await page.waitForSelector('.node[data-community-state="faded"]');
   await page.mouse.move(80, 80);
+  await closeToolbarWithBlankClick(page);
+  await waitForToolbarPanel(page, "closed");
 
   await page.locator(".node[data-id='A']").click();
 
