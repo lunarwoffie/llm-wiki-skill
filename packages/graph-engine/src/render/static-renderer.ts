@@ -594,7 +594,7 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
 
   function applyMotionFrame(positions: RenderPositionMap): void {
     if (destroyed) return;
-    graph = buildRenderableGraph(data, { pins, theme, selectedNodeId, selection, positions, pathCache });
+    graph = buildRenderableGraph(data, { pins, theme, selectedNodeId, selection, focus, typeFilters, positions, pathCache });
     const nodeById = new Map(graph.nodes.map((node) => [node.id, node]));
     for (const node of graph.nodes) {
       const element = dom.nodeElements.get(node.id);

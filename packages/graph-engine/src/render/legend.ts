@@ -14,7 +14,7 @@ export function buildCommunityLegend(
   nodes: Array<Pick<RenderableNode, "id" | "community">>
 ): CommunityLegendRow[] {
   return communities
-    .filter((community) => community.wash && community.nodeCount > 0)
+    .filter((community) => community.nodeCount > 0)
     .map((community) => ({
       id: community.id,
       label: community.label || community.id,

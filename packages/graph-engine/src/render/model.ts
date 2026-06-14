@@ -269,13 +269,15 @@ export function buildRenderableGraph(data: GraphData, options: BuildRenderableGr
     }];
   });
 
+  const allFilteredNodes = applyNodeTypeFilters(model.nodes, typeFilters);
   const communities = model.communities.map((community, index) => {
     const communityNodes = nodes.filter((node) => node.community === community.id);
+    const allCommunityNodes = allFilteredNodes.filter((node) => node.community === community.id);
     return {
       id: community.id,
       label: community.label || community.id,
       color: getCommunityColor(theme, Number(community.color_index ?? index)),
-      nodeCount: Number(community.node_count ?? communityNodes.length),
+      nodeCount: Number(community.node_count ?? allCommunityNodes.length),
       wash: computeCommunityWash(communityNodes)
     };
   });
@@ -297,7 +299,7 @@ export function buildRenderableGraph(data: GraphData, options: BuildRenderableGr
     },
     nodes,
     edges,
-    communities: communities.filter((community) => community.wash),
+    communities,
     minimap: {
       path: MINIMAP_PATH,
       nodes: nodes.slice(0, 60).map((node) => {

@@ -50,6 +50,13 @@ describe("community legend", () => {
         color: "#999",
         nodeCount: 0,
         wash: null
+      },
+      {
+        id: "hidden",
+        label: "隐藏社区",
+        color: "#555",
+        nodeCount: 2,
+        wash: null
       }
     ], [
       { id: "A", community: "c1" },
@@ -63,6 +70,12 @@ describe("community legend", () => {
       color: "#c33",
       pageCount: 3,
       nodeIds: ["A", "B"]
+    }, {
+      id: "hidden",
+      label: "隐藏社区",
+      color: "#555",
+      pageCount: 2,
+      nodeIds: []
     }]);
   });
 

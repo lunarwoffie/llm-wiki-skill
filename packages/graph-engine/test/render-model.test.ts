@@ -186,6 +186,10 @@ describe("buildRenderableGraph", () => {
     assert.equal(graph.counts.totalNodes, 4);
     assert.equal(graph.focus?.kind, "community");
     assert.equal(graph.focus?.id, "c1");
+    assert.deepEqual(
+      communityWashStates(graph),
+      [["c1", true], ["c2", false], ["c3", false]]
+    );
   });
 
   it("filters visible nodes by graph node type and stacks with community focus", () => {
@@ -205,6 +209,33 @@ describe("buildRenderableGraph", () => {
     assert.equal(graph.typeFilters.topic, false);
   });
 
+  it("preserves community focus and type filters when positions are reapplied", () => {
+    const graph = buildRenderableGraph(sampleGraph(), {
+      theme: "shan-shui",
+      focus: { kind: "community", id: "c1" },
+      typeFilters: {
+        entity: true,
+        topic: false,
+        source: true
+      },
+      positions: {
+        topic: { x: 500, y: 500 },
+        entity: { x: 420, y: 320 },
+        source: { x: 900, y: 120 },
+        island: { x: 120, y: 120 }
+      }
+    });
+
+    assert.deepEqual(graph.nodes.map((node) => node.id), ["entity"]);
+    assert.deepEqual(graph.edges, []);
+    assert.equal(graph.focus?.id, "c1");
+    assert.equal(graph.typeFilters.topic, false);
+    assert.deepEqual(
+      communityWashStates(graph),
+      [["c1", true], ["c2", false], ["c3", false]]
+    );
+  });
+
   it("keeps community wash around the member cluster instead of chasing an outlier", () => {
     const graph = buildRenderableGraph(outlierCommunityGraph(), { theme: "shan-shui" });
     const community = graph.communities.find((item) => item.id === "c1");
@@ -215,6 +246,12 @@ describe("buildRenderableGraph", () => {
     assert.ok(community.wash.rx < 140, `wash radius should not stretch to the outlier, got ${community.wash.rx}`);
   });
 });
+
+function communityWashStates(graph: ReturnType<typeof buildRenderableGraph>): Array<[string, boolean]> {
+  return graph.communities
+    .map((community): [string, boolean] => [community.id, Boolean(community.wash)])
+    .sort(([left], [right]) => left.localeCompare(right));
+}
 
 describe("screen-effective density", () => {
   it("uses viewport scale to choose the effective density mode", () => {
