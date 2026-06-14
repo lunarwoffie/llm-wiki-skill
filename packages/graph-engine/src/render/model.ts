@@ -62,10 +62,12 @@ export interface RenderableEdge {
   type: string;
   confidence: string;
   relationType: string;
+  relationClass: string;
   path: string;
   curveOffset: number;
   strokeWidth: number;
   opacity: number;
+  simulationWeight: number;
 }
 
 export interface RenderableCommunity {
@@ -243,22 +245,27 @@ export function buildRenderableGraph(data: GraphData, options: BuildRenderableGr
   });
 
   const nodeById = new Map(nodes.map((node) => [node.id, node]));
+  const isFocusedView = focus?.kind === "community";
   const edges = filteredVisibleEdges.flatMap((edge) => {
     const source = nodeById.get(edge.source);
     const target = nodeById.get(edge.target);
     if (!source || !target) return [];
     const curveOffset = options.pathCache?.getEdgeCurve(edge, source.point, target.point) ?? edgeCurveOffset(source.point, target.point, edge);
+    const confidence = normalizeEdgeConfidence(edge);
+    const relationType = normalizeEdgeRelationType(edge);
     return [{
       id: edge.id,
       source: edge.source,
       target: edge.target,
-      type: String(edge.type || "EXTRACTED").toLowerCase(),
-      confidence: String(edge.confidence || edge.type || "EXTRACTED").toLowerCase(),
-      relationType: String(edge.relation_type || "依赖"),
+      type: confidence,
+      confidence,
+      relationType,
+      relationClass: edgeRelationClass(relationType),
       path: makeEdgePathFromPoints(source.point, target.point, curveOffset),
       curveOffset,
-      strokeWidth: edgeStrokeWidth(edge),
-      opacity: edgeOpacity(edge)
+      strokeWidth: edgeVisualStrokeWidth(edge, isFocusedView),
+      opacity: edgeVisualOpacity(edge, isFocusedView),
+      simulationWeight: edgeStrokeWidth(edge)
     }];
   });
 
@@ -332,6 +339,33 @@ export function edgeOpacity(edge: { weight?: number }): number {
   return round(0.32 + clampWeight(edge.weight) * 0.44);
 }
 
+export function edgeVisualStrokeWidth(edge: { weight?: number }, focusedView: boolean): number {
+  if (focusedView) return edgeStrokeWidth(edge);
+  return round(0.95 + clampWeight(edge.weight) * 0.75);
+}
+
+export function edgeVisualOpacity(edge: { weight?: number }, focusedView: boolean): number {
+  if (focusedView) return edgeOpacity(edge);
+  return round(0.2 + clampWeight(edge.weight) * 0.22);
+}
+
+export function edgeRelationClass(relationType: unknown): string {
+  switch (normalizeEdgeRelationText(relationType)) {
+    case "实现":
+      return "relation-implementation";
+    case "依赖":
+      return "relation-dependency";
+    case "衍生":
+      return "relation-derivation";
+    case "对比":
+      return "relation-contrast";
+    case "矛盾":
+      return "relation-conflict";
+    default:
+      return "relation-dependency";
+  }
+}
+
 export function screenEffectiveDensityMode(visibleNodeCount: number, viewportScale: number): DensityMode {
   const count = Number.isFinite(Number(visibleNodeCount)) ? Math.max(0, Number(visibleNodeCount)) : 0;
   const scale = Number.isFinite(Number(viewportScale)) ? clamp(Number(viewportScale), 0.25, 4) : 1;
@@ -385,6 +419,21 @@ function normalizeGraphTypeFilters(filters: GraphTypeFilters | undefined, nodes:
 
 function applyNodeTypeFilters(nodes: AtlasNode[], filters: GraphTypeFilters): AtlasNode[] {
   return nodes.filter((node) => filters[node.type] !== false);
+}
+
+function normalizeEdgeConfidence(edge: AtlasEdge): string {
+  const value = String(edge.confidence || edge.type || "EXTRACTED").toUpperCase();
+  if (value === "INFERRED" || value === "AMBIGUOUS" || value === "UNVERIFIED") return value.toLowerCase();
+  return "extracted";
+}
+
+function normalizeEdgeRelationType(edge: AtlasEdge): string {
+  return normalizeEdgeRelationText(edge.relation_type || "依赖");
+}
+
+function normalizeEdgeRelationText(relationType: unknown): string {
+  const value = String(relationType || "依赖").trim();
+  return value || "依赖";
 }
 
 function pinKeyForNode(node: { source_path?: unknown; path?: unknown; source?: unknown; id: string }): WikiPath {

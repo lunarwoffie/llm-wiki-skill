@@ -1068,12 +1068,18 @@ function paint(
   for (const edge of graph.edges) {
     const path = document.createElementNS(SVG_NS, "path");
     path.setAttribute("d", edge.path);
-    path.setAttribute("class", `edge ${edge.type}`);
+    path.setAttribute("class", `edge confidence-${edge.confidence} ${edge.relationClass}`);
     path.setAttribute("data-from", edge.source);
     path.setAttribute("data-to", edge.target);
     path.setAttribute("data-edge-id", edge.id);
+    path.setAttribute("data-confidence", edge.confidence);
+    path.setAttribute("data-relation-type", edge.relationType);
+    path.setAttribute("aria-label", `${edge.relationType} · ${edgeConfidenceLabel(edge.confidence)}`);
     path.style.strokeWidth = String(edge.strokeWidth);
     path.style.opacity = String(edge.opacity);
+    const title = document.createElementNS(SVG_NS, "title");
+    title.textContent = `${edge.relationType} · ${edgeConfidenceLabel(edge.confidence)}`;
+    path.appendChild(title);
     edgeLayer.appendChild(path);
     painted.edgeElements.set(edge.id, path);
   }
@@ -1344,6 +1350,19 @@ function graphReaderMetaItems(node: GraphOpenPagePayload["node"]): string[] {
   if (node.date) items.push(node.date);
   if (node.source) items.push(node.source);
   return items;
+}
+
+function edgeConfidenceLabel(confidence: string): string {
+  switch (confidence) {
+    case "inferred":
+      return "推断";
+    case "ambiguous":
+      return "待确认";
+    case "unverified":
+      return "未验证";
+    default:
+      return "原文";
+  }
 }
 
 function eventToGraphPoint(root: HTMLElement, event: PointerEvent): { x: number; y: number } {
@@ -2028,17 +2047,34 @@ const STATIC_RENDERER_CSS = `
 .edge.is-diff-removed {
   animation: llm-wiki-fade-out .72s ease forwards;
 }
-.edge.extracted { stroke: color-mix(in srgb, var(--night) 74%, transparent); }
-.edge.inferred { stroke: color-mix(in srgb, var(--jade) 62%, transparent); stroke-dasharray: 6 8; }
-.edge.ambiguous { stroke: color-mix(in srgb, var(--amber) 66%, transparent); stroke-dasharray: 2 7; }
-.edge.unverified { stroke: color-mix(in srgb, var(--muted) 45%, transparent); stroke-dasharray: 1 8; }
+.edge.relation-implementation,
+.edge.relation-dependency,
+.edge.relation-derivation {
+  stroke: color-mix(in srgb, var(--night) 66%, transparent);
+}
+.edge.relation-contrast {
+  stroke: color-mix(in srgb, var(--amber) 82%, transparent);
+}
+.edge.relation-conflict {
+  stroke: color-mix(in srgb, #d94693 78%, transparent);
+}
+.edge.confidence-inferred { stroke-dasharray: 6 8; }
+.edge.confidence-ambiguous { stroke-dasharray: 2 7; }
+.edge.confidence-unverified { stroke-dasharray: 1 8; }
 .llm-wiki-graph-engine[data-theme="mo-ye"] .edge {
   opacity: .82;
 }
-.llm-wiki-graph-engine[data-theme="mo-ye"] .edge.extracted { stroke: color-mix(in srgb, var(--line) 68%, transparent); }
-.llm-wiki-graph-engine[data-theme="mo-ye"] .edge.inferred { stroke: color-mix(in srgb, var(--jade) 70%, transparent); }
-.llm-wiki-graph-engine[data-theme="mo-ye"] .edge.ambiguous { stroke: color-mix(in srgb, var(--amber) 72%, transparent); }
-.llm-wiki-graph-engine[data-theme="mo-ye"] .edge.unverified { stroke: color-mix(in srgb, var(--muted) 52%, transparent); }
+.llm-wiki-graph-engine[data-theme="mo-ye"] .edge.relation-implementation,
+.llm-wiki-graph-engine[data-theme="mo-ye"] .edge.relation-dependency,
+.llm-wiki-graph-engine[data-theme="mo-ye"] .edge.relation-derivation {
+  stroke: color-mix(in srgb, var(--line) 70%, transparent);
+}
+.llm-wiki-graph-engine[data-theme="mo-ye"] .edge.relation-contrast {
+  stroke: color-mix(in srgb, var(--amber) 76%, transparent);
+}
+.llm-wiki-graph-engine[data-theme="mo-ye"] .edge.relation-conflict {
+  stroke: color-mix(in srgb, #f472b6 78%, transparent);
+}
 .community-wash {
   transition: opacity .16s ease, cx .24s ease, cy .24s ease, rx .24s ease, ry .24s ease;
 }

@@ -70,7 +70,7 @@ export class LiveGraphSimulation {
         id: edge.id,
         source: edge.source,
         target: edge.target,
-        weight: Number.isFinite(Number(edge.strokeWidth)) ? Number(edge.strokeWidth) : 1
+        weight: Number.isFinite(Number(edge.simulationWeight)) ? Number(edge.simulationWeight) : 1
       }));
 
     this.simulation = forceSimulation<LiveSimulationNode, LiveSimulationLink>(this.nodes)
