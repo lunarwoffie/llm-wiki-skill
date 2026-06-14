@@ -1,5 +1,23 @@
 # CLAUDE.md
 
+## 🧭 仓库导航（任何人 / AI 进来先读这里）
+
+本仓库是 **llm-wiki monorepo**，含三个区：
+
+| 区 | 位置 | 状态 |
+|---|---|---|
+| **agent 工作台**（开发主线） | `workbench/`（server + web） | 🚧 活跃开发 |
+| **共享图谱引擎** | `packages/graph-engine/` | 🚧 随 agent 演进 |
+| **Skill 形态** | 根目录 `SKILL.md` / `scripts/` / `templates/` / `platforms/` | ❄️ 成熟·维护冻结 |
+
+➡️ **开发 agent 工作台（日常主线）**：先读 [workbench/CLAUDE.md](workbench/CLAUDE.md) + [workbench/PRODUCT.md](workbench/PRODUCT.md)——当前阶段、ADR、协作规则都在那里。
+
+➡️ **本文件以下内容**：Skill 形态的安装与维护规则，**仅当你在维护 Skill 时才看**（install.sh / SKILL.md / scripts / templates / platforms）。Skill 已功能成熟、进入维护冻结，不再追加新功能。
+
+---
+
+## Skill 形态：安装与维护
+
 先看这三个文件：
 
 - [README.md](README.md)：多平台总说明

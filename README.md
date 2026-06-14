@@ -213,6 +213,17 @@ Hermes 会优先加载仓库根的 `HERMES.md` 作为项目上下文。这个文
 
 ---
 
+## 这个仓库里有什么
+
+本仓库是 llm-wiki 的 monorepo，包含两种使用形态，读写同一份知识库格式、可自由切换：
+
+- **Skill 形态**（上文介绍，成熟稳定）：把仓库链接丢给 Claude Code / Codex / OpenClaw / Hermes 一键安装，在你的 AI CLI 里维护知识库。
+- **agent 工作台**（`workbench/`，开发中）：本地运行的知识库工作台，以对话为中心、内置交互式数字山水知识图谱。当前面向开发者（`npm run dev`），成熟后提供桌面应用。
+
+交互式图谱引擎（`packages/graph-engine/`）由两种形态共享——Skill 的离线 HTML 和工作台的图谱视图，是同一个引擎的两个出口。
+
+---
+
 ## Windows 用户
 
 Windows PowerShell 5.1（Win10 / Win11 系统自带）默认 console 编码为 GB2312、`$OutputEncoding` 为 ASCII，Python 子进程 `sys.stdout.encoding` 默认为 `gbk`。直接在 PS 5.1 下运行 `bash install.sh` 会导致中文输出和 hook JSON 出现乱码（[#16](https://github.com/sdyckjq-lab/llm-wiki-skill/issues/16)）。
