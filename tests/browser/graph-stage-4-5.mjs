@@ -200,6 +200,7 @@ async function assertOfflineReaderMeta(page, expected) {
   } else {
     assert.equal(await reader.locator(".graph-reader-source").count(), 0, "non-source pages should not expose source path reader links");
   }
+  await assertNoOfflineAskActions(reader);
 }
 
 async function runOfflinePinReloadCheck(page) {
@@ -300,8 +301,11 @@ async function runLegendChecks(page, options) {
   }
 
   const beforeClick = await layerTransform(page);
+  const initialNodes = await page.locator(".node").count();
   await row.click();
   await waitForLayerTransform(page, beforeClick);
+  const focusedNodes = await page.locator(".node").count();
+  assert.ok(focusedNodes < initialNodes, "legend click should enter a focused community view with fewer visible nodes");
   const selected = await page.locator(".node[aria-pressed='true']").count();
   assert.ok(selected >= 1, "legend click should select the community nodes");
 
@@ -346,10 +350,17 @@ async function assertOfflineSelectionPanel(page, expectedMode) {
   await panel.getByText("内部关联").waitFor();
   assert.ok(await panel.locator(".graph-selection-fact").count() >= 4, "offline selection panel should show structural facts");
   assert.equal(await panel.getByText("提问选区").count(), 0, "offline selection panel should not show ask actions");
+  await assertNoOfflineAskActions(panel);
   if (expectedMode === "community") {
     await panel.getByText(/社区选区/).waitFor();
   } else {
     await panel.getByText(/手动选区|选中页面/).waitFor();
+  }
+}
+
+async function assertNoOfflineAskActions(scope) {
+  for (const label of ["提问选区", "在对话中引用", "它和谁有关", "总结这一组", "探索潜在联系"]) {
+    assert.equal(await scope.getByText(label).count(), 0, `offline graph should not show ${label}`);
   }
 }
 
