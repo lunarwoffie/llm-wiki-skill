@@ -51,6 +51,11 @@ import {
   type GraphToolbarPanelState
 } from "./toolbar";
 
+// 聚焦单个社区时，子集包围盒常很小；用默认 4× fit 会把少量节点放大成糊屏巨卡。
+// 聚焦 fit 限制到适度放大，让节点保持可读、社区居中留白（镜头推进而非贴脸）。
+// 大社区包围盒大、fit 算出的 scale 本就 < 此上限，不受影响。
+const FOCUS_FIT_MAX_SCALE = 1.5;
+
 interface StaticRendererOptions {
   data: GraphData;
   pins?: PinMap;
@@ -173,7 +178,7 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
   };
   ownerDocument.addEventListener("keydown", handleDocumentKeydown);
   const viewportCommitter = createViewportFrameCommitter(commitViewport, root.ownerDocument.defaultView || undefined);
-  let blankPan: { pointerId: number; lastX: number; lastY: number } | null = null;
+  let blankPan: { pointerId: number; lastX: number; lastY: number; startX: number; startY: number; moved: boolean } | null = null;
   let viewportAnimationTimer: ReturnType<typeof setTimeout> | null = null;
   let lastEffectiveDensityMode: DensityMode | null = null;
 
@@ -523,7 +528,7 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
     const points = graph.nodes.map((node) => node.point);
     if (!points.length) return;
     setViewportAnimating(true);
-    viewportCommitter.schedule(fitRendererViewportToPoints(points, viewportSize()));
+    viewportCommitter.schedule(fitRendererViewportToPoints(points, viewportSize(), { maxScale: FOCUS_FIT_MAX_SCALE }));
   }
 
   function resetViewState(): void {
@@ -658,34 +663,44 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
     }, { passive: false });
     root.addEventListener("pointerdown", (event) => {
       if (event.button !== 0 || !isBlankViewportTarget(event.target)) return;
-      if (shouldBlankClickCloseToolbar(toolbarPanelState)) {
-        event.preventDefault();
-        closeToolbarPanel();
-        return;
-      }
-      if (focus) {
-        event.preventDefault();
-        retreatFocusedView();
-        return;
-      }
+      // 空白按下一律先准备平移；究竟是"单击手势"（关弹层 / 退一层）还是"拖动平移"，
+      // 留到 pointerup 时按"指针是否移动过"判定——否则在聚焦视图里一按下就退层会吃掉拖动。
       root.focus({ preventScroll: true });
-      blankPan = { pointerId: event.pointerId, lastX: event.clientX, lastY: event.clientY };
+      blankPan = {
+        pointerId: event.pointerId,
+        lastX: event.clientX,
+        lastY: event.clientY,
+        startX: event.clientX,
+        startY: event.clientY,
+        moved: false
+      };
       setViewportAnimating(false);
-      root.dataset.viewportDragging = "true";
       root.setPointerCapture(event.pointerId);
     });
     root.addEventListener("pointermove", (event) => {
       if (!blankPan || event.pointerId !== blankPan.pointerId) return;
       const dx = event.clientX - blankPan.lastX;
       const dy = event.clientY - blankPan.lastY;
-      blankPan = { pointerId: event.pointerId, lastX: event.clientX, lastY: event.clientY };
+      const moved = blankPan.moved
+        || Math.abs(event.clientX - blankPan.startX) > 3
+        || Math.abs(event.clientY - blankPan.startY) > 3;
+      blankPan = { pointerId: event.pointerId, lastX: event.clientX, lastY: event.clientY, startX: blankPan.startX, startY: blankPan.startY, moved };
+      if (moved) root.dataset.viewportDragging = "true";
       viewportCommitter.schedule(panRendererViewport(viewport, { x: dx, y: dy }, viewportSize()));
     });
     const endPan = (event: PointerEvent) => {
       if (!blankPan || event.pointerId !== blankPan.pointerId) return;
+      const wasClick = !blankPan.moved;
       blankPan = null;
       delete root.dataset.viewportDragging;
       if (root.hasPointerCapture(event.pointerId)) root.releasePointerCapture(event.pointerId);
+      if (!wasClick) return;
+      // 真·单击空白（按下到抬起没拖动）：关弹层 → 退一层（聚焦态），与拖动平移互不冲突
+      if (shouldBlankClickCloseToolbar(toolbarPanelState)) {
+        closeToolbarPanel();
+        return;
+      }
+      if (focus) retreatFocusedView();
     };
     root.addEventListener("pointerup", endPan);
     root.addEventListener("pointercancel", endPan);

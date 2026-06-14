@@ -37,6 +37,22 @@ describe("renderer viewport state", () => {
     );
   });
 
+  it("clamps focus-fit zoom so a tiny community does not blow up to fullscreen", () => {
+    const size = { width: 1440, height: 900 };
+    // 极小包围盒：聚焦一个只有几个聚集节点的小社区
+    const tightCluster = [
+      { x: 500, y: 400 },
+      { x: 520, y: 415 },
+      { x: 510, y: 430 }
+    ];
+    // 默认 fit 会把这么小的簇放大到上限（远超可读尺寸）——这正是"切社区节点爆大"的来源
+    const defaultFit = fitRendererViewportToPoints(tightCluster, size);
+    assert.ok(defaultFit.scale > 1.5, `sanity: default fit over-zooms a tiny cluster (got ${defaultFit.scale})`);
+    // focusCommunity 传保守 maxScale 后，缩放被钳住，节点保持可读、社区居中留白
+    const clamped = fitRendererViewportToPoints(tightCluster, size, { maxScale: 1.5 });
+    assert.ok(clamped.scale <= 1.5, `focus fit must clamp zoom to <= 1.5 (got ${clamped.scale})`);
+  });
+
   it("keeps pin coordinates separate from viewport transforms", () => {
     const pins: PinMap = {
       "wiki/a.md": { x: 420, y: 210 }
