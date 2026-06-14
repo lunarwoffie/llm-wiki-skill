@@ -131,6 +131,36 @@ test_node_helper_bad_json_exits_with_error() {
     rm -rf "$tmp_dir"
 }
 
+test_helper_preserves_node_source_path() {
+    local tmp_dir output
+    tmp_dir="$(mktemp -d)"
+
+    mkdir -p "$tmp_dir/wiki/synthesis/sessions"
+
+    cat > "$tmp_dir/wiki/synthesis/sessions/A.md" <<'EOF'
+# A
+
+正文。
+EOF
+
+    cat > "$tmp_dir/nodes.json" <<EOF
+[
+  {"id":"A","label":"A","type":"synthesis","source_path":"$tmp_dir/wiki/synthesis/sessions/A.md"}
+]
+EOF
+
+    cat > "$tmp_dir/edges.json" <<'EOF'
+[]
+EOF
+
+    node "$HELPER" "$tmp_dir/nodes.json" "$tmp_dir/edges.json" "$tmp_dir/out.json" 0 500 250 1000 > /dev/null
+
+    output="$(jq -r '.nodes[] | select(.id == "A") | .source_path // ""' "$tmp_dir/out.json")"
+    [ "$output" = "$tmp_dir/wiki/synthesis/sessions/A.md" ] || fail "Expected source_path to survive graph analysis, got: $output"
+
+    rm -rf "$tmp_dir"
+}
+
 test_helper_reports_sparse_and_bridge_insights() {
     local output
 
@@ -199,6 +229,7 @@ main() {
     test_single_node_graph_louvain_returns_safely
     test_parse_sources_yaml_multiline
     test_node_helper_bad_json_exits_with_error
+    test_helper_preserves_node_source_path
     test_helper_reports_sparse_and_bridge_insights
     echo "PASS: graph analysis helper regression coverage"
 }

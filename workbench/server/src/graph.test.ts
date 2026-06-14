@@ -1,10 +1,27 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { graphLayoutPath, readGraphLayout, writeGraphLayout } from "./graph.js";
+import { graphDataPath, graphLayoutPath, readGraphData, readGraphLayout, writeGraphLayout } from "./graph.js";
+
+test("graph data without node source paths is treated as stale", async () => {
+	const kbPath = await tempKb();
+	try {
+		await mkdir(path.dirname(graphDataPath(kbPath)), { recursive: true });
+		await writeFile(graphDataPath(kbPath), JSON.stringify({
+			meta: { build_date: "2026-01-01T00:00:00Z", wiki_title: "Stale", total_nodes: 1, total_edges: 0 },
+			nodes: [{ id: "session-a", label: "Session A", type: "synthesis" }],
+			edges: [],
+		}), "utf8");
+
+		const result = await readGraphData(kbPath);
+		assert.equal(result.needsBuild, true);
+	} finally {
+		await rm(kbPath, { recursive: true, force: true });
+	}
+});
 
 test("graph layout read/write roundtrip stores kb-local pins", async () => {
 	const kbPath = await tempKb();

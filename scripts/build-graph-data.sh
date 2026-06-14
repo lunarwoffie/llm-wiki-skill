@@ -53,6 +53,7 @@ WIKI_DIR="$WIKI_ROOT/wiki"
   echo "       请先运行 init-wiki.sh 初始化知识库。" >&2
   exit 2
 }
+WIKI_ROOT_ABS="$(cd "$WIKI_ROOT" && pwd)"
 
 TMPDIR=$(mktemp -d -t llm-wiki-graph.XXXXXX)
 trap 'rm -rf "$TMPDIR"' EXIT
@@ -231,16 +232,19 @@ NODES_JSONL="$TMPDIR/nodes.jsonl"
 : > "$NODES_JSONL"
 while IFS=$'\t' read -r id label type path; do
   abs_path=$(cd "$(dirname "$path")" && pwd)/$(basename "$path")
+  rel_path="${abs_path#"$WIKI_ROOT_ABS"/}"
   jq -n \
     --arg id "$id" \
     --arg label "$label" \
     --arg type "$type" \
     --arg source_path "$abs_path" \
+    --arg rel_path "$rel_path" \
     '{
       id: $id,
       label: $label,
       type: $type,
-      source_path: $source_path
+      source_path: $rel_path,
+      _file_path: $source_path
     }' >> "$NODES_JSONL"
 done < "$NODES_TSV"
 

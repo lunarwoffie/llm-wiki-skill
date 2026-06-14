@@ -20,6 +20,36 @@ describe("graph selection prompt payload", () => {
 		assert.match(payload.expandedText, /- a -> b \(EXTRACTED\)/);
 		assert.match(payload.expandedText, /请基于上面的选区信息回答/);
 	});
+
+	it("uses stored synthesis session paths when sending graph nodes into chat", () => {
+		const data = fixtureGraph();
+		data.nodes = [
+			{
+				id: "session-a",
+				label: "Session A",
+				type: "synthesis",
+				community: "alpha",
+				source_path: "wiki/synthesis/sessions/session-a.md",
+			},
+		];
+		data.edges = [];
+		const learning = data.learning;
+		assert.ok(learning);
+		data.learning = {
+			...learning,
+			views: {
+				...learning.views,
+				global: { enabled: true, node_ids: ["session-a"], degraded: false },
+			},
+			communities: [{ id: "alpha", label: "Alpha Group", node_count: 1, color_index: 0 }],
+		};
+
+		const selection = resolveSelection(data, { kind: "node", id: "session-a" });
+		const payload = buildSelectionPromptPayload(data, selection, null);
+
+		assert.match(payload.expandedText, /1\. \[\[wiki\/synthesis\/sessions\/session-a\.md\]\] - Session A - 社区 alpha/);
+		assert.doesNotMatch(payload.expandedText, /wiki\/synthesis\/session-a\.md/);
+	});
 });
 
 function fixtureGraph(): GraphData {

@@ -37,7 +37,8 @@ function loadNodeDetails(nodes, degraded, maxLines) {
   const byId = {};
 
   for (const node of nodes) {
-    const raw = fs.readFileSync(node.source_path, "utf8");
+    const filePath = node._file_path || node.source_path;
+    const raw = fs.readFileSync(filePath, "utf8");
     const frontmatter = extractFrontmatter(raw);
     const parsedSources = parseSourcesFrontmatter(frontmatter.frontmatter);
     const normalizedNode = {
@@ -631,6 +632,7 @@ function analyzeGraph(nodes, edges, options = {}) {
     id: node.id,
     label: node.label,
     type: node.type,
+    source_path: node.source_path,
     community: communityAssignments.get(node.id) || null,
     content: nodesById[node.id].content
   }));

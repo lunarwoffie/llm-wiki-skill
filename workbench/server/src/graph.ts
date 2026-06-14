@@ -83,7 +83,17 @@ export async function readGraphData(kbPath: string): Promise<GraphReadResult> {
 	if (!Array.isArray(data.nodes) || !Array.isArray(data.edges)) {
 		throw new Error("graph-data.json 格式不完整");
 	}
+	if (!graphNodesHavePagePaths(data.nodes)) {
+		return { ok: true, needsBuild: true, graphPath };
+	}
 	return { ok: true, needsBuild: false, graphPath, data };
+}
+
+function graphNodesHavePagePaths(nodes: GraphData["nodes"]): boolean {
+	return nodes.every((node) => {
+		const sourcePath = node.source_path || node.path || node.source;
+		return typeof sourcePath === "string" && sourcePath.trim().length > 0;
+	});
 }
 
 export function triggerGraphRebuild(kbPath: string): { ok: true; status: GraphBuildStatus } {
