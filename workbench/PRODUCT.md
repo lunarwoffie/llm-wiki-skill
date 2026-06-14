@@ -44,9 +44,9 @@
 
 **关键事实**：pi-agent 原生实现 Anthropic Skill 标准。llm-wiki-skill 一行不改就能被 agent 项目加载使用。
 
-**长期愿景**：当前 `llm-wiki-agent` 是**临时仓库**；agent 形态成熟后**并入 `llm-wiki` 仓库**作为 Skill 的升级版同时存在（保留 Skill 给纯 CLI 用户）。今天"agent 调 Skill"的边界 = 未来合并的过渡线。详见 ADR-16。
+**长期愿景（ADR-16，已由阶段四落地）**：agent 形态并入 `llm-wiki` 仓库，作为 Skill 的升级版同时存在（保留 Skill 给纯 CLI 用户）。这次合并已在阶段四完成（见下）；本节保留 ADR-16 的原始意图脉络。
 
-**阶段四起合并启动**：本仓库整体搬入主仓库子目录 `workbench/`（monorepo，不发版不宣布），图谱引擎 `@llm-wiki/graph-engine` 是第一块两端共享代码。终局形态为"一个产品、两扇门"——产品 = 知识库格式 + 素材管线 + 方法论；门一 = Skill（嵌入用户已有 harness），门二 = 工作台。详见 ADR-20。
+**合并已完成（阶段四）**：原 agent 仓库已 `git subtree` 搬入主仓库子目录 `workbench/`（monorepo，不发版不宣布），图谱引擎 `@llm-wiki/graph-engine` 是第一块两端共享代码。终局形态为"一个产品、两扇门"——产品 = 知识库格式 + 素材管线 + 方法论；门一 = Skill（嵌入用户已有 harness），门二 = 工作台。详见 ADR-20。
 
 ### 1.4 这个项目"不是什么"
 

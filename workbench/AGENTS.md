@@ -55,26 +55,19 @@
 
 ## 项目当前阶段
 
-当前进度、阶段验收、commit 表和接受的妥协，以 `PRODUCT.md` 第 10 节为准。
+详细进度、阶段验收、commit 表以 `PRODUCT.md` 第 10 节为准（这里只放快速概览，不再自存详细状态，避免两处不同步）。
 
-当前状态：**阶段 3.5 已完成并合并到 `main`**。当前处于阶段四开始前的收尾维护期（2026-05-28）。
+**阶段 4.5 已合入**（图谱可用性收尾：画布导航 + 点击语义重构 + 搜索/图例 + 节点瘦身）。决策见 ADR-22。
 
-阶段 3.5 范围：导航 UX 重构（侧栏统一 + 拖拽添加 KB + 非 wiki 目录初始化引导）+ 多模型双角色（`config.json` 的 `modelRoles.{main, digest}`）+ 子代理批量消化（30 行并发框架 + pi SDK 原生 `SessionManager.inMemory()`）。
+❗ 开发主场在**主仓库 monorepo**（本目录是其 `workbench/` 子目录）：图谱引擎在 `packages/graph-engine/`，`npm run dev` 从 monorepo 根执行。原独立 llm-wiki-agent 仓库已只读归档（处置留品牌阶段，见 ADR-20）。
 
-阶段设计归档：
-
-- 阶段二：✅ 已完成 2026-05-27
-- 阶段三：✅ 已完成 2026-05-27
-- 阶段 3.5：✅ 已完成 2026-05-27
-- 阶段 3.5 收尾补强：✅ 已完成 2026-05-28
-- 阶段 3.5 预览布局补强：✅ 已完成 2026-05-28
-- 阶段 3.5 设置面板滚动补强：✅ 已完成 2026-05-28
+阶段一 / 二 / 三 / 3.5 / 四 / 4.5 均已完成（详见 PRODUCT.md §10）。
 
 ## 关键路径速查
 
 | 类型 | 值 |
 |---|---|
-| 一行启动 | `npm run dev` |
+| 一行启动 | `npm run dev`（从 monorepo 根，并行起前后端）|
 | 后端端口 | `8787` |
 | 前端端口 | `5180`，`strictPort: true` |
 | 知识库默认根 | `~/llm-wiki/` |
@@ -82,8 +75,9 @@
 | 应用数据 | `~/.llm-wiki-agent/` |
 | 会话目录 | `~/.llm-wiki-agent/sessions/<sha256-of-kb-path>/*.jsonl` |
 | 模型凭证 | `~/.pi/agent/auth.json` |
-| 后端代码 | `server/`，Hono + pi-coding-agent SDK |
-| 前端代码 | `web/`，Vite + React + shadcn/ui |
+| 后端代码 | `workbench/server/`，Hono + pi-coding-agent SDK |
+| 前端代码 | `workbench/web/`，Vite + React + shadcn/ui |
+| 共享图谱引擎 | `packages/graph-engine/`（工作台与 Skill 离线 HTML 同享）|
 
 ## 环境要求
 

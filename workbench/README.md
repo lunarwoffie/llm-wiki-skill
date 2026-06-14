@@ -2,11 +2,11 @@
 
 本地运行的知识库工作台。以对话为中心，通过 `@` 引用知识库内容、`/` 调用工具能力，把对话沉淀为可读可分享的产物（笔记、HTML、PPT、Word 等）。
 
-> ⚠️ **当前状态**：阶段一进行中（主干打通）。**尚不可用**。
+> 这是 **llm-wiki monorepo** 里的 agent 工作台（`workbench/` 子目录）。当前进度、定位、路线、决策见 [PRODUCT.md](PRODUCT.md)。
 
 ## 这个项目是什么
 
-- 配套 [llm-wiki-skill](https://github.com/sdyckjq-lab/llm-wiki-skill) 的独立 agent 形态
+- llm-wiki 的 **agent 工作台形态**，与 Skill 形态同处一个 monorepo，读写同一份知识库格式
 - 基于 [pi-agent](https://github.com/earendil-works/pi) 的 SDK
 - 本地运行，未来打包为 Tauri 桌面应用
 
@@ -18,7 +18,7 @@
 
 ## 开发
 
-阶段一仍在打通，命令将随阶段推进补全。
+从 monorepo 根执行 `npm run dev`，并行起后端（`8787`）和前端（`5180`）。详见 PRODUCT.md §10 与 monorepo 根 `CLAUDE.md`。
 
 ### 环境要求
 
