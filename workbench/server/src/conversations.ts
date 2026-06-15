@@ -21,6 +21,7 @@ import { SessionManager, type SessionInfo } from "@earendil-works/pi-coding-agen
 
 import { APP_DIR } from "./config.js";
 import { stripKnowledgeContextForDisplay } from "./retrieval.js";
+import { formatToolDisplay } from "./tool-status-events.js";
 
 export const SESSIONS_ROOT = join(APP_DIR, "sessions");
 
@@ -88,6 +89,7 @@ export async function listConversations(kbAbsolutePath: string): Promise<Convers
  */
 export function piMessagesToUIMessages(messages: AgentMessage[]): UIMessage[] {
 	const result: UIMessage[] = [];
+	const toolResults = indexToolResults(messages);
 
 	for (const msg of messages) {
 		if (msg.role === "user") {
@@ -102,7 +104,7 @@ export function piMessagesToUIMessages(messages: AgentMessage[]): UIMessage[] {
 			}
 		} else if (msg.role === "assistant") {
 			const text = extractText(msg);
-			const tools = extractToolNames(msg);
+			const tools = extractToolSummaries(msg, toolResults);
 			if (text.trim() || tools.length > 0) {
 				result.push({
 					id: `a-${result.length}`,
@@ -116,6 +118,21 @@ export function piMessagesToUIMessages(messages: AgentMessage[]): UIMessage[] {
 	}
 
 	return result;
+}
+
+interface ToolCallSummarySource {
+	id?: string;
+	name: string;
+	args: Record<string, unknown>;
+	hasArgs: boolean;
+}
+
+interface ToolResultSummarySource {
+	toolCallId?: string;
+	toolName?: string;
+	text: string;
+	isError: boolean;
+	details?: unknown;
 }
 
 function extractText(msg: AgentMessage): string {
@@ -134,17 +151,100 @@ function extractText(msg: AgentMessage): string {
 	return "";
 }
 
-function extractToolNames(msg: AgentMessage): string[] {
+function extractToolSummaries(
+	msg: AgentMessage,
+	toolResults: Map<string, ToolResultSummarySource>,
+): string[] {
 	const content = (msg as { content?: unknown }).content;
 	if (!Array.isArray(content)) return [];
-	const names: string[] = [];
+	const summaries: string[] = [];
 	for (const part of content) {
 		if (typeof part !== "object" || part === null) continue;
 		const p = part as Record<string, unknown>;
 		if (p.type === "tool_call" || p.type === "toolCall") {
-			if (typeof p.name === "string") names.push(p.name);
-			else if (typeof p.toolName === "string") names.push(p.toolName);
+			const call = normalizeToolCall(p);
+			if (!call) continue;
+			const result = call.id ? toolResults.get(call.id) : undefined;
+			summaries.push(renderToolSummary(call, result));
 		}
 	}
-	return names;
+	return summaries;
+}
+
+function indexToolResults(messages: AgentMessage[]): Map<string, ToolResultSummarySource> {
+	const results = new Map<string, ToolResultSummarySource>();
+	for (const message of messages) {
+		if (message.role !== "toolResult") continue;
+		const record = message as unknown as Record<string, unknown>;
+		const toolCallId = typeof record.toolCallId === "string" ? record.toolCallId : undefined;
+		if (!toolCallId) continue;
+		results.set(toolCallId, {
+			toolCallId,
+			toolName: typeof record.toolName === "string" ? record.toolName : undefined,
+			text: extractText(message).trim(),
+			isError: record.isError === true,
+			details: record.details,
+		});
+	}
+	return results;
+}
+
+function normalizeToolCall(record: Record<string, unknown>): ToolCallSummarySource | null {
+	const name = typeof record.name === "string"
+		? record.name
+		: typeof record.toolName === "string"
+			? record.toolName
+			: null;
+	if (!name) return null;
+	const id = typeof record.id === "string"
+		? record.id
+		: typeof record.toolCallId === "string"
+			? record.toolCallId
+			: undefined;
+	const rawArgs = record.arguments ?? record.args ?? record.input;
+	const args = isRecord(rawArgs) ? rawArgs : {};
+	return {
+		id,
+		name,
+		args,
+		hasArgs: Object.keys(args).length > 0,
+	};
+}
+
+function renderToolSummary(
+	call: ToolCallSummarySource,
+	result: ToolResultSummarySource | undefined,
+): string {
+	const display = call.hasArgs
+		? formatToolDisplay(call.name, call.args)
+		: { action: "历史工具调用", target: call.name };
+	const resultText = summarizeToolResult(result);
+	const failure = result?.isError ? " 失败" : "";
+	if (!call.hasArgs) {
+		return resultText
+			? `历史工具调用：${call.name}${failure}：${resultText}`
+			: `历史工具调用：${call.name}${failure}`;
+	}
+	return resultText
+		? `${display.action} ${display.target}${failure}：${resultText}`
+		: `${display.action} ${display.target}${failure}`;
+}
+
+function summarizeToolResult(result: ToolResultSummarySource | undefined): string {
+	if (!result) return "";
+	if (result.text) return truncateSummary(result.text);
+	const details = isRecord(result.details) ? result.details : {};
+	for (const key of ["summary", "message", "error", "path"]) {
+		const value = details[key];
+		if (typeof value === "string" && value.trim()) return truncateSummary(value.trim());
+	}
+	return "";
+}
+
+function truncateSummary(value: string): string {
+	return value.length <= 80 ? value : `${value.slice(0, 52)}...${value.slice(-25)}`;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }

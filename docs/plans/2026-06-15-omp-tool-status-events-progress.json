@@ -2,9 +2,9 @@
   "plan": "docs/plans/2026-06-15-omp-tool-status-events-phased-plan.md",
   "status": {
     "overall": "in_progress",
-    "phase": "phase-2",
-    "task": "2.3",
-    "next_allowed_action": "Implement phase-2 task 2.3; do not enter phase-3 until all phase-2 acceptance checks pass"
+    "phase": "phase-3",
+    "task": "3.1",
+    "next_allowed_action": "Implement phase-3 task 3.1 after verified phase-2 completion"
   },
   "execution_rules": {
     "branch": "codex/feat-omp-tool-status-events",
@@ -207,7 +207,7 @@
     {
       "id": "phase-2",
       "goal": "Expose stable backend tool status events",
-      "status": "pending",
+      "status": "completed",
       "acceptance": [
 				{
 					"check": "Stable tool status adapter covers start, update, end, failure, missing args, and common tool formatting",
@@ -221,8 +221,11 @@
 				},
 				{
 					"check": "Backend and frontend tests share contract event fixtures so SSE event fields cannot drift silently",
-					"status": "pending",
-					"evidence": []
+					"status": "passed",
+					"evidence": [
+						"workbench/server/src/tool-status-events.ts exports buildToolStatusContractFixture as the shared backend contract sample for later frontend parser and history-summary tests.",
+						"workbench/server/src/tool-status-events.test.ts snapshots the fixture shape so backend field changes fail before frontend parser work proceeds."
+					]
 				},
 				{
 					"check": "Client abort or explicit stop calls the session abort path where supported and emits cancelled tool status endings for active tools",
@@ -262,7 +265,7 @@
 					"check": "node --import tsx --test workbench/server/src/tool-status-events.test.ts exits 0",
 					"status": "passed",
           "evidence": [
-            "node --import tsx --test workbench/server/src/tool-status-events.test.ts exited 0 with 7 passing subtests."
+            "node --import tsx --test workbench/server/src/tool-status-events.test.ts exited 0 with 10 passing subtests after 2.2 and 2.3."
           ]
         },
         {
@@ -323,8 +326,21 @@
         {
           "id": "2.3",
           "title": "Preserve history display through generated summaries",
-          "status": "pending",
-          "verification": [],
+          "status": "completed",
+          "verification": [
+            "Read progress file and plan; current unit was phase-2 task 2.3.",
+            "Ran git log --oneline -15 and npm run typecheck before new work; both exited 0.",
+            "Updated piMessagesToUIMessages to generate completed history tool summaries from assistant toolCall blocks and matching toolResult messages.",
+            "Historical summaries are regenerated from pi session messages on every load, so new-session summaries persist after refresh without adding a new stored field.",
+            "Old incomplete tool calls with missing ids, args, targets, results, or errors fall back to best-effort labels such as 历史工具调用：bash and do not invent unavailable details.",
+            "Assistant messages without tool calls continue to return an empty tools array.",
+            "Added conversations.test.ts covering tool-call result summaries, incomplete old tool calls, no-tool messages, and missing-detail failures.",
+            "Verified node --import tsx --test workbench/server/src/conversations.test.ts exited 0 with 4 passing subtests.",
+            "Verified node --import tsx --test workbench/server/src/tool-status-events.test.ts workbench/server/src/retrieval.test.ts exited 0 with 19 passing subtests.",
+            "Verified npm run typecheck --workspace=@llm-wiki-agent/server exited 0.",
+            "Verified npm run typecheck exited 0.",
+            "Verified git diff --check exited 0."
+          ],
           "commit": null
         }
       ]
@@ -575,6 +591,17 @@
         "Verified node --import tsx --test workbench/server/src/tool-status-events.test.ts, npm run typecheck --workspace=@llm-wiki-agent/server, npm run typecheck, API SSE smoke, process cleanup, and git diff --check all passed.",
         "Committed verified task 2.2 as 141f4ea1489e663b8ea923200da05da6d94a157a.",
         "Advanced current task pointer to phase-2 task 2.3 after recording the 2.2 commit hash."
+      ]
+    },
+    {
+      "turn": "phase-2-task-2.3",
+      "status": "completed",
+      "evidence": [
+        "Read progress file and plan; current unit was phase-2 task 2.3.",
+        "Ran git log --oneline -15 and npm run typecheck before new work; both exited 0.",
+        "Updated history conversion to regenerate completed tool summaries from assistant tool calls and toolResult messages, with best-effort fallback for incomplete old sessions and no empty summaries for messages without tools.",
+        "Added conversations.test.ts and verified conversations, tool-status-events, retrieval, server typecheck, full typecheck, and git diff --check all passed.",
+        "All phase-2 acceptance checks now pass, so the progress pointer advanced to phase-3 task 3.1."
       ]
     }
   ],
