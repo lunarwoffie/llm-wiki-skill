@@ -25,7 +25,7 @@ interface Props {
 	onGraphSelectionAsk: (actionId: string | null, newConversation: boolean) => void;
 	onResize: (width: number) => void;
 	onToggleFullscreen: () => void;
-	onClose: () => void;
+	onClose: (reason: "button" | "escape") => void;
 }
 
 const KIND_ICON: Record<ArtifactManifest["kind"], string> = {
@@ -64,7 +64,7 @@ export function RightDrawer({
 		if (drawer.mode === "closed") return;
 
 		const handleKeyDown = (event: KeyboardEvent) => {
-			if (event.key === "Escape") onClose();
+			if (event.key === "Escape") onClose("escape");
 		};
 
 		window.addEventListener("keydown", handleKeyDown, { capture: true });
@@ -154,7 +154,7 @@ export function RightDrawer({
 					<button type="button" className="icon-btn" onClick={onToggleFullscreen} aria-label={fullscreen ? "退出全屏" : "全屏"}>
 						{fullscreen ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
 					</button>
-					<button type="button" className="icon-btn" onClick={onClose} aria-label="关闭">
+					<button type="button" className="icon-btn" onClick={() => onClose("button")} aria-label="关闭">
 						<X className="size-4" />
 					</button>
 				</div>

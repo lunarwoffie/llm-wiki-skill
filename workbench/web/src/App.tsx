@@ -131,7 +131,7 @@ function App() {
 	const [graphRefreshToken, setGraphRefreshToken] = useState(0);
 	const [graphHasPendingUpdate, setGraphHasPendingUpdate] = useState(false);
 	const [graphData, setGraphData] = useState<GraphData | null>(null);
-	const [selectionCommand, setSelectionCommand] = useState<{ id: string; type: "clear" | "neighbors" } | undefined>();
+	const [selectionCommand, setSelectionCommand] = useState<{ id: string; type: "clear" | "clear-selection" | "neighbors" } | undefined>();
 	const [mainView, setMainView] = useState<MainView>(() => {
 		if (typeof window === "undefined") return "chat";
 		return window.localStorage.getItem(MAIN_VIEW_STORAGE_KEY) === "graph" ? "graph" : "chat";
@@ -401,10 +401,13 @@ function App() {
 		setSelectionCommand({ id: Math.random().toString(36).slice(2, 10), type: "clear" });
 	};
 
-	const handleCloseDrawer = useCallback(() => {
+	const handleCloseDrawer = useCallback((reason: "button" | "escape") => {
 		setDrawer((current) => {
 			if (current.mode === "graph-reader" || current.mode === "graph-selection") {
-				setSelectionCommand({ id: Math.random().toString(36).slice(2, 10), type: "clear" });
+				setSelectionCommand({
+					id: Math.random().toString(36).slice(2, 10),
+					type: reason === "button" ? "clear-selection" : "clear",
+				});
 				setGraphFocusPath(null);
 			}
 			return closedDrawer();

@@ -94,6 +94,11 @@ export function createGraphEngine(container: HTMLElement, options: GraphEngineOp
       return resolveForHostCapabilities(selector);
     },
 
+    clearSelection(): void {
+      assertActive();
+      renderer.clearSelection();
+    },
+
     clearInteraction(): void {
       assertActive();
       renderer.clearInteraction();

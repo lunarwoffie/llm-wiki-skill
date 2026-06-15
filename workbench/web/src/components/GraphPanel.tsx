@@ -28,7 +28,7 @@ interface Props {
 	onOpenPage?: (payload: GraphOpenPagePayload) => void;
 	onGraphDataChange?: (data: GraphData | null) => void;
 	onSelectionChange?: (selection: Selection | null) => void;
-	selectionCommand?: { id: string; type: "clear" | "neighbors" };
+	selectionCommand?: { id: string; type: "clear" | "clear-selection" | "neighbors" };
 	focusPath?: string | null;
 	pendingDiff?: GraphDiff | null;
 	refreshToken?: number;
@@ -304,6 +304,10 @@ export function GraphPanel({
 		if (!selectionCommand || status !== "ready") return;
 		if (selectionCommand.type === "clear") {
 			engineRef.current?.clearInteraction();
+			onSelectionChangeRef.current?.(null);
+		}
+		if (selectionCommand.type === "clear-selection") {
+			engineRef.current?.clearSelection();
 			onSelectionChangeRef.current?.(null);
 		}
 		if (selectionCommand.type === "neighbors") {

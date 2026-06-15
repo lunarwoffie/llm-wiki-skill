@@ -37,6 +37,7 @@ import {
   fitRendererViewportToPoints,
   panRendererViewport,
   rendererViewportToMinimapRect,
+  viewportAfterResize,
   viewportAfterWheelZoom,
   type RendererViewport
 } from "./viewport";
@@ -84,6 +85,7 @@ export interface StaticGraphRenderer {
   setTypeFilters(filters: GraphTypeFilters): void;
   resetView(): void;
   select(selection: SelectionInput): void;
+  clearSelection(): void;
   clearInteraction(): void;
   resetLayout(): void;
   destroy(): void;
@@ -181,10 +183,13 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
   let blankPan: { pointerId: number; lastX: number; lastY: number; startX: number; startY: number; moved: boolean } | null = null;
   let viewportAnimationTimer: ReturnType<typeof setTimeout> | null = null;
   let lastEffectiveDensityMode: DensityMode | null = null;
+  let lastViewportSize = viewportSize();
+  let resizeObserver: ResizeObserver | null = null;
 
   let graph = buildRenderableGraph(data, { pins, theme, selectedNodeId, selection, focus, typeFilters, pathCache });
   let pinState = new PinState(graph, pins);
   bindViewportHandlers();
+  bindResizeObserver();
 
   function render(next: Partial<StaticRendererOptions> & { selectedNodeId?: string | null; selection?: SelectionInput | null } = {}): void {
     assertActive();
@@ -317,6 +322,9 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
       manualNodeIds = nextSelection.kind === "nodes" ? nextSelection.ids : [];
       render({ selection: nextSelection });
     },
+    clearSelection(): void {
+      retreatFocusedView();
+    },
     clearInteraction(): void {
       clearInteractionState();
     },
@@ -331,6 +339,8 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
       destroyed = true;
       simulation?.destroy();
       simulation = null;
+      resizeObserver?.disconnect();
+      resizeObserver = null;
       ownerDocument.removeEventListener("keydown", handleDocumentKeydown);
       if (previewTimer) clearTimeout(previewTimer);
       if (viewportAnimationTimer) clearTimeout(viewportAnimationTimer);
@@ -709,6 +719,24 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
       event.preventDefault();
       resetViewState();
     });
+  }
+
+  function bindResizeObserver(): void {
+    const ViewResizeObserver = root.ownerDocument.defaultView?.ResizeObserver;
+    if (!ViewResizeObserver) return;
+    lastViewportSize = viewportSize();
+    resizeObserver = new ViewResizeObserver(() => {
+      const previous = lastViewportSize;
+      const next = viewportSize();
+      if (Math.abs(previous.width - next.width) < 1 && Math.abs(previous.height - next.height) < 1) return;
+      lastViewportSize = next;
+      const anchorPoint = selectedNodeId
+        ? graph.nodes.find((node) => node.id === selectedNodeId)?.point ?? null
+        : null;
+      setViewportAnimating(false);
+      commitViewport(viewportAfterResize(viewport, previous, next, { anchorPoint }));
+    });
+    resizeObserver.observe(root);
   }
 
   function commitViewport(nextViewport: RendererViewport): void {

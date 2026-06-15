@@ -39,10 +39,20 @@ export const DEFAULT_RENDERER_VIEWPORT: RendererViewport = {
 const WHEEL_LINE_HEIGHT_PX = 18;
 const WHEEL_PAGE_HEIGHT_PX = 720;
 const WHEEL_ZOOM_SPEED = 0.0016;
+const WORLD_WIDTH = 1000;
+const WORLD_HEIGHT = 680;
+const COMFORTABLE_ANCHOR_MIN_X = 0.18;
+const COMFORTABLE_ANCHOR_MAX_X = 0.78;
+const COMFORTABLE_ANCHOR_MIN_Y = 0.18;
+const COMFORTABLE_ANCHOR_MAX_Y = 0.82;
 const DEFAULT_VIEWPORT_OPTIONS: Required<RendererViewportOptions> = {
   minScale: 0.5,
   maxScale: 4
 };
+
+export interface RendererViewportResizeOptions extends RendererViewportOptions {
+  anchorPoint?: RendererPoint | null;
+}
 
 export function normalizeRendererViewport(viewport: Partial<RendererViewport> | null | undefined): RendererViewport {
   return {
@@ -131,6 +141,27 @@ export function centerRendererViewportOnPoint(
   return centerAtlasViewportOnPoint(point, viewportSize, safe.scale, viewportOptions(options)) as RendererViewport;
 }
 
+export function viewportAfterResize(
+  viewport: Partial<RendererViewport> | null | undefined,
+  previousSize: RendererViewportSize,
+  nextSize: RendererViewportSize,
+  options: RendererViewportResizeOptions = {}
+): RendererViewport {
+  const safe = normalizeRendererViewport(viewport);
+  const previous = normalizeViewportSize(previousSize);
+  const next = normalizeViewportSize(nextSize);
+  const anchorPoint = options.anchorPoint || viewportCenterPoint(safe, previous);
+  const previousScreen = modelPointToScreen(anchorPoint, safe, previous);
+  const desiredXRatio = clamp(previousScreen.x / previous.width, COMFORTABLE_ANCHOR_MIN_X, COMFORTABLE_ANCHOR_MAX_X);
+  const desiredYRatio = clamp(previousScreen.y / previous.height, COMFORTABLE_ANCHOR_MIN_Y, COMFORTABLE_ANCHOR_MAX_Y);
+
+  return clampAtlasViewport({
+    x: next.width * desiredXRatio - safe.scale * (anchorPoint.x / WORLD_WIDTH * next.width),
+    y: next.height * desiredYRatio - safe.scale * (anchorPoint.y / WORLD_HEIGHT * next.height),
+    scale: safe.scale
+  }, next, viewportOptions(options)) as RendererViewport;
+}
+
 export function rendererViewportToMinimapRect(
   viewport: Partial<RendererViewport> | null | undefined,
   viewportSize: RendererViewportSize
@@ -166,6 +197,31 @@ export function createViewportFrameCommitter(
 
 function finiteNumber(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function normalizeViewportSize(size: RendererViewportSize): RendererViewportSize {
+  return {
+    width: Math.max(1, finiteNumber(size.width, WORLD_WIDTH)),
+    height: Math.max(1, finiteNumber(size.height, WORLD_HEIGHT))
+  };
+}
+
+function viewportCenterPoint(viewport: RendererViewport, size: RendererViewportSize): RendererPoint {
+  return {
+    x: clamp(((size.width / 2 - viewport.x) / viewport.scale) / size.width * WORLD_WIDTH, 0, WORLD_WIDTH),
+    y: clamp(((size.height / 2 - viewport.y) / viewport.scale) / size.height * WORLD_HEIGHT, 0, WORLD_HEIGHT)
+  };
+}
+
+function modelPointToScreen(point: RendererPoint, viewport: RendererViewport, size: RendererViewportSize): RendererPoint {
+  return {
+    x: viewport.x + viewport.scale * (point.x / WORLD_WIDTH * size.width),
+    y: viewport.y + viewport.scale * (point.y / WORLD_HEIGHT * size.height)
+  };
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
 }
 
 function round(value: number): number {

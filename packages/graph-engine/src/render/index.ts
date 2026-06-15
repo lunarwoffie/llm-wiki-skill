@@ -53,6 +53,7 @@ export {
   panRendererViewport,
   rendererViewportToMinimapRect,
   rendererViewportToTransform,
+  viewportAfterResize,
   viewportAfterWheelZoom
 } from "./viewport";
-export type { RafScheduler, RendererPoint, RendererViewport, RendererViewportOptions, RendererViewportSize, WheelDeltaLike } from "./viewport";
+export type { RafScheduler, RendererPoint, RendererViewport, RendererViewportOptions, RendererViewportResizeOptions, RendererViewportSize, WheelDeltaLike } from "./viewport";

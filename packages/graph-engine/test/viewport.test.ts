@@ -9,6 +9,7 @@ import {
   panRendererViewport,
   rendererViewportToMinimapRect,
   rendererViewportToTransform,
+  viewportAfterResize,
   viewportAfterWheelZoom
 } from "../src/render";
 import type { GraphData, PinMap } from "../src/types";
@@ -115,6 +116,21 @@ describe("renderer viewport state", () => {
 
     assert.equal(centered.scale, 2);
     assert.deepEqual(centered, { x: -500, y: -340, scale: 2 });
+  });
+
+  it("keeps a selected model point visually anchored when the viewport host resizes", () => {
+    const point = { x: 760, y: 340 };
+    const beforeSize = { width: 1170, height: 856 };
+    const afterSize = { width: 750, height: 856 };
+    const before = centerRendererViewportOnPoint(point, { x: 0, y: 0, scale: 1.5 }, beforeSize);
+    const resized = viewportAfterResize(before, beforeSize, afterSize, { anchorPoint: point });
+    const screenRatio = (
+      resized.x + resized.scale * (point.x / 1000 * afterSize.width)
+    ) / afterSize.width;
+
+    assert.equal(resized.scale, before.scale);
+    assert.ok(screenRatio >= 0.18, `anchored point should not hug the left edge, got ${screenRatio}`);
+    assert.ok(screenRatio <= 0.78, `anchored point should stay clear of the drawer edge, got ${screenRatio}`);
   });
 
   it("maps the current viewport to a minimap rectangle", () => {

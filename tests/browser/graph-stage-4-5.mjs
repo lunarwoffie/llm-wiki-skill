@@ -335,6 +335,31 @@ async function runLegendChecks(page, options) {
   if (options.expectWorkbenchDrawer) {
     await page.waitForSelector(".drawer-panel-open");
     await page.locator(".drawer-panel-open .drawer-title", { hasText: "选区" }).waitFor();
+    await page.locator(".drawer-header button").last().click();
+    await page.waitForSelector(".drawer-panel-open", { state: "detached" });
+    assert.equal(
+      await page.locator(".node").count(),
+      focusedNodes,
+      "closing the workbench selection drawer should keep the focused community visible"
+    );
+    await expectNoPressedNodes(page, "closing the workbench selection drawer should clear highlights but not leave community focus");
+
+    await closeToolbarWithBlankClick(page);
+    await waitForToolbarPanel(page, "closed");
+    const target = await rightmostNodeSnapshot(page);
+    await page.locator(`.node[data-id="${cssString(target.id)}"]`).click();
+    await page.waitForSelector(".drawer-panel-open");
+    await page.locator(".drawer-panel-open .drawer-title").waitFor();
+    const afterOpen = await nodeSnapshot(page, target.id);
+    const drift = Math.abs(afterOpen.centerRatioX - target.centerRatioX);
+    assert.ok(
+      drift <= 0.16,
+      `opening the workbench reader drawer should keep the clicked node visually anchored; drift=${drift.toFixed(3)}`
+    );
+    assert.ok(
+      afterOpen.centerRatioX >= 0.18 && afterOpen.centerRatioX <= 0.78,
+      `clicked node should remain in a comfortable visible band after drawer opens; ratio=${afterOpen.centerRatioX.toFixed(3)}`
+    );
     await page.keyboard.press("Escape");
     await page.waitForSelector(".drawer-panel-open", { state: "detached" });
   } else {
@@ -417,6 +442,38 @@ function cssString(value) {
   return String(value).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 }
 
+async function rightmostNodeSnapshot(page) {
+  const nodes = await page.locator(".node").evaluateAll((elements) => {
+    const root = document.querySelector("[data-llm-wiki-graph-root='true']");
+    if (!root) throw new Error("graph root should exist");
+    const rootRect = root.getBoundingClientRect();
+    return elements.map((element) => {
+      const rect = element.getBoundingClientRect();
+      return {
+        id: element.getAttribute("data-id") || "",
+        centerRatioX: (rect.left + rect.width / 2 - rootRect.left) / Math.max(1, rootRect.width),
+        centerRatioY: (rect.top + rect.height / 2 - rootRect.top) / Math.max(1, rootRect.height)
+      };
+    }).filter((item) => item.id);
+  });
+  assert.ok(nodes.length > 0, "focused community should expose at least one node");
+  return nodes.sort((a, b) => b.centerRatioX - a.centerRatioX)[0];
+}
+
+async function nodeSnapshot(page, id) {
+  return page.locator(`.node[data-id="${cssString(id)}"]`).evaluate((element) => {
+    const root = document.querySelector("[data-llm-wiki-graph-root='true']");
+    if (!root) throw new Error("graph root should exist");
+    const rootRect = root.getBoundingClientRect();
+    const rect = element.getBoundingClientRect();
+    return {
+      id: element.getAttribute("data-id") || "",
+      centerRatioX: (rect.left + rect.width / 2 - rootRect.left) / Math.max(1, rootRect.width),
+      centerRatioY: (rect.top + rect.height / 2 - rootRect.top) / Math.max(1, rootRect.height)
+    };
+  });
+}
+
 async function assertOfflineSelectionPanel(page, expectedMode) {
   await page.waitForSelector(".graph-selection-panel[data-state='open']");
   const panel = page.locator(".graph-selection-panel");
@@ -449,14 +506,19 @@ async function openToolbarFilters(page) {
 
 async function closeToolbarWithBlankClick(page) {
   const root = page.locator("[data-llm-wiki-graph-root='true']");
-  await root.dispatchEvent("pointerdown", {
+  const pointer = {
     button: 0,
     pointerId: 1,
     clientX: 32,
     clientY: 128,
     bubbles: true,
     cancelable: true
+  };
+  await root.dispatchEvent("pointerdown", {
+    ...pointer,
+    buttons: 1
   });
+  await root.dispatchEvent("pointerup", pointer);
 }
 
 async function waitForToolbarPanel(page, state) {

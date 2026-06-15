@@ -304,6 +304,7 @@ export interface GraphEngine {
   setTypeFilters(filters: GraphTypeFilters): void;
   resetView(): void;
   select(selector: SelectionInput): Selection;
+  clearSelection(): void;
   clearInteraction(): void;
   setTheme(theme: ThemeId): void;
   setPins(pins: PinMap): void;
