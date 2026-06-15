@@ -14,6 +14,7 @@
 
 import { createHash } from "node:crypto";
 import { mkdir } from "node:fs/promises";
+import { homedir } from "node:os";
 import { join } from "node:path";
 
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
@@ -232,17 +233,21 @@ function renderToolSummary(
 
 function summarizeToolResult(result: ToolResultSummarySource | undefined): string {
 	if (!result) return "";
-	if (result.text) return truncateSummary(result.text);
+	if (result.text) return truncateSummary(redactPrivatePaths(result.text));
 	const details = isRecord(result.details) ? result.details : {};
 	for (const key of ["summary", "message", "error", "path"]) {
 		const value = details[key];
-		if (typeof value === "string" && value.trim()) return truncateSummary(value.trim());
+		if (typeof value === "string" && value.trim()) return truncateSummary(redactPrivatePaths(value.trim()));
 	}
 	return "";
 }
 
 function truncateSummary(value: string): string {
 	return value.length <= 80 ? value : `${value.slice(0, 52)}...${value.slice(-25)}`;
+}
+
+function redactPrivatePaths(value: string): string {
+	return value.split(homedir()).join("~").replace(/\/Users\/[^/\s]+/g, "/Users/<user>");
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

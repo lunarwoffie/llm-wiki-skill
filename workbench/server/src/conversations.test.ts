@@ -69,6 +69,25 @@ test("piMessagesToUIMessages does not invent details missing from tool results",
 	]);
 });
 
+test("piMessagesToUIMessages redacts private paths in historical tool results", () => {
+	const messages = piMessagesToUIMessages([
+		assistantMessage("读取文件。", [
+			{
+				type: "toolCall",
+				id: "call-private",
+				name: "read",
+				arguments: { path: `${homedir()}/wiki/private.md` },
+			},
+		]),
+		toolResultMessage("call-private", "read", `读取完成：${homedir()}/wiki/private.md`, false),
+	]);
+
+	assert.equal(JSON.stringify(messages).includes(homedir()), false);
+	assert.deepEqual(messages[0]?.tools, [
+		{ name: "读取 ~/wiki/private.md：读取完成：~/wiki/private.md", status: "done" },
+	]);
+});
+
 function userMessage(text: string): AgentMessage {
 	return {
 		role: "user",
