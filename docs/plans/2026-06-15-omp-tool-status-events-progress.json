@@ -173,7 +173,7 @@
             "git diff --check exited 0.",
             "No user-global omp or global pi-agent files were modified; git diff is limited to package-lock.json, workbench/server/package.json, and this progress ledger."
           ],
-          "commit": null
+          "commit": "babf3309b98845d31244a5b306daa2a8deb351d8"
         },
         {
           "id": "1.3",
@@ -467,7 +467,8 @@
         "Ran git log --oneline -15 and npm run typecheck before new work; both exited 0.",
         "Ran npm install for @llm-wiki-agent/server to migrate @earendil-works/pi-agent-core, @earendil-works/pi-coding-agent, and direct @earendil-works/pi-ai to ^0.79.4.",
         "No source import changes were needed because the service already used the @earendil-works package family and the 0.79.4 exports remain compatible.",
-        "Verified npm run typecheck --workspace=@llm-wiki-agent/server, npm run typecheck, npm ls for the three pi packages, and git diff --check."
+        "Verified npm run typecheck --workspace=@llm-wiki-agent/server, npm run typecheck, npm ls for the three pi packages, and git diff --check.",
+        "Committed verified task 1.2 as babf3309b98845d31244a5b306daa2a8deb351d8."
       ]
     }
   ],
