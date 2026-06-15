@@ -200,7 +200,7 @@
             "Stopped the dev server and confirmed ports 5180 and 8787 had no listeners.",
             "Ran npm run typecheck after smoke verification; it exited 0."
           ],
-          "commit": null
+          "commit": "ca84cbcf7c66ec83e58e3f4acb87b39997858d56"
         }
       ]
     },
@@ -499,7 +499,8 @@
         "Ran git log --oneline -15 and npm run typecheck before new work; both exited 0.",
         "Started npm run dev from clean ports; readiness checks proved frontend port 5180 and backend port 8787.",
         "Ran browser smoke at http://localhost:5180/ with pi-agent selected, visible current model, usable chat area, ordinary assistant reply, and retrieval-triggering prompt with no backend error output.",
-        "Stopped npm run dev, confirmed process cleanup on ports 5180 and 8787, and reran npm run typecheck successfully."
+        "Stopped npm run dev, confirmed process cleanup on ports 5180 and 8787, and reran npm run typecheck successfully.",
+        "Committed verified task 1.3 as ca84cbcf7c66ec83e58e3f4acb87b39997858d56."
       ]
     }
   ],
