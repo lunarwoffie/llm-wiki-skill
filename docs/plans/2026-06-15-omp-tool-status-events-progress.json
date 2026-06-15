@@ -2,9 +2,9 @@
   "plan": "docs/plans/2026-06-15-omp-tool-status-events-phased-plan.md",
   "status": {
     "overall": "in_progress",
-    "phase": "phase-3",
-    "task": "3.3",
-    "next_allowed_action": "Implement phase-3 task 3.3 after recording the 3.2 commit hash"
+    "phase": "phase-4",
+    "task": "4.1",
+    "next_allowed_action": "Implement phase-4 task 4.1 after verified phase-3 completion"
   },
   "execution_rules": {
     "branch": "codex/feat-omp-tool-status-events",
@@ -348,7 +348,7 @@
     {
       "id": "phase-3",
       "goal": "Create frontend tool status model and stream integration",
-      "status": "in_progress",
+      "status": "completed",
       "acceptance": [
         {
           "check": "Tool status reducer tests cover switching, missing args, failed/cancelled tools, parallel tools, and truncation",
@@ -466,7 +466,7 @@
             "Verified git diff --check exited 0.",
             "Started npm run dev; curl confirmed backend health and frontend HTTP 200; headless Chrome rendered http://localhost:5180/ to /tmp/llm-wiki-omp-phase-3-3.png; stopped dev server and confirmed ports 5180 and 8787 had no listeners."
           ],
-          "commit": null
+          "commit": "531e1e68b809406fbdf21d32e9a6d5907eb18fde"
         }
       ]
     },
@@ -699,7 +699,9 @@
         "Ran git log --oneline -15 and npm run typecheck before new work; both exited 0.",
         "Reconnected ChatPanel to stable tool status events, added local stop/cancel cleanup, and stopped appending old live tool rows.",
         "Added reducer coverage for local cancellation without backend abort confirmation.",
-        "Verified npm run test --workspace=@llm-wiki-agent/web -- tool-status-model.test.ts, npm run test --workspace=@llm-wiki-agent/web, npm run typecheck --workspace=@llm-wiki-agent/web, npm run typecheck, git diff --check, and a headless Chrome render all passed."
+        "Verified npm run test --workspace=@llm-wiki-agent/web -- tool-status-model.test.ts, npm run test --workspace=@llm-wiki-agent/web, npm run typecheck --workspace=@llm-wiki-agent/web, npm run typecheck, git diff --check, and a headless Chrome render all passed.",
+        "Committed verified task 3.3 as 531e1e68b809406fbdf21d32e9a6d5907eb18fde.",
+        "All phase-3 acceptance checks now pass, so the progress pointer advanced to phase-4 task 4.1."
       ]
     }
   ],
