@@ -383,7 +383,8 @@
           "check": "npm run test --workspace=@llm-wiki-agent/web exits 0",
           "status": "passed",
           "evidence": [
-            "npm run test --workspace=@llm-wiki-agent/web exited 0 with 16 tests, 8 suites, 0 failures."
+            "npm run test --workspace=@llm-wiki-agent/web exited 0 with 16 tests, 8 suites, 0 failures.",
+            "After adding tool-status-format.test.ts, npm run test --workspace=@llm-wiki-agent/web exited 0 with 21 tests, 9 suites, 0 failures."
           ]
         },
         {
@@ -424,8 +425,19 @@
         {
           "id": "3.2",
           "title": "Format user-readable tool actions and targets",
-          "status": "pending",
-          "verification": [],
+          "status": "completed",
+          "verification": [
+            "Read progress file and plan; current unit was phase-3 task 3.2.",
+            "Ran git log --oneline -15 and npm run typecheck before new work; both exited 0.",
+            "Added workbench/web/src/lib/tool-status-format.ts with stable action labels, target shortening, grouping, private home path redaction, and empty-target fallbacks for read/write/bash/search/skill/unknown tools.",
+            "Added workbench/web/test/tool-status-format.test.ts covering long paths, long commands, empty args, unknown tools, private absolute home path redaction, stable groups, and middle truncation.",
+            "Watched npm run test --workspace=@llm-wiki-agent/web -- tool-status-format.test.ts fail before implementation because tool-status-format did not exist.",
+            "Verified npm run test --workspace=@llm-wiki-agent/web -- tool-status-format.test.ts exited 0 after implementation.",
+            "Verified npm run test --workspace=@llm-wiki-agent/web exited 0.",
+            "Verified npm run typecheck --workspace=@llm-wiki-agent/web exited 0.",
+            "Verified npm run typecheck exited 0.",
+            "Verified git diff --check exited 0."
+          ],
           "commit": null
         },
         {
@@ -643,6 +655,17 @@
         "Verified npm run test --workspace=@llm-wiki-agent/web -- tool-status-model.test.ts, npm run test --workspace=@llm-wiki-agent/web, npm run typecheck --workspace=@llm-wiki-agent/web, npm run typecheck, and git diff --check all exited 0.",
         "Committed verified task 3.1 as 5fea9c2e0d79614d8e84bde8632c30f68b6dd0b5.",
         "Advanced current task pointer to phase-3 task 3.2 after recording the 3.1 commit hash."
+      ]
+    },
+    {
+      "turn": "phase-3-task-3.2",
+      "status": "completed",
+      "evidence": [
+        "Read progress file and plan; current unit was phase-3 task 3.2.",
+        "Ran git log --oneline -15 and npm run typecheck before new work; both exited 0.",
+        "Added frontend formatter for user-readable tool actions, compact targets, stable groups, redacted private home paths, and empty unknown fallbacks.",
+        "Added formatter tests for read/write long paths, bash long commands, search and skill grouping, empty args, unknown tools, and truncation.",
+        "Verified npm run test --workspace=@llm-wiki-agent/web -- tool-status-format.test.ts, npm run test --workspace=@llm-wiki-agent/web, npm run typecheck --workspace=@llm-wiki-agent/web, npm run typecheck, and git diff --check all exited 0."
       ]
     }
   ],
