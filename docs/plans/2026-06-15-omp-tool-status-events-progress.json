@@ -1,10 +1,10 @@
 {
   "plan": "docs/plans/2026-06-15-omp-tool-status-events-phased-plan.md",
   "status": {
-    "overall": "in_progress",
+    "overall": "completed",
     "phase": "phase-5",
     "task": "5.3",
-    "next_allowed_action": "Implement phase-5 task 5.3 after recording the 5.2 commit hash"
+    "next_allowed_action": "All tasks complete; stop and report final status"
   },
   "execution_rules": {
     "branch": "codex/feat-omp-tool-status-events",
@@ -588,7 +588,7 @@
     {
       "id": "phase-5",
       "goal": "Verify end-to-end experience and update documentation",
-      "status": "in_progress",
+      "status": "completed",
       "acceptance": [
         {
           "check": "Browser QA at 1440px, 768px, and 390px proves one live tool runway, folded summary, stop/cancel behavior, no overflow, and expandable details",
@@ -707,7 +707,7 @@
             "Verified npm run typecheck exited 0.",
             "Residual risk: no new blocking risk found; README.en.md remains unchanged because the plan explicitly required README.md."
           ],
-          "commit": null
+          "commit": "9c948a97b8e5a3b23847055c7a5e1b47bd289d54"
         }
       ]
     }
@@ -898,7 +898,8 @@
         "Ran git log --oneline -15 and npm run typecheck before new work; both exited 0.",
         "Updated CHANGELOG.md, README.md, and workbench/PRODUCT.md for the shipped workbench dynamic tool status behavior.",
         "Verified documentation text with rg, git diff --check, and npm run typecheck; all exited 0.",
-        "Task 5.3 is ready to commit; commit hash and final overall status will be recorded after the verified task commit is created."
+        "Committed verified task 5.3 as 9c948a97b8e5a3b23847055c7a5e1b47bd289d54.",
+        "All plan tasks and acceptance checks are complete; final overall status was marked completed."
       ]
     }
   ],
