@@ -2,9 +2,9 @@
   "plan": "docs/plans/2026-06-15-omp-tool-status-events-phased-plan.md",
   "status": {
     "overall": "in_progress",
-    "phase": "phase-4",
-    "task": "4.3",
-    "next_allowed_action": "Implement phase-4 task 4.3 after recording the 4.2 commit hash"
+    "phase": "phase-5",
+    "task": "5.1",
+    "next_allowed_action": "Implement phase-5 task 5.1 after recording the 4.3 commit hash and phase-4 completion"
   },
   "execution_rules": {
     "branch": "codex/feat-omp-tool-status-events",
@@ -473,7 +473,7 @@
     {
       "id": "phase-4",
       "goal": "Render OMP-style live runway and folded history summary",
-      "status": "in_progress",
+      "status": "completed",
       "acceptance": [
         {
           "check": "ToolStatusRunway has readable running, done, failed, and cancelled states",
@@ -581,14 +581,14 @@
             "Verified git diff --check exited 0.",
             "Started npm run dev; headless Chrome loaded http://localhost:5180/ at 1440px and 390px with no .msg-tools nodes and no horizontal overflow; stopped dev server and confirmed ports 5180 and 8787 had no listeners."
           ],
-          "commit": null
+          "commit": "31396aa543837ed57141b3ffeb53c66715965d7a"
         }
       ]
     },
     {
       "id": "phase-5",
       "goal": "Verify end-to-end experience and update documentation",
-      "status": "pending",
+      "status": "in_progress",
       "acceptance": [
         {
           "check": "Browser QA at 1440px, 768px, and 390px proves one live tool runway, folded summary, stop/cancel behavior, no overflow, and expandable details",
@@ -799,7 +799,8 @@
         "Replaced old assistant tool-list rendering with ToolStatusRunway for the active stream and ToolHistorySummary for completed or historical assistant messages.",
         "Added legacy history conversion and test coverage proving old UIMessage.tools records render as folded summaries instead of .msg-tools or tool-runway.",
         "Verified node --import tsx --test workbench/web/test/chat-panel-tool-status.test.tsx, npm run test --workspace=@llm-wiki-agent/web, npm run typecheck --workspace=@llm-wiki-agent/web, npm run typecheck, git diff --check, and headless Chrome desktop/narrow checks all passed.",
-        "Task 4.3 is ready to commit; commit hash will be recorded after the verified task commit is created."
+        "Committed verified task 4.3 as 31396aa543837ed57141b3ffeb53c66715965d7a.",
+        "All phase-4 acceptance checks now pass, so phase-4 was marked completed and the progress pointer advanced to phase-5 task 5.1."
       ]
     }
   ],
