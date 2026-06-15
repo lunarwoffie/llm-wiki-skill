@@ -3,8 +3,8 @@
   "status": {
     "overall": "in_progress",
     "phase": "phase-2",
-    "task": "2.2",
-    "next_allowed_action": "Implement phase-2 task 2.2 after verified adapter commit; do not enter phase-3 until all phase-2 acceptance checks pass"
+    "task": "2.3",
+    "next_allowed_action": "Implement phase-2 task 2.3; do not enter phase-3 until all phase-2 acceptance checks pass"
   },
   "execution_rules": {
     "branch": "codex/feat-omp-tool-status-events",
@@ -573,7 +573,8 @@
         "Ran git log --oneline -15 and npm run typecheck before new work; both exited 0.",
         "Connected /api/prompt to ToolStatusEventAdapter and OrderedSseWriter, including knowledge_search tool events, artifact_created preservation, assistant_done/error/cancelled handling, prompt concurrency rejection, and abort cleanup.",
         "Verified node --import tsx --test workbench/server/src/tool-status-events.test.ts, npm run typecheck --workspace=@llm-wiki-agent/server, npm run typecheck, API SSE smoke, process cleanup, and git diff --check all passed.",
-        "Committed verified task 2.2 as 141f4ea1489e663b8ea923200da05da6d94a157a."
+        "Committed verified task 2.2 as 141f4ea1489e663b8ea923200da05da6d94a157a.",
+        "Advanced current task pointer to phase-2 task 2.3 after recording the 2.2 commit hash."
       ]
     }
   ],
