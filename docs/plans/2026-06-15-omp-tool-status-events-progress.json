@@ -3,8 +3,8 @@
   "status": {
     "overall": "in_progress",
     "phase": "phase-2",
-    "task": "2.1",
-    "next_allowed_action": "Implement phase-2 task 2.1; phase-1 acceptance checks passed"
+    "task": "2.2",
+    "next_allowed_action": "Implement phase-2 task 2.2 after verified adapter commit; do not enter phase-3 until all phase-2 acceptance checks pass"
   },
   "execution_rules": {
     "branch": "codex/feat-omp-tool-status-events",
@@ -211,8 +211,13 @@
       "acceptance": [
 				{
 					"check": "Stable tool status adapter covers start, update, end, failure, missing args, and common tool formatting",
-					"status": "pending",
-					"evidence": []
+					"status": "passed",
+					"evidence": [
+						"Added workbench/server/src/tool-status-events.ts with ToolStatusEventAdapter and v1 contract event types: assistant_text_delta, tool_status_start, tool_status_update, tool_status_end, tool_status_summary, assistant_done, and assistant_error.",
+						"Adapter tests cover tool_execution_start, tool_execution_update, tool_execution_end success, failed tool ending, undefined args normalized to {}, read/write/bash/search/skill formatting, and unknown targets.",
+						"Adapter tracks parallel tool calls by toolCallId; ending tool B leaves tool A running and reports remaining runningToolCount.",
+						"Adapter provides cancelActiveTools for active tools and emits cancelled endings without leaking raw paths."
+					]
 				},
 				{
 					"check": "Backend and frontend tests share contract event fixtures so SSE event fields cannot drift silently",
@@ -241,26 +246,43 @@
 				},
 				{
 					"check": "node --import tsx --test workbench/server/src/tool-status-events.test.ts exits 0",
-					"status": "pending",
-          "evidence": []
+					"status": "passed",
+          "evidence": [
+            "node --import tsx --test workbench/server/src/tool-status-events.test.ts exited 0 with 7 passing subtests."
+          ]
         },
         {
           "check": "npm run typecheck --workspace=@llm-wiki-agent/server exits 0",
-          "status": "pending",
-          "evidence": []
+          "status": "passed",
+          "evidence": [
+            "npm run typecheck --workspace=@llm-wiki-agent/server exited 0 after adding the adapter and tests."
+          ]
         },
         {
           "check": "npm run typecheck exits 0",
-          "status": "pending",
-          "evidence": []
+          "status": "passed",
+          "evidence": [
+            "npm run typecheck exited 0 after adding the adapter and tests."
+          ]
         }
       ],
       "tasks": [
         {
           "id": "2.1",
           "title": "Build Tool Status event adapter",
-          "status": "pending",
-          "verification": [],
+          "status": "completed",
+          "verification": [
+            "Read progress file and plan; current unit was phase-2 task 2.1.",
+            "Ran git log --oneline -15 and npm run typecheck before new work; both exited 0.",
+            "Added backend ToolStatusEventAdapter with schemaVersion 1 contract events, runId/messageId/seq fields, text delta, tool start/update/end/summary/done/error support, and active-tool cancellation support.",
+            "Added path and command redaction before events are emitted, including home directory replacement and long target truncation.",
+            "Added user-readable tool action/target formatting for read, write/edit, bash/shell/command, search/grep/find, and skill tools.",
+            "Added shared contract fixture builder for later frontend parser and history-summary tests.",
+            "Verified node --import tsx --test workbench/server/src/tool-status-events.test.ts exited 0 with 7 passing subtests.",
+            "Verified npm run typecheck --workspace=@llm-wiki-agent/server exited 0.",
+            "Verified npm run typecheck exited 0.",
+            "Verified git diff --check exited 0."
+          ],
           "commit": null
         },
         {
@@ -501,6 +523,17 @@
         "Ran browser smoke at http://localhost:5180/ with pi-agent selected, visible current model, usable chat area, ordinary assistant reply, and retrieval-triggering prompt with no backend error output.",
         "Stopped npm run dev, confirmed process cleanup on ports 5180 and 8787, and reran npm run typecheck successfully.",
         "Committed verified task 1.3 as ca84cbcf7c66ec83e58e3f4acb87b39997858d56."
+      ]
+    },
+    {
+      "turn": "phase-2-task-2.1",
+      "status": "completed",
+      "evidence": [
+        "Read progress file and plan; current unit was phase-2 task 2.1.",
+        "Ran git log --oneline -15 and npm run typecheck before new work; both exited 0.",
+        "Implemented backend ToolStatusEventAdapter and shared contract fixture in workbench/server/src/tool-status-events.ts.",
+        "Added workbench/server/src/tool-status-events.test.ts covering v1 schema fields, ordered seq, start/update/end/failure/missing args, common tool formatting, redaction, parallel tools, cancellation, and shared fixture snapshot.",
+        "Verified node --import tsx --test workbench/server/src/tool-status-events.test.ts, npm run typecheck --workspace=@llm-wiki-agent/server, npm run typecheck, and git diff --check all exited 0."
       ]
     }
   ],
