@@ -615,18 +615,27 @@
         },
         {
           "check": "npm run typecheck exits 0",
-          "status": "pending",
-          "evidence": []
+          "status": "passed",
+          "evidence": [
+            "npm run typecheck exited 0 at the start of phase-5 task 5.2.",
+            "npm run typecheck --workspace=@llm-wiki-agent/web exited 0.",
+            "npm run typecheck --workspace=@llm-wiki-agent/server initially failed when run in parallel before graph-engine declarations were regenerated; after the web pretypecheck regenerated graph-engine declarations, rerunning the same server typecheck command exited 0."
+          ]
         },
         {
           "check": "npm run test --workspace=@llm-wiki-agent/web exits 0",
-          "status": "pending",
-          "evidence": []
+          "status": "passed",
+          "evidence": [
+            "npm run test --workspace=@llm-wiki-agent/web exited 0 with 29 tests across 12 suites passing."
+          ]
         },
         {
           "check": "Server tests for changed surfaces exit 0 or documented environment-only failure with changed tests passing",
-          "status": "pending",
-          "evidence": []
+          "status": "passed",
+          "evidence": [
+            "node --import tsx --test workbench/server/src/tool-status-events.test.ts exited 0 with 10 tests passing.",
+            "node --import tsx --test workbench/server/src/*.test.ts exited 0 with 34 tests passing."
+          ]
         },
         {
           "check": "CHANGELOG.md and README.md updated for the shipped behavior",
@@ -664,8 +673,17 @@
         {
           "id": "5.2",
           "title": "Run automated regression checks",
-          "status": "pending",
-          "verification": [],
+          "status": "completed",
+          "verification": [
+            "Read progress file and plan; current unit was phase-5 task 5.2.",
+            "Ran git log --oneline -15 and npm run typecheck before new work; both exited 0.",
+            "Verified npm run typecheck --workspace=@llm-wiki-agent/web exited 0.",
+            "Verified npm run test --workspace=@llm-wiki-agent/web exited 0.",
+            "Verified node --import tsx --test workbench/server/src/tool-status-events.test.ts exited 0.",
+            "npm run typecheck --workspace=@llm-wiki-agent/server initially failed when run in parallel before graph-engine declarations were regenerated; rerunning npm run typecheck --workspace=@llm-wiki-agent/server after web pretypecheck exited 0.",
+            "Verified node --import tsx --test workbench/server/src/*.test.ts exited 0.",
+            "Verified git diff --check exited 0."
+          ],
           "commit": null
         },
         {
@@ -842,6 +860,17 @@
         "Verified node --import tsx --test workbench/web/test/chat-panel-tool-status.test.tsx, npm run test --workspace=@llm-wiki-agent/web, npm run typecheck, and git diff --check all exited 0.",
         "Committed verified task 5.1 as 8258b2a6f54770f8960313ebb55a8fd10a6c8cf2.",
         "Advanced current task pointer to phase-5 task 5.2 after recording the 5.1 commit hash."
+      ]
+    },
+    {
+      "turn": "phase-5-task-5.2",
+      "status": "completed",
+      "evidence": [
+        "Read progress file and plan; current unit was phase-5 task 5.2.",
+        "Ran git log --oneline -15 and npm run typecheck before new work; both exited 0.",
+        "Verified npm run typecheck --workspace=@llm-wiki-agent/web, npm run test --workspace=@llm-wiki-agent/web, node --import tsx --test workbench/server/src/tool-status-events.test.ts, node --import tsx --test workbench/server/src/*.test.ts, and git diff --check all exited 0.",
+        "npm run typecheck --workspace=@llm-wiki-agent/server failed only when run in parallel before graph-engine declarations were regenerated; rerunning it after web pretypecheck exited 0.",
+        "Task 5.2 is ready to commit; commit hash will be recorded after the verified task commit is created."
       ]
     }
   ],
