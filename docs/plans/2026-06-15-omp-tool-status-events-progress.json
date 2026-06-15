@@ -348,22 +348,31 @@
     {
       "id": "phase-3",
       "goal": "Create frontend tool status model and stream integration",
-      "status": "pending",
+      "status": "in_progress",
       "acceptance": [
         {
           "check": "Tool status reducer tests cover switching, missing args, failed/cancelled tools, parallel tools, and truncation",
-          "status": "pending",
-          "evidence": []
+          "status": "passed",
+          "evidence": [
+            "Added workbench/web/test/tool-status-model.test.ts covering sequential tool switching, missing args normalized to {}, failed tool endings, cancelled tool endings, parallel tool starts/ends, and completed-history truncation.",
+            "Added workbench/web/src/lib/tool-status-model.ts to track active tools, completed tools, failures, capped summaries, and overflow labels."
+          ]
         },
         {
           "check": "Reducer keys events by runId/messageId and ignores late, duplicate, or unknown-run events",
-          "status": "pending",
-          "evidence": []
+          "status": "passed",
+          "evidence": [
+            "Reducer state is initialized with runId and messageId and rejects foreign-run, foreign-message, duplicate, and late seq events.",
+            "tool-status-model.test.ts asserts rejected foreign and late events do not add active or completed tools to the current assistant message."
+          ]
         },
         {
           "check": "Rapid tool update events are coalesced or throttled, and long tool histories are capped with a remaining-count summary",
-          "status": "pending",
-          "evidence": []
+          "status": "passed",
+          "evidence": [
+            "Tool status model queues rapid tool_status_update events and flushes the latest visible update on a configurable cadence; the default cadence is 100ms.",
+            "tool-status-model.test.ts verifies three rapid updates are coalesced until a 120ms flush and that completed history and summary overflow labels show '还有 N 项'."
+          ]
         },
         {
           "check": "Streaming UI exposes a stop action and clears or cancels the live runway instead of leaving a stale running state",
@@ -372,26 +381,44 @@
         },
         {
           "check": "npm run test --workspace=@llm-wiki-agent/web exits 0",
-          "status": "pending",
-          "evidence": []
+          "status": "passed",
+          "evidence": [
+            "npm run test --workspace=@llm-wiki-agent/web exited 0 with 16 tests, 8 suites, 0 failures."
+          ]
         },
         {
           "check": "npm run typecheck --workspace=@llm-wiki-agent/web exits 0",
-          "status": "pending",
-          "evidence": []
+          "status": "passed",
+          "evidence": [
+            "npm run typecheck --workspace=@llm-wiki-agent/web exited 0 after rebuilding @llm-wiki/graph-engine."
+          ]
         },
         {
           "check": "npm run typecheck exits 0",
-          "status": "pending",
-          "evidence": []
+          "status": "passed",
+          "evidence": [
+            "npm run typecheck exited 0 when rerun sequentially after web test and web typecheck verification."
+          ]
         }
       ],
       "tasks": [
         {
           "id": "3.1",
           "title": "Define frontend Tool Status types and reducer",
-          "status": "pending",
-          "verification": [],
+          "status": "completed",
+          "verification": [
+            "Read progress file and plan; current unit was phase-3 task 3.1.",
+            "Ran git log --oneline -15 and npm run typecheck before new work; both exited 0.",
+            "Added frontend Tool Status contract event types in workbench/web/src/lib/api.ts.",
+            "Added workbench/web/src/lib/tool-status-model.ts with run/message ownership checks, seq de-duplication, active/completed/failure/summary state, 100ms update coalescing, and capped completed/summary histories.",
+            "Added workbench/web/test/tool-status-model.test.ts reusing the backend buildToolStatusContractFixture and covering switching, missing args, failure, cancellation, parallel tools, ownership, duplicate/late events, coalescing, and truncation.",
+            "Watched npm run test --workspace=@llm-wiki-agent/web -- tool-status-model.test.ts fail before implementation because tool-status-model did not exist.",
+            "Verified npm run test --workspace=@llm-wiki-agent/web -- tool-status-model.test.ts exited 0 after implementation.",
+            "Verified npm run test --workspace=@llm-wiki-agent/web exited 0.",
+            "Verified npm run typecheck --workspace=@llm-wiki-agent/web exited 0.",
+            "Verified npm run typecheck exited 0 when rerun sequentially.",
+            "Verified git diff --check exited 0."
+          ],
           "commit": null
         },
         {
@@ -603,6 +630,17 @@
         "Added conversations.test.ts and verified conversations, tool-status-events, retrieval, server typecheck, full typecheck, and git diff --check all passed.",
         "All phase-2 acceptance checks now pass, so the progress pointer advanced to phase-3 task 3.1.",
         "Committed verified task 2.3 as d2c686f0fbc047d77a637cf675bbe8e718ac076a."
+      ]
+    },
+    {
+      "turn": "phase-3-task-3.1",
+      "status": "completed",
+      "evidence": [
+        "Read progress file and plan; current unit was phase-3 task 3.1.",
+        "Ran git log --oneline -15 and npm run typecheck before new work; both exited 0.",
+        "Added frontend Tool Status event types and reducer state for active tools, completed tools, failures, summaries, ignored events, coalesced updates, and capped histories.",
+        "Added reducer tests that reuse the backend contract fixture and cover switching, missing args, failed/cancelled tools, parallel tools, run/message ownership, duplicate/late events, coalescing, and truncation.",
+        "Verified npm run test --workspace=@llm-wiki-agent/web -- tool-status-model.test.ts, npm run test --workspace=@llm-wiki-agent/web, npm run typecheck --workspace=@llm-wiki-agent/web, npm run typecheck, and git diff --check all exited 0."
       ]
     }
   ],

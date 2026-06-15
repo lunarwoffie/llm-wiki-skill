@@ -166,6 +166,86 @@ export type GraphEvent =
 			rebuiltAt: string;
 	  };
 
+export type ToolRunStatus = "running" | "done" | "failed" | "cancelled";
+
+export interface ToolStatusBaseEvent {
+	schemaVersion: 1;
+	type: ToolStatusContractEvent["type"];
+	runId: string;
+	messageId: string;
+	seq: number;
+}
+
+export interface ToolDisplay {
+	toolCallId: string;
+	toolName: string;
+	action: string;
+	target: string;
+}
+
+export interface ToolStatusStartEvent extends ToolStatusBaseEvent, ToolDisplay {
+	type: "tool_status_start";
+	status: "running";
+	args: Record<string, unknown>;
+	runningToolCount: number;
+	otherRunningCount: number;
+}
+
+export interface ToolStatusUpdateEvent extends ToolStatusBaseEvent, ToolDisplay {
+	type: "tool_status_update";
+	status: "running";
+	args: Record<string, unknown>;
+	detail: unknown;
+	runningToolCount: number;
+	otherRunningCount: number;
+}
+
+export interface ToolStatusEndEvent extends ToolStatusBaseEvent, ToolDisplay {
+	type: "tool_status_end";
+	status: Exclude<ToolRunStatus, "running">;
+	result: unknown;
+	summary: string | null;
+	error: string | null;
+	durationMs: number;
+	runningToolCount: number;
+	otherRunningCount: number;
+}
+
+export interface ToolStatusSummaryEvent extends ToolStatusBaseEvent {
+	type: "tool_status_summary";
+	items: Array<ToolDisplay & { status: Exclude<ToolRunStatus, "running">; summary: string | null }>;
+	remainingRunningCount: number;
+}
+
+export interface AssistantTextDeltaEvent extends ToolStatusBaseEvent {
+	type: "assistant_text_delta";
+	delta: string;
+}
+
+export interface AssistantDoneEvent extends ToolStatusBaseEvent {
+	type: "assistant_done";
+}
+
+export interface AssistantCancelledEvent extends ToolStatusBaseEvent {
+	type: "assistant_cancelled";
+	reason: string;
+}
+
+export interface AssistantErrorEvent extends ToolStatusBaseEvent {
+	type: "assistant_error";
+	error: string;
+}
+
+export type ToolStatusContractEvent =
+	| AssistantTextDeltaEvent
+	| ToolStatusStartEvent
+	| ToolStatusUpdateEvent
+	| ToolStatusEndEvent
+	| ToolStatusSummaryEvent
+	| AssistantDoneEvent
+	| AssistantCancelledEvent
+	| AssistantErrorEvent;
+
 // ============= API =============
 
 export async function getHealth(): Promise<{
