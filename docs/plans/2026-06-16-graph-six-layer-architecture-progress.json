@@ -3,8 +3,8 @@
   "status": {
     "overall": "pending",
     "phase": "phase-2",
-    "task": "2.2",
-    "next_allowed_action": "Run the baseline smoke check, then implement graph-owned browser default behavior policy for task 2.2."
+    "task": "2.3",
+    "next_allowed_action": "Run the baseline smoke check, then commit fast-release drag using final intent coordinates for task 2.3."
   },
   "execution_rules": {
     "parent_branch": "codex/graph-interaction-architecture",
@@ -319,8 +319,13 @@
         },
         {
           "check": "Graph-owned surfaces do not trigger browser page zoom, native text selection, or native drag selection.",
-          "status": "pending",
-          "evidence": []
+          "status": "passed",
+          "evidence": [
+            "GraphGestures routes graph-owned ctrl/meta wheel over nodes, edges, community washes, and blank canvas to graph zoom while blockers remain blocked.",
+            "GraphGestureController prevents browser defaults for graph-owned pointerdown/move/up/cancel sequences while leaving search and other blockers alone.",
+            "static-renderer root CSS sets overscroll-behavior: contain, touch-action: none, and user-select: none; search and reader text surfaces restore normal text behavior.",
+            "tests/graph-default-behavior.regression-1.sh records unchanged devicePixelRatio, visualViewport.scale, documentElement.clientWidth, and documentElement.clientHeight while graph transform changes."
+          ]
         },
         {
           "check": "Fast node drag release persists the final released position.",
@@ -360,9 +365,35 @@
         {
           "id": "2.2",
           "title": "Implement graph-owned browser default behavior policy",
-          "status": "pending",
-          "verification": [],
-          "commit": null
+          "status": "completed",
+          "verification": [
+            {
+              "command": "node --import tsx --test packages/graph-engine/test/gestures.test.ts",
+              "result": "19 tests passed, 0 failed",
+              "status": "passed"
+            },
+            {
+              "command": "npm run test --workspace=@llm-wiki/graph-engine",
+              "result": "214 tests passed, 0 failed",
+              "status": "passed"
+            },
+            {
+              "command": "npm run typecheck --workspace=@llm-wiki/graph-engine",
+              "result": "tsc -p tsconfig.json --noEmit exited 0",
+              "status": "passed"
+            },
+            {
+              "command": "npm run build --workspace=@llm-wiki/graph-engine",
+              "result": "vite build and declaration emit exited 0",
+              "status": "passed"
+            },
+            {
+              "command": "bash tests/graph-default-behavior.regression-1.sh",
+              "result": "PASS: graph default behavior regression; evidence confirmed graph transform changes while page zoom metrics stay unchanged, search input remains a blocker, and blank drag leaves no text selection.",
+              "status": "passed"
+            }
+          ],
+          "commit": "cdc904f"
         },
         {
           "id": "2.3",
