@@ -396,18 +396,78 @@ describe("graph gesture controller", () => {
 
   it("does not prevent browser defaults over gesture blocker pointer targets", () => {
     const root = new FakeGestureRoot();
+    const intents: GraphGestureIntent[] = [];
     const controller = new GraphGestureController(root as unknown as HTMLElement, {
       targetFromEventTarget: (target) => target as GraphGestureTargetLike | null,
       pointerEventFromPointerEvent: (event) => pointer(event.pointerId, event.clientX, event.clientY, { shiftKey: event.shiftKey }),
       onWheelZoom: () => {},
-      onGestureIntents: () => {}
+      onGestureIntents: (nextIntents) => {
+        intents.push(...nextIntents);
+      }
     });
 
-    const searchPointerDown = pointerDomEvent(controlTarget(".graph-search"), 31, 10, 10);
-    root.dispatch("pointerdown", searchPointerDown);
+    const blockerCases: Array<[string, GraphGestureTargetLike]> = [
+      ["search", controlTarget(".graph-search")],
+      ["toolbar", controlTarget(".graph-toolbar")],
+      ["drawer", controlTarget(".graph-reader, .graph-selection-panel, [data-graph-drawer=\"true\"]")],
+      ["minimap", controlTarget(".mini-map")],
+      ["text-control", new FakeTarget({ tagName: "input", type: "text" })]
+    ];
 
-    assert.equal(searchPointerDown.defaultPrevented, false);
-    assert.equal(root.hasPointerCapture(31), false);
+    for (const [label, target] of blockerCases) {
+      const pointerDown = pointerDomEvent(target, 31, 10, 10);
+      root.dispatch("pointerdown", pointerDown);
+
+      assert.equal(pointerDown.defaultPrevented, false, `${label} pointerdown should not be owned by graph gestures`);
+      assert.equal(root.hasPointerCapture(31), false, `${label} pointerdown should not capture the pointer`);
+      assert.equal(controller.snapshot(), null, `${label} pointerdown should not start an active graph gesture`);
+    }
+
+    assert.deepEqual(intents, []);
+
+    controller.destroy();
+  });
+
+  it("cleans up controller-owned active gestures on pointercancel and lostpointercapture", () => {
+    const root = new FakeGestureRoot();
+    const intents: GraphGestureIntent[] = [];
+    const controller = new GraphGestureController(root as unknown as HTMLElement, {
+      targetFromEventTarget: (target) => target as GraphGestureTargetLike | null,
+      pointerEventFromPointerEvent: (event) => pointer(event.pointerId, event.clientX, event.clientY, { shiftKey: event.shiftKey }),
+      onWheelZoom: () => {},
+      onGestureIntents: (nextIntents) => {
+        intents.push(...nextIntents);
+      }
+    });
+
+    const nodePointerDown = pointerDomEvent(nodeTarget("node-a"), 41, 10, 10);
+    root.dispatch("pointerdown", nodePointerDown);
+    root.dispatch("pointermove", pointerDomEvent(nodeTarget("node-a"), 41, 20, 10));
+    assert.equal(root.hasPointerCapture(41), true);
+
+    const nodeCancel = pointerDomEvent(nodeTarget("node-a"), 41, 20, 10);
+    root.dispatch("pointercancel", nodeCancel);
+
+    assert.equal(nodeCancel.defaultPrevented, true);
+    assert.equal(root.hasPointerCapture(41), false);
+    assert.equal(controller.snapshot(), null);
+
+    const blankPointerDown = pointerDomEvent(blankTarget(), 42, 100, 100);
+    root.dispatch("pointerdown", blankPointerDown);
+    root.dispatch("pointermove", pointerDomEvent(blankTarget(), 42, 116, 100));
+    assert.equal(root.hasPointerCapture(42), true);
+    root.releasePointerCapture(42);
+    root.dispatch("lostpointercapture", pointerDomEvent(blankTarget(), 42, 116, 100));
+
+    assert.equal(controller.snapshot(), null);
+    assert.deepEqual(intents, [
+      { kind: "node-drag-start", nodeId: "node-a", pointerId: 41, screenPoint: { x: 20, y: 10 } },
+      { kind: "node-drag-move", nodeId: "node-a", pointerId: 41, screenPoint: { x: 20, y: 10 }, delta: { x: 10, y: 0 } },
+      { kind: "node-drag-cancel", nodeId: "node-a", pointerId: 41, reason: "pointercancel" },
+      { kind: "blank-pan-start", pointerId: 42, screenPoint: { x: 116, y: 100 } },
+      { kind: "blank-pan-move", pointerId: 42, screenPoint: { x: 116, y: 100 }, delta: { x: 16, y: 0 } },
+      { kind: "blank-pan-cancel", pointerId: 42, reason: "lostpointercapture" }
+    ]);
 
     controller.destroy();
   });

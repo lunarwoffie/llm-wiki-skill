@@ -34,6 +34,7 @@ try {
   const blankShortcutWheel = await assertShortcutWheelZoomsGraph(page, await findBlankPoint(page), "blank graph", { metaKey: true });
   const searchWheel = await assertShortcutWheelDoesNotZoomGraph(page, ".graph-search-input", "search input", { ctrlKey: true });
   const blankDrag = await assertBlankDragDoesNotSelectText(page);
+  const cancellationBoundaries = await assertCancellationAndBlockerBoundaries(page);
   const fastReleaseDrag = await assertFastReleasePinsFinalPointerPosition(page);
   const keyboardOwnership = await assertKeyboardOwnership(page);
 
@@ -46,6 +47,7 @@ try {
       searchInput: searchWheel
     },
     blankDrag,
+    cancellationBoundaries,
     fastReleaseDrag,
     keyboardOwnership
   }, null, 2));
@@ -123,6 +125,155 @@ async function assertBlankDragDoesNotSelectText(page) {
   assert.equal(state.viewportDragging, "", "blank graph drag should not leave viewport dragging active");
   assert.equal(state.dragging, "", "blank graph drag should not leave node dragging active");
   return { start: roundedPoint(point), state };
+}
+
+async function assertCancellationAndBlockerBoundaries(page) {
+  await page.reload();
+  await page.waitForSelector("[data-llm-wiki-graph-root='true']");
+  await page.waitForSelector("[data-viewport-layer='true']");
+  await page.waitForSelector(".node");
+
+  const pointerCancel = await assertPointerCancelClearsNodeDrag(page);
+  const lostPointerCapture = await assertLostPointerCaptureClearsBlankPan(page);
+  const blockers = await assertPointerBlockersDoNotStartGestures(page);
+
+  return {
+    pointerCancel,
+    lostPointerCapture,
+    blockers
+  };
+}
+
+async function assertPointerCancelClearsNodeDrag(page) {
+  const before = await page.locator(".node").first().evaluate((node) => {
+    const rect = node.getBoundingClientRect();
+    return {
+      id: node.dataset.id || "",
+      pinned: node.dataset.pinned || "",
+      center: { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
+    };
+  });
+  assert.notEqual(before.id, "", "pointercancel regression should have a node target");
+
+  const move = { x: before.center.x + 80, y: before.center.y + 8 };
+  await dispatchPointer(page, `.node[data-id="${cssString(before.id)}"]`, "pointerdown", before.center, {
+    pointerId: 88,
+    button: 0,
+    buttons: 1
+  });
+  await dispatchPointer(page, "[data-llm-wiki-graph-root='true']", "pointermove", move, {
+    pointerId: 88,
+    button: 0,
+    buttons: 1
+  });
+  await page.waitForFunction(
+    (id) => {
+      const root = document.querySelector("[data-llm-wiki-graph-root='true']");
+      const node = document.querySelector(`.node[data-id="${CSS.escape(id)}"]`);
+      return root?.dataset.dragging === id && node?.classList.contains("is-dragging");
+    },
+    before.id,
+    { timeout: 3000 }
+  );
+
+  const cancelEvent = await dispatchPointer(page, "[data-llm-wiki-graph-root='true']", "pointercancel", move, {
+    pointerId: 88,
+    button: 0,
+    buttons: 0
+  });
+  await waitForClearInteraction(page, before.id);
+
+  const after = await graphInteractionState(page, before.id);
+  assert.equal(cancelEvent.cancelled, true, "pointercancel during node drag should prevent browser default");
+  assert.equal(after.dragging, "", "pointercancel should clear root dragging state");
+  assert.equal(after.nodeDragging, false, "pointercancel should clear node dragging class");
+  assert.equal(after.pinned, before.pinned, "pointercancel should not create or remove a node pin");
+
+  return {
+    id: before.id,
+    move: roundedPoint(move),
+    cancelEvent,
+    beforePinned: before.pinned,
+    after
+  };
+}
+
+async function assertLostPointerCaptureClearsBlankPan(page) {
+  const start = await findBlankPoint(page);
+  const move = { x: start.x + 96, y: start.y + 12 };
+
+  await dispatchPointer(page, "[data-llm-wiki-graph-root='true']", "pointerdown", start, {
+    pointerId: 89,
+    button: 0,
+    buttons: 1
+  });
+  await dispatchPointer(page, "[data-llm-wiki-graph-root='true']", "pointermove", move, {
+    pointerId: 89,
+    button: 0,
+    buttons: 1
+  });
+  await page.waitForFunction(
+    () => document.querySelector("[data-llm-wiki-graph-root='true']")?.dataset.viewportDragging === "true",
+    undefined,
+    { timeout: 3000 }
+  );
+
+  const lostEvent = await dispatchPointer(page, "[data-llm-wiki-graph-root='true']", "lostpointercapture", move, {
+    pointerId: 89,
+    button: 0,
+    buttons: 0
+  });
+  await page.waitForFunction(
+    () => (document.querySelector("[data-llm-wiki-graph-root='true']")?.dataset.viewportDragging || "") === "",
+    undefined,
+    { timeout: 3000 }
+  );
+
+  const state = await graphInteractionState(page);
+  assert.equal(state.viewportDragging, "", "lostpointercapture should clear viewport dragging state");
+  assert.equal(state.dragging, "", "lostpointercapture should not leave node dragging state");
+
+  return {
+    start: roundedPoint(start),
+    move: roundedPoint(move),
+    lostEvent,
+    state
+  };
+}
+
+async function assertPointerBlockersDoNotStartGestures(page) {
+  await page.locator(".node").first().click();
+  await page.waitForSelector('.graph-reader[data-state="open"]');
+
+  const cases = [
+    [".graph-search-input", "search input"],
+    [".graph-toolbar", "toolbar"],
+    [".mini-map", "minimap"],
+    [".graph-reader-body", "reader drawer"]
+  ];
+  const results = [];
+  for (let index = 0; index < cases.length; index += 1) {
+    const [selector, label] = cases[index];
+    const beforeTransform = await layerTransform(page);
+    const eventResult = await dispatchPointerOnSelector(page, selector, "pointerdown", {
+      pointerId: 100 + index,
+      button: 0,
+      buttons: 1
+    });
+    await page.waitForTimeout(60);
+    const state = await graphInteractionState(page);
+    const afterTransform = await layerTransform(page);
+
+    assert.equal(eventResult.cancelled, false, `${label} pointerdown should remain outside graph gesture ownership`);
+    assert.equal(state.dragging, "", `${label} pointerdown should not start node dragging`);
+    assert.equal(state.viewportDragging, "", `${label} pointerdown should not start blank panning`);
+    assert.equal(afterTransform, beforeTransform, `${label} pointerdown should not move the graph`);
+    results.push({ selector, label, eventResult, state });
+  }
+
+  await page.locator(".graph-reader-close").click();
+  await page.waitForSelector('.graph-reader[data-state="closed"]');
+  return results;
 }
 
 async function assertFastReleasePinsFinalPointerPosition(page) {
@@ -379,6 +530,33 @@ async function graphSearchState(page) {
   return page.locator(".graph-search").evaluate((element) => element.dataset.state || "");
 }
 
+async function graphInteractionState(page, nodeId = "") {
+  return page.evaluate((nodeId) => {
+    const root = document.querySelector("[data-llm-wiki-graph-root='true']");
+    const node = nodeId ? document.querySelector(`.node[data-id="${CSS.escape(nodeId)}"]`) : null;
+    return {
+      dragging: root?.dataset.dragging || "",
+      viewportDragging: root?.dataset.viewportDragging || "",
+      pinned: node?.dataset.pinned || "",
+      nodeDragging: Boolean(node?.classList.contains("is-dragging"))
+    };
+  }, nodeId);
+}
+
+async function waitForClearInteraction(page, nodeId = "") {
+  await page.waitForFunction(
+    (nodeId) => {
+      const root = document.querySelector("[data-llm-wiki-graph-root='true']");
+      const node = nodeId ? document.querySelector(`.node[data-id="${CSS.escape(nodeId)}"]`) : null;
+      return (root?.dataset.dragging || "") === ""
+        && (root?.dataset.viewportDragging || "") === ""
+        && !node?.classList.contains("is-dragging");
+    },
+    nodeId,
+    { timeout: 3000 }
+  );
+}
+
 async function resetSelection(page) {
   await page.evaluate(() => window.getSelection()?.removeAllRanges());
 }
@@ -392,4 +570,30 @@ function roundedPoint(point) {
 
 function cssString(value) {
   return String(value).replace(/\\/g, "\\\\").replace(/"/g, "\\\"");
+}
+
+async function dispatchPointerOnSelector(page, selector, type, options) {
+  return page.evaluate(({ selector, type, options }) => {
+    const target = document.querySelector(selector);
+    if (!target) throw new Error(`Missing selector ${selector}`);
+    const rect = target.getBoundingClientRect();
+    const point = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+    const event = new PointerEvent(type, {
+      bubbles: true,
+      cancelable: true,
+      pointerId: options.pointerId,
+      pointerType: "mouse",
+      clientX: point.x,
+      clientY: point.y,
+      button: options.button,
+      buttons: options.buttons,
+      isPrimary: true
+    });
+    const dispatchResult = target.dispatchEvent(event);
+    return {
+      cancelled: !dispatchResult,
+      defaultPrevented: event.defaultPrevented,
+      point
+    };
+  }, { selector, type, options });
 }
