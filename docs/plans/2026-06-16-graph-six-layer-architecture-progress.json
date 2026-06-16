@@ -3,8 +3,8 @@
   "status": {
     "overall": "pending",
     "phase": "phase-3",
-    "task": "3.1",
-    "next_allowed_action": "Run the baseline smoke check, then remove renderer-local coordinate calculations that bypass GraphViewport for task 3.1."
+    "task": "3.2",
+    "next_allowed_action": "Run the baseline smoke check, then drive hover, selection, focus, drag, pins, and viewport from GraphState snapshots for task 3.2."
   },
   "execution_rules": {
     "parent_branch": "codex/graph-interaction-architecture",
@@ -521,8 +521,14 @@
       "acceptance": [
         {
           "check": "No old renderer-local coordinate formulas drive graph behavior.",
-          "status": "pending",
-          "evidence": []
+          "status": "passed",
+          "evidence": [
+            "static-renderer.ts now uses geometry helpers for viewport fallback size, motion-frame world deltas, and isolated diff side anchors instead of direct renderer-local world-size formulas.",
+            "model.ts uses geometry helpers for CSS percent projection and minimap projection, and live positions are no longer clamped to the old 1000x680 world.",
+            "geometry.test.ts covers CSS percent projection outside the default world, world-point delta projection, and side-exit anchors.",
+            "render-model.test.ts covers preserving live drag positions beyond the old default world.",
+            "rg -n \"rootRect\\.width \\*|rootRect\\.height \\*|eventToGraphPoint|clientX.*WORLD|clientY.*WORLD\" packages/graph-engine/src/render/static-renderer.ts -> no matches"
+          ]
         },
         {
           "check": "Hover, selection, focus, active drag, pins, and viewport have one GraphState-owned path.",
@@ -544,9 +550,55 @@
         {
           "id": "3.1",
           "title": "Remove renderer-local coordinate calculations that bypass GraphViewport",
-          "status": "pending",
-          "verification": [],
-          "commit": null
+          "status": "completed",
+          "verification": [
+            {
+              "command": "node --import tsx --test packages/graph-engine/test/geometry.test.ts",
+              "result": "12 tests passed, 0 failed",
+              "status": "passed"
+            },
+            {
+              "command": "node --import tsx --test packages/graph-engine/test/render-model.test.ts",
+              "result": "19 tests passed, 0 failed",
+              "status": "passed"
+            },
+            {
+              "command": "npm run test --workspace=@llm-wiki/graph-engine",
+              "result": "224 tests passed, 0 failed",
+              "status": "passed"
+            },
+            {
+              "command": "npm run typecheck --workspace=@llm-wiki/graph-engine",
+              "result": "tsc -p tsconfig.json --noEmit exited 0",
+              "status": "passed"
+            },
+            {
+              "command": "npm run build --workspace=@llm-wiki/graph-engine",
+              "result": "vite build and declaration emit exited 0",
+              "status": "passed"
+            },
+            {
+              "command": "bash tests/graph-workbench-interactions.regression-1.sh",
+              "result": "PASS: graph workbench interaction regression",
+              "status": "passed"
+            },
+            {
+              "command": "bash tests/graph-offline-phase-6.regression-1.sh",
+              "result": "PASS: phase 6 offline graph regression",
+              "status": "passed"
+            },
+            {
+              "command": "bash tests/graph-default-behavior.regression-1.sh",
+              "result": "PASS: graph default behavior regression",
+              "status": "passed"
+            },
+            {
+              "command": "rg -n \"rootRect\\.width \\*|rootRect\\.height \\*|eventToGraphPoint|clientX.*WORLD|clientY.*WORLD\" packages/graph-engine/src/render/static-renderer.ts",
+              "result": "No matches",
+              "status": "passed"
+            }
+          ],
+          "commit": "bf77d29"
         },
         {
           "id": "3.2",
