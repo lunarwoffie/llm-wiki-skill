@@ -2,9 +2,9 @@
   "plan": "docs/plans/2026-06-16-graph-six-layer-architecture-phased-plan.md",
   "status": {
     "overall": "pending",
-    "phase": "phase-6",
-    "task": "6.4",
-    "next_allowed_action": "Verify wash behavior in workbench and offline browser paths."
+    "phase": "phase-7",
+    "task": "7.1",
+    "next_allowed_action": "Delete old renderer-owned interaction, coordinate, hit-test, and hidden-state paths."
   },
   "execution_rules": {
     "parent_branch": "codex/graph-interaction-architecture",
@@ -1334,17 +1334,26 @@
     {
       "id": "phase-6",
       "goal": "Complete community wash soft-boundary behavior.",
-      "status": "pending",
+      "status": "completed",
       "acceptance": [
         {
           "check": "Dragged or pinned outliers influence wash shape only within caps.",
-          "status": "pending",
-          "evidence": []
+          "status": "passed",
+          "evidence": [
+            "packages/graph-engine/test/community-wash.test.ts covers extreme dragged outliers without unbounded wash growth.",
+            "packages/graph-engine/test/render-model.test.ts covers a dragged core member reshaping the wash within caps.",
+            "bash tests/graph-workbench-interactions.regression-1.sh recorded communityDrag washWorld rx 157.644 and ry 47.139 after dragging a node outside the initial wash.",
+            "bash tests/graph-community-wash-interactions.regression-1.sh recorded a pinned dragged node outside the initial wash."
+          ]
         },
         {
           "check": "Nodes can be dragged outside community washes without changing membership.",
-          "status": "pending",
-          "evidence": []
+          "status": "passed",
+          "evidence": [
+            "packages/graph-engine/test/render-model.test.ts covers dragged core member movement without community membership mutation.",
+            "bash tests/graph-workbench-interactions.regression-1.sh recorded visibleNodes [A, B] after community focus and a pinned dragged node outside the initial wash.",
+            "bash tests/graph-community-wash-interactions.regression-1.sh recorded thresholdMoveVisibleNodes [A, B, C] and communityClickVisibleNodes [A, B], preserving click-vs-drag behavior."
+          ]
         },
         {
           "check": "Node hits outrank community wash hits, and community hits outrank blank hits.",
@@ -1357,13 +1366,21 @@
         },
         {
           "check": "Community wash caps do not grow unbounded when layout bounds expand.",
-          "status": "pending",
-          "evidence": []
+          "status": "passed",
+          "evidence": [
+            "packages/graph-engine/test/community-wash.test.ts includes a single extreme dragged outlier cap fixture.",
+            "packages/graph-engine/test/render-model.test.ts confirms expanded world bounds do not enlarge wash caps.",
+            "npm run test --workspace=@llm-wiki/graph-engine -> 251 tests passed, 0 failed."
+          ]
         },
         {
           "check": "Community wash, workbench, and offline browser regressions exit 0.",
-          "status": "pending",
-          "evidence": []
+          "status": "passed",
+          "evidence": [
+            "bash tests/graph-community-wash-interactions.regression-1.sh -> PASS: graph community wash interaction regression.",
+            "bash tests/graph-workbench-interactions.regression-1.sh -> PASS: graph workbench interaction regression.",
+            "bash tests/graph-offline-phase-6.regression-1.sh -> PASS: phase 6 offline graph regression."
+          ]
         }
       ],
       "tasks": [
@@ -1459,8 +1476,29 @@
         {
           "id": "6.4",
           "title": "Verify wash behavior in workbench and offline browser paths",
-          "status": "pending",
-          "verification": [],
+          "status": "completed",
+          "verification": [
+            {
+              "command": "npm run test --workspace=@llm-wiki/graph-engine",
+              "result": "251 tests passed, 0 failed",
+              "status": "passed"
+            },
+            {
+              "command": "bash tests/graph-community-wash-interactions.regression-1.sh",
+              "result": "PASS: graph community wash interaction regression; records wash wheel zoom, community click visible nodes, drag threshold behavior, and pinned dragged node evidence.",
+              "status": "passed"
+            },
+            {
+              "command": "bash tests/graph-workbench-interactions.regression-1.sh",
+              "result": "PASS: graph workbench interaction regression; records wheel ownership for blank/node/community/edge, blocked controls, hover anchors, drawer resize, community drag, root scroll, and reset behavior.",
+              "status": "passed"
+            },
+            {
+              "command": "bash tests/graph-offline-phase-6.regression-1.sh",
+              "result": "PASS: phase 6 offline graph regression; records offline wheel ownership, hover after zoom, drag pointer distance, reader drawer, pin persistence, dense graph, and multicomm fixtures.",
+              "status": "passed"
+            }
+          ],
           "commit": null
         }
       ]
