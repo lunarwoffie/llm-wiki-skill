@@ -2,9 +2,9 @@
   "plan": "docs/plans/2026-06-16-graph-interaction-architecture-phased-plan.md",
   "status": {
     "overall": "pending",
-    "phase": "phase-6",
-    "task": "6.3",
-    "next_allowed_action": "Execute phase-6 task 6.3: run offline HTML verification. Start by reading the progress file and running git log --oneline -15 plus npm run test --workspace=@llm-wiki/graph-engine."
+    "phase": "phase-7",
+    "task": "7.1",
+    "next_allowed_action": "Execute phase-7 task 7.1: remove or isolate any remaining old scattered interaction formulas. Start by reading the progress file and running git log --oneline -15 plus npm run test --workspace=@llm-wiki/graph-engine."
   },
   "execution_rules": {
     "branch": "codex/graph-interaction-architecture",
@@ -644,7 +644,7 @@
     {
       "id": "phase-6",
       "goal": "Verify workbench and offline HTML hosts share the fixed engine behavior",
-      "status": "pending",
+      "status": "completed",
       "acceptance": [
         {
           "check": "Workbench host does not duplicate graph coordinate logic",
@@ -681,8 +681,13 @@
         },
         {
           "check": "Offline HTML fixture verification passes against built IIFE",
-          "status": "pending",
-          "evidence": []
+          "status": "completed",
+          "evidence": [
+            "Added tests/graph-offline-phase-6.regression-1.sh to build the graph-engine IIFE, copy graph-interactive-basic, graph-interactive-dense, and graph-interactive-multicomm into a temporary workspace, run scripts/build-graph-html.sh for each fixture, and assert each generated wiki/knowledge-graph.html is non-empty and contains the built single-file engine.",
+            "Added tests/browser/graph-offline-phase-6.mjs to open the generated file:// HTML in Chrome and verify wheel zoom over blank canvas, node, and community wash; root native scroll reset; hover preview after zoom; node drag and pin persistence; built-in reader; theme toggle; dense/multicommunity render smoke; and absence of React host drawer state.",
+            "Verified bash tests/graph-offline-phase-6.regression-1.sh exited 0. Evidence artifacts: /var/folders/5f/hq4t401j741g652glng_xbww0000gn/T//llm-wiki-graph-offline-phase-6.gmT59W/phase-6-offline-interactions.json and /var/folders/5f/hq4t401j741g652glng_xbww0000gn/T//llm-wiki-graph-offline-phase-6.gmT59W/phase-6-offline-basic.png.",
+            "Verified node --check tests/browser/graph-offline-phase-6.mjs, bash -n tests/graph-offline-phase-6.regression-1.sh, npm run test --workspace=@llm-wiki/graph-engine, npm run typecheck --workspace=@llm-wiki/graph-engine, npm run build --workspace=@llm-wiki/graph-engine, and git diff --check all exited 0."
+          ]
         }
       ],
       "tasks": [
@@ -731,9 +736,23 @@
         {
           "id": "6.3",
           "title": "Run offline HTML verification",
-          "status": "pending",
-          "verification": [],
-          "commit": null
+          "status": "completed",
+          "verification": [
+            "Read progress file and plan; current unit was phase-6 task 6.3.",
+            "Ran git log --oneline -15 and npm run test --workspace=@llm-wiki/graph-engine before continuing; graph-engine tests exited 0.",
+            "Created an offline HTML regression that builds @llm-wiki/graph-engine, generates graph-interactive-basic, graph-interactive-dense, and graph-interactive-multicomm in a temporary directory, and asserts each generated knowledge-graph.html is non-empty and contains the built IIFE engine without external graph script files.",
+            "Browser verification covers offline wheel zoom over blank canvas, node, and community wash; root native scroll reset; hover preview after zoom; node drag staying under the pointer; localStorage pin persistence after reload; built-in reader; theme toggle; dense fixture smoke; multicomm fixture smoke; and no React host drawer dependency.",
+            "Verified bash tests/graph-offline-phase-6.regression-1.sh exited 0. Evidence artifacts were written to /var/folders/5f/hq4t401j741g652glng_xbww0000gn/T//llm-wiki-graph-offline-phase-6.gmT59W.",
+            "Verified node --check tests/browser/graph-offline-phase-6.mjs exited 0.",
+            "Verified bash -n tests/graph-offline-phase-6.regression-1.sh exited 0.",
+            "Verified npm run test --workspace=@llm-wiki/graph-engine exited 0: 49 suites, 198 tests passed.",
+            "Verified npm run typecheck --workspace=@llm-wiki/graph-engine exited 0.",
+            "Verified npm run build --workspace=@llm-wiki/graph-engine exited 0 and generated engine.esm.js and engine.iife.js.",
+            "Verified git diff --check exited 0.",
+            "Committed verified task 6.3 as 3c23bea990234ab45c4fd915ce2b1a47b26a08cb.",
+            "All phase-6 acceptance checks now pass, so phase-6 was marked completed and the progress pointer advanced to phase-7 task 7.1."
+          ],
+          "commit": "3c23bea990234ab45c4fd915ce2b1a47b26a08cb"
         }
       ]
     },
@@ -991,6 +1010,18 @@
         "Verified graph-engine test/typecheck/build, workbench test/typecheck/build, script syntax checks, and git diff --check all exited 0; workbench build only emitted the existing large chunk warning.",
         "Committed verified task 6.2 as da8e39c352c03e6be435e88d04b4959c8ae8e1a0.",
         "Advanced current task pointer to phase-6 task 6.3; phase-6 remains pending because offline HTML verification still needs the planned task."
+      ]
+    },
+    {
+      "turn": "phase-6-task-6.3",
+      "status": "completed",
+      "evidence": [
+        "Read progress file and plan; current unit was phase-6 task 6.3.",
+        "Added offline HTML regression coverage for generated file:// graphs across basic, dense, and multicomm fixtures.",
+        "Verified offline zoom, hover, drag, pin persistence, built-in reader, theme toggle, and no React drawer dependency against the built IIFE.",
+        "Verified graph-engine test/typecheck/build, script syntax checks, and git diff --check all exited 0.",
+        "Committed verified task 6.3 as 3c23bea990234ab45c4fd915ce2b1a47b26a08cb.",
+        "All phase-6 acceptance checks now pass, so phase-6 was marked completed and the progress pointer advanced to phase-7 task 7.1."
       ]
     }
   ]
