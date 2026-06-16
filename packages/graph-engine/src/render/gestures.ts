@@ -87,6 +87,17 @@ export interface GraphGestureStateMachineOptions {
   dragThreshold?: number;
 }
 
+export interface GraphGestureControllerOptions {
+  stateMachine?: GraphGestureStateMachine;
+  targetFromEventTarget?: (target: EventTarget | null) => GraphGestureTargetLike | null;
+  pointerEventFromPointerEvent: (event: PointerEvent) => GraphPointerEventLike;
+  onWheelZoom: (event: WheelEvent, decision: Extract<GraphWheelTargetDecision, { intent: "zoom" }>) => void;
+  onPointerDown?: (event: PointerEvent, decision: Exclude<GraphPointerDownTargetDecision, { intent: "blocked" }>) => void;
+  onGestureIntents: (intents: GraphGestureIntent[], event: PointerEvent | null) => void;
+  onActiveStateChange?: (active: GraphGestureActiveState) => void;
+  onBlankDoubleClick?: (event: MouseEvent) => void;
+}
+
 export type GraphGestureActiveState =
   | {
       kind: "node";
@@ -394,6 +405,103 @@ export class GraphGestureStateMachine {
         : [{ kind: "community-click-cancelled", communityId: active.communityId, pointerId, reason }];
     }
     return active.locked ? [{ kind: "blank-pan-cancel", pointerId, reason }] : [];
+  }
+}
+
+export class GraphGestureController {
+  private readonly root: HTMLElement;
+  private readonly options: GraphGestureControllerOptions;
+  private readonly stateMachine: GraphGestureStateMachine;
+  private destroyed = false;
+
+  constructor(root: HTMLElement, options: GraphGestureControllerOptions) {
+    this.root = root;
+    this.options = options;
+    this.stateMachine = options.stateMachine || new GraphGestureStateMachine();
+    this.root.addEventListener("wheel", this.handleWheel, { passive: false });
+    this.root.addEventListener("pointerdown", this.handlePointerDown);
+    this.root.addEventListener("pointermove", this.handlePointerMove);
+    this.root.addEventListener("pointerup", this.handlePointerUp);
+    this.root.addEventListener("pointercancel", this.handlePointerCancel);
+    this.root.addEventListener("lostpointercapture", this.handleLostPointerCapture);
+    this.root.addEventListener("dblclick", this.handleDoubleClick);
+  }
+
+  destroy(): void {
+    if (this.destroyed) return;
+    this.destroyed = true;
+    this.root.removeEventListener("wheel", this.handleWheel);
+    this.root.removeEventListener("pointerdown", this.handlePointerDown);
+    this.root.removeEventListener("pointermove", this.handlePointerMove);
+    this.root.removeEventListener("pointerup", this.handlePointerUp);
+    this.root.removeEventListener("pointercancel", this.handlePointerCancel);
+    this.root.removeEventListener("lostpointercapture", this.handleLostPointerCapture);
+    this.root.removeEventListener("dblclick", this.handleDoubleClick);
+  }
+
+  snapshot(): GraphGestureActiveState {
+    return this.stateMachine.snapshot();
+  }
+
+  escape(): GraphGestureIntent[] {
+    const intents = this.stateMachine.escape();
+    this.emitActiveState();
+    return intents;
+  }
+
+  private readonly handleWheel = (event: WheelEvent): void => {
+    const decision = classifyGraphWheelTarget(this.eventTarget(event.target), event);
+    if (decision.intent !== "zoom") return;
+    this.options.onWheelZoom(event, decision);
+  };
+
+  private readonly handlePointerDown = (event: PointerEvent): void => {
+    if (event.button !== 0) return;
+    const decision = classifyGraphPointerDownTarget(this.eventTarget(event.target));
+    if (decision.intent === "blocked") return;
+    this.options.onPointerDown?.(event, decision);
+    this.stateMachine.pointerDown(decision, this.options.pointerEventFromPointerEvent(event));
+    this.emitActiveState();
+    this.root.setPointerCapture(event.pointerId);
+  };
+
+  private readonly handlePointerMove = (event: PointerEvent): void => {
+    this.applyIntents(this.stateMachine.pointerMove(this.options.pointerEventFromPointerEvent(event)), event);
+  };
+
+  private readonly handlePointerUp = (event: PointerEvent): void => {
+    this.applyIntents(this.stateMachine.pointerUp(this.options.pointerEventFromPointerEvent(event)), event);
+    if (this.root.hasPointerCapture(event.pointerId)) this.root.releasePointerCapture(event.pointerId);
+  };
+
+  private readonly handlePointerCancel = (event: PointerEvent): void => {
+    this.applyIntents(this.stateMachine.pointerCancel({ pointerId: event.pointerId }), event);
+    if (this.root.hasPointerCapture(event.pointerId)) this.root.releasePointerCapture(event.pointerId);
+  };
+
+  private readonly handleLostPointerCapture = (event: PointerEvent): void => {
+    const pointerId = Number(event.pointerId);
+    if (!Number.isFinite(pointerId)) return;
+    this.applyIntents(this.stateMachine.lostPointerCapture({ pointerId }), null);
+  };
+
+  private readonly handleDoubleClick = (event: MouseEvent): void => {
+    const decision = classifyGraphPointerDownTarget(this.eventTarget(event.target));
+    if (decision.intent !== "blank-pan-candidate") return;
+    this.options.onBlankDoubleClick?.(event);
+  };
+
+  private applyIntents(intents: GraphGestureIntent[], event: PointerEvent | null): void {
+    this.options.onGestureIntents(intents, event);
+    this.emitActiveState();
+  }
+
+  private emitActiveState(): void {
+    this.options.onActiveStateChange?.(this.stateMachine.snapshot());
+  }
+
+  private eventTarget(target: EventTarget | null): GraphGestureTargetLike | null {
+    return this.options.targetFromEventTarget ? this.options.targetFromEventTarget(target) : target as GraphGestureTargetLike | null;
   }
 }
 

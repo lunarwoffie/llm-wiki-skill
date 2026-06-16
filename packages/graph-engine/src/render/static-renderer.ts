@@ -49,9 +49,8 @@ import { beginGraphNodeDrag, resolveGraphNodeDragTarget } from "./simulation-bri
 import { cancelGraphNodeDrag, commitGraphNodeDrag, type GraphNodeDragSession } from "./node-drag-lifecycle";
 import { graphEdgeHoverAnchor, graphNodeHoverAnchor, resolveGraphHoverPreviewPosition } from "./overlays";
 import {
+  GraphGestureController,
   GraphGestureStateMachine,
-  classifyGraphPointerDownTarget,
-  classifyGraphWheelTarget,
   type GraphGestureActiveState,
   type GraphGestureIntent,
   type GraphGestureTargetLike
@@ -207,6 +206,7 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
   ownerDocument.addEventListener("keydown", handleDocumentKeydown);
   const viewportCommitter = createViewportFrameCommitter(commitViewport, root.ownerDocument.defaultView || undefined);
   const gestureMachine = new GraphGestureStateMachine({ dragThreshold: 4 });
+  let gestureController: GraphGestureController | null = null;
   let pendingNodeDrag: PendingNodeDragSession | null = null;
   let viewportAnimationTimer: ReturnType<typeof setTimeout> | null = null;
   let lastEffectiveDensityMode: DensityMode | null = null;
@@ -222,7 +222,7 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
     focus
   });
   let pinState = new PinState(graph, runtimeState.snapshot().pins);
-  bindViewportHandlers();
+  gestureController = bindViewportHandlers();
   bindResizeObserver();
 
   function render(next: Partial<StaticRendererOptions> & { selectedNodeId?: string | null; selection?: SelectionInput | null } = {}): void {
@@ -351,6 +351,8 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
       resizeObserver = null;
       root.removeEventListener("scroll", resetRootScroll);
       ownerDocument.removeEventListener("keydown", handleDocumentKeydown);
+      gestureController?.destroy();
+      gestureController = null;
       if (previewTimer) clearTimeout(previewTimer);
       if (viewportAnimationTimer) clearTimeout(viewportAnimationTimer);
       pathCache.clear();
@@ -710,62 +712,35 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
     }
   }
 
-  function bindViewportHandlers(): void {
-    root.addEventListener("wheel", (event) => {
-      const decision = classifyGraphWheelTarget(graphGestureTarget(event.target), event);
-      if (decision.intent !== "zoom") return;
-      event.preventDefault();
-      setViewportAnimating(false);
-      const screenPoint = graphScreenPointFromPointerEvent(event);
-      viewportCommitter.schedule(viewportAfterWheelZoom(
-        runtimeState.snapshot().viewport,
-        { deltaY: event.deltaY, deltaMode: event.deltaMode },
-        screenPoint,
-        viewportSize()
-      ));
-    }, { passive: false });
-    root.addEventListener("pointerdown", (event) => {
-      if (event.button !== 0) return;
-      const decision = classifyGraphPointerDownTarget(graphGestureTarget(event.target));
-      if (decision.intent === "blocked") return;
-      pendingNodeDrag = decision.intent === "node-drag-candidate" && decision.target.id
-        ? pendingNodeDragFromPointerDown(decision.target.id, event)
-        : null;
-      if (decision.intent !== "node-drag-candidate") root.focus({ preventScroll: true });
-      gestureMachine.pointerDown(decision, graphPointerEvent(event));
-      syncRuntimeGestureState();
-      setViewportAnimating(false);
-      root.setPointerCapture(event.pointerId);
-    });
-    root.addEventListener("pointermove", (event) => {
-      const intents = gestureMachine.pointerMove(graphPointerEvent(event));
-      applyGestureIntents(intents, event);
-      syncRuntimeGestureState();
-    });
-    root.addEventListener("pointerup", (event) => {
-      const intents = gestureMachine.pointerUp(graphPointerEvent(event));
-      applyGestureIntents(intents, event);
-      if (root.hasPointerCapture(event.pointerId)) root.releasePointerCapture(event.pointerId);
-      syncRuntimeGestureState();
-    });
-    root.addEventListener("pointercancel", (event) => {
-      const intents = gestureMachine.pointerCancel({ pointerId: event.pointerId });
-      applyGestureIntents(intents, event);
-      if (root.hasPointerCapture(event.pointerId)) root.releasePointerCapture(event.pointerId);
-      syncRuntimeGestureState();
-    });
-    root.addEventListener("lostpointercapture", (event) => {
-      const pointerId = "pointerId" in event ? Number(event.pointerId) : Number.NaN;
-      if (!Number.isFinite(pointerId)) return;
-      const intents = gestureMachine.lostPointerCapture({ pointerId });
-      applyGestureIntents(intents, null);
-      syncRuntimeGestureState();
-    });
-    root.addEventListener("dblclick", (event) => {
-      const decision = classifyGraphPointerDownTarget(graphGestureTarget(event.target));
-      if (decision.intent !== "blank-pan-candidate") return;
-      event.preventDefault();
-      resetViewState();
+  function bindViewportHandlers(): GraphGestureController {
+    return new GraphGestureController(root, {
+      stateMachine: gestureMachine,
+      targetFromEventTarget: graphGestureTarget,
+      pointerEventFromPointerEvent: graphPointerEvent,
+      onWheelZoom: (event) => {
+        event.preventDefault();
+        setViewportAnimating(false);
+        const screenPoint = graphScreenPointFromPointerEvent(event);
+        viewportCommitter.schedule(viewportAfterWheelZoom(
+          runtimeState.snapshot().viewport,
+          { deltaY: event.deltaY, deltaMode: event.deltaMode },
+          screenPoint,
+          viewportSize()
+        ));
+      },
+      onPointerDown: (event, decision) => {
+        pendingNodeDrag = decision.intent === "node-drag-candidate" && decision.target.id
+          ? pendingNodeDragFromPointerDown(decision.target.id, event)
+          : null;
+        if (decision.intent !== "node-drag-candidate") root.focus({ preventScroll: true });
+        setViewportAnimating(false);
+      },
+      onGestureIntents: applyGestureIntents,
+      onActiveStateChange: syncRuntimeGestureState,
+      onBlankDoubleClick: (event) => {
+        event.preventDefault();
+        resetViewState();
+      }
     });
   }
 

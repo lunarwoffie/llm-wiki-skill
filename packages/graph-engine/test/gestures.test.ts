@@ -5,6 +5,7 @@ import {
   GRAPH_GESTURE_BLOCKER_TARGET_KINDS,
   GRAPH_GESTURE_SELECTORS,
   GRAPH_OWNED_TARGET_KINDS,
+  GraphGestureController,
   GraphGestureStateMachine,
   classifyGraphEventTarget,
   classifyGraphPointerDownTarget,
@@ -12,6 +13,7 @@ import {
   graphGestureTargetOwnership,
   isGraphGestureBlockerTarget,
   isGraphOwnedGestureTarget,
+  type GraphGestureIntent,
   type GraphGestureTarget,
   type GraphGestureTargetLike
 } from "../src/render";
@@ -300,6 +302,50 @@ describe("graph gesture state machine", () => {
   });
 });
 
+describe("graph gesture controller", () => {
+  it("owns root wheel and pointer event bindings and releases them on destroy", () => {
+    const root = new FakeGestureRoot();
+    const zoomed: Array<{ target: string; deltaY: number }> = [];
+    const intents: GraphGestureIntent[] = [];
+    const activeSnapshots: unknown[] = [];
+    const controller = new GraphGestureController(root as unknown as HTMLElement, {
+      targetFromEventTarget: (target) => target as GraphGestureTargetLike | null,
+      pointerEventFromPointerEvent: (event) => pointer(event.pointerId, event.clientX, event.clientY, { shiftKey: event.shiftKey }),
+      onWheelZoom: (event, decision) => {
+        event.preventDefault();
+        zoomed.push({ target: decision.target.kind, deltaY: event.deltaY });
+      },
+      onGestureIntents: (nextIntents) => {
+        intents.push(...nextIntents);
+      },
+      onActiveStateChange: (active) => {
+        activeSnapshots.push(active);
+      }
+    });
+
+    const wheel = wheelDomEvent(nodeTarget("node-a"), 24);
+    root.dispatch("wheel", wheel);
+    assert.equal(wheel.defaultPrevented, true);
+    assert.deepEqual(zoomed, [{ target: "node", deltaY: 24 }]);
+
+    root.dispatch("pointerdown", pointerDomEvent(nodeTarget("node-a"), 21, 10, 10));
+    assert.equal(root.hasPointerCapture(21), true);
+    root.dispatch("pointermove", pointerDomEvent(nodeTarget("node-a"), 21, 20, 18));
+    root.dispatch("pointerup", pointerDomEvent(nodeTarget("node-a"), 21, 20, 18));
+    assert.equal(root.hasPointerCapture(21), false);
+    assert.deepEqual(intents, [
+      { kind: "node-drag-start", nodeId: "node-a", pointerId: 21, screenPoint: { x: 20, y: 18 } },
+      { kind: "node-drag-move", nodeId: "node-a", pointerId: 21, screenPoint: { x: 20, y: 18 }, delta: { x: 10, y: 8 } },
+      { kind: "node-drag-end", nodeId: "node-a", pointerId: 21, screenPoint: { x: 20, y: 18 } }
+    ]);
+    assert.ok(activeSnapshots.length >= 3);
+
+    controller.destroy();
+    root.dispatch("wheel", wheelDomEvent(nodeTarget("node-b"), 12));
+    assert.deepEqual(zoomed, [{ target: "node", deltaY: 24 }]);
+  });
+});
+
 function blankTarget(): FakeTarget {
   return new FakeTarget();
 }
@@ -330,6 +376,73 @@ function pointer(pointerId: number, x: number, y: number, options: { shiftKey?: 
     screenPoint: { x, y },
     shiftKey: options.shiftKey
   };
+}
+
+class FakeGestureRoot {
+  private readonly listeners = new Map<string, Set<(event: any) => void>>();
+  private readonly pointerCaptures = new Set<number>();
+
+  addEventListener(type: string, listener: (event: any) => void): void {
+    const listeners = this.listeners.get(type) || new Set();
+    listeners.add(listener);
+    this.listeners.set(type, listeners);
+  }
+
+  removeEventListener(type: string, listener: (event: any) => void): void {
+    this.listeners.get(type)?.delete(listener);
+  }
+
+  dispatch(type: string, event: any): void {
+    for (const listener of this.listeners.get(type) || []) {
+      listener(event);
+    }
+  }
+
+  setPointerCapture(pointerId: number): void {
+    this.pointerCaptures.add(pointerId);
+  }
+
+  hasPointerCapture(pointerId: number): boolean {
+    return this.pointerCaptures.has(pointerId);
+  }
+
+  releasePointerCapture(pointerId: number): void {
+    this.pointerCaptures.delete(pointerId);
+  }
+}
+
+function wheelDomEvent(target: GraphGestureTargetLike, deltaY: number): WheelEvent & { defaultPrevented: boolean } {
+  let defaultPrevented = false;
+  return {
+    target,
+    deltaY,
+    deltaMode: 0,
+    ctrlKey: false,
+    metaKey: false,
+    preventDefault: () => {
+      defaultPrevented = true;
+    },
+    get defaultPrevented() {
+      return defaultPrevented;
+    }
+  } as WheelEvent & { defaultPrevented: boolean };
+}
+
+function pointerDomEvent(
+  target: GraphGestureTargetLike,
+  pointerId: number,
+  clientX: number,
+  clientY: number,
+  options: { button?: number; shiftKey?: boolean } = {}
+): PointerEvent {
+  return {
+    target,
+    pointerId,
+    clientX,
+    clientY,
+    button: options.button ?? 0,
+    shiftKey: options.shiftKey === true
+  } as PointerEvent;
 }
 
 function matchesSelf(target: FakeTarget, selector: string): boolean {

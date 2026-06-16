@@ -57,6 +57,7 @@ export type {
 export {
   GRAPH_GESTURE_BLOCKER_TARGET_KINDS,
   GRAPH_GESTURE_SELECTORS,
+  GraphGestureController,
   GRAPH_OWNED_TARGET_KINDS,
   GraphGestureStateMachine,
   classifyGraphEventTarget,
@@ -72,6 +73,7 @@ export {
 export type {
   GraphGestureBlockerTargetKind,
   GraphGestureActiveState,
+  GraphGestureControllerOptions,
   GraphGestureIntent,
   GraphGestureStateMachineOptions,
   GraphGestureTargetOwnership,
