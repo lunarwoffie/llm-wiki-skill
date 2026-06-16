@@ -186,7 +186,7 @@
             "npm run build --workspace=@llm-wiki/graph-engine exited 0 and generated both engine.esm.js and engine.iife.js.",
             "git diff --check exited 0."
           ],
-          "commit": null
+          "commit": "fe1c69f83d2b0e18b0c2c7593420f98c4be95638"
         },
         {
           "id": "1.2",
@@ -498,6 +498,7 @@
         "Ran git log --oneline -15 and npm run test --workspace=@llm-wiki/graph-engine before changing code; both exited 0.",
         "Added Geometry module and tests for explicit coordinate spaces, inverse projection, no silent drag clamp, drawer resize layer conversion, deltas, svg naming, and minimap mapping.",
         "Verified geometry single-file test, full graph-engine test, graph-engine typecheck, graph-engine build, and git diff --check all exited 0.",
+        "Committed verified task 1.1 as fe1c69f83d2b0e18b0c2c7593420f98c4be95638.",
         "Advanced current task pointer to phase-1 task 1.2; phase-1 remains pending because viewport narrowing and pin/layout bounds compatibility are not complete."
       ]
     }
