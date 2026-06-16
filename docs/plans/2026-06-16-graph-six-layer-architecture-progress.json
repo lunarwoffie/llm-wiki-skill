@@ -2,9 +2,9 @@
   "plan": "docs/plans/2026-06-16-graph-six-layer-architecture-phased-plan.md",
   "status": {
     "overall": "pending",
-    "phase": "phase-2",
-    "task": "2.5",
-    "next_allowed_action": "Run the baseline smoke check, then cover cancellation and blocker boundaries in tests and browser scripts for task 2.5."
+    "phase": "phase-3",
+    "task": "3.1",
+    "next_allowed_action": "Run the baseline smoke check, then remove renderer-local coordinate calculations that bypass GraphViewport for task 3.1."
   },
   "execution_rules": {
     "parent_branch": "codex/graph-interaction-architecture",
@@ -310,12 +310,17 @@
     {
       "id": "phase-2",
       "goal": "Make GraphGestures the sole raw input and browser-default policy owner.",
-      "status": "pending",
+      "status": "completed",
       "acceptance": [
         {
           "check": "Graph-owned wheel, trackpad-like wheel, pointer, and graph-focused keyboard behavior is routed through GraphGestures.",
-          "status": "pending",
-          "evidence": []
+          "status": "passed",
+          "evidence": [
+            "GraphGestureController owns root wheel, pointerdown, pointermove, pointerup, pointercancel, lostpointercapture, and double-click bindings.",
+            "gestures.test.ts covers graph-owned wheel/pointer routing, blocker boundaries, pointercancel, lostpointercapture, click-vs-drag threshold, and graph-owned shortcut wheel zoom.",
+            "keyboard.test.ts covers graph-focused shortcut and Escape ownership, while blocking text editing and outside-graph focus.",
+            "tests/graph-default-behavior.regression-1.sh covers graph-owned shortcut wheel, native selection prevention, fast drag release, cancellation cleanup, blocker boundaries, and keyboard ownership in a real browser."
+          ]
         },
         {
           "check": "Graph-owned surfaces do not trigger browser page zoom, native text selection, or native drag selection.",
@@ -339,8 +344,11 @@
         },
         {
           "check": "Workbench and offline browser regressions exit 0 with page zoom metrics recorded.",
-          "status": "pending",
-          "evidence": []
+          "status": "passed",
+          "evidence": [
+            "bash tests/graph-default-behavior.regression-1.sh -> PASS: graph default behavior regression; evidence includes unchanged devicePixelRatio, visualViewport.scale, clientWidth, and clientHeight while graph transform changes.",
+            "bash tests/graph-workbench-interactions.regression-1.sh -> PASS: graph workbench interaction regression; evidence includes graph-owned wheel over blank, node, community wash, and edge plus blocked wheel targets for search, toolbar, legend, minimap, and drawer."
+          ]
         }
       ],
       "tasks": [
@@ -469,9 +477,40 @@
         {
           "id": "2.5",
           "title": "Cover cancellation and blocker boundaries in tests and browser scripts",
-          "status": "pending",
-          "verification": [],
-          "commit": null
+          "status": "completed",
+          "verification": [
+            {
+              "command": "node --import tsx --test packages/graph-engine/test/gestures.test.ts",
+              "result": "20 tests passed, 0 failed",
+              "status": "passed"
+            },
+            {
+              "command": "bash tests/graph-default-behavior.regression-1.sh",
+              "result": "PASS: graph default behavior regression; browser evidence confirmed pointercancel clears node drag without creating a pin, lostpointercapture clears blank pan, and search/toolbar/minimap/reader blockers do not start graph gestures.",
+              "status": "passed"
+            },
+            {
+              "command": "npm run test --workspace=@llm-wiki/graph-engine",
+              "result": "221 tests passed, 0 failed",
+              "status": "passed"
+            },
+            {
+              "command": "npm run typecheck --workspace=@llm-wiki/graph-engine",
+              "result": "tsc -p tsconfig.json --noEmit exited 0",
+              "status": "passed"
+            },
+            {
+              "command": "npm run build --workspace=@llm-wiki/graph-engine",
+              "result": "vite build and declaration emit exited 0",
+              "status": "passed"
+            },
+            {
+              "command": "bash tests/graph-workbench-interactions.regression-1.sh",
+              "result": "PASS: graph workbench interaction regression",
+              "status": "passed"
+            }
+          ],
+          "commit": "e1b4d62"
         }
       ]
     },
