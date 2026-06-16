@@ -31,6 +31,34 @@ describe("graph overlay anchors", () => {
     );
   });
 
+  it("keeps node hover anchors tied to expanded world bounds", () => {
+    const viewport: RendererViewport = { x: 84, y: -36, scale: 1.7 };
+    const viewportSize: RendererViewportSize = { width: 760, height: 520 };
+    const worldBounds = { minX: -240, minY: -120, maxX: 1260, maxY: 900, width: 1500, height: 1020 };
+    const node = { point: { x: -80, y: 820 } };
+
+    assertPointNear(
+      graphNodeHoverAnchor(node, viewport, viewportSize, worldBounds),
+      worldPointToScreenPoint(node.point, viewport, viewportSize, worldBounds)
+    );
+  });
+
+  it("reprojects hover anchors when drawer resize changes the graph viewport", () => {
+    const viewport: RendererViewport = { x: -320, y: -180, scale: 2.4 };
+    const node = { point: { x: 460, y: 220 } };
+    const wideSize: RendererViewportSize = { width: 1000, height: 680 };
+    const drawerSize: RendererViewportSize = { width: 640, height: 680 };
+
+    const wideAnchor = graphNodeHoverAnchor(node, viewport, wideSize);
+    const drawerAnchor = graphNodeHoverAnchor(node, viewport, drawerSize);
+
+    assert.notDeepEqual(drawerAnchor, wideAnchor);
+    assertPointNear(
+      drawerAnchor,
+      worldPointToScreenPoint(node.point, viewport, drawerSize)
+    );
+  });
+
   it("positions edge hover anchors from the projected midpoint of both endpoints", () => {
     const viewport: RendererViewport = { x: 120, y: -64, scale: 1.8 };
     const source = { point: { x: 200, y: 190 } };
@@ -40,6 +68,24 @@ describe("graph overlay anchors", () => {
 
     assertPointNear(
       graphEdgeHoverAnchor({ source, target }, viewport, VIEWPORT_SIZE),
+      {
+        x: (sourceScreen.x + targetScreen.x) / 2,
+        y: (sourceScreen.y + targetScreen.y) / 2
+      }
+    );
+  });
+
+  it("positions edge hover anchors through expanded bounds", () => {
+    const viewport: RendererViewport = { x: 40, y: -88, scale: 1.25 };
+    const viewportSize: RendererViewportSize = { width: 900, height: 620 };
+    const worldBounds = { minX: -400, minY: -200, maxX: 1400, maxY: 1040, width: 1800, height: 1240 };
+    const source = { point: { x: -200, y: 920 } };
+    const target = { point: { x: 1180, y: -40 } };
+    const sourceScreen = worldPointToScreenPoint(source.point, viewport, viewportSize, worldBounds);
+    const targetScreen = worldPointToScreenPoint(target.point, viewport, viewportSize, worldBounds);
+
+    assertPointNear(
+      graphEdgeHoverAnchor({ source, target }, viewport, viewportSize, worldBounds),
       {
         x: (sourceScreen.x + targetScreen.x) / 2,
         y: (sourceScreen.y + targetScreen.y) / 2
