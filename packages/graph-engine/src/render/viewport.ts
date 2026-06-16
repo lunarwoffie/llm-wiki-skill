@@ -1,4 +1,14 @@
-import { atlasViewportToMinimapRect, centerAtlasViewportOnPoint, clampAtlasViewport, fitAtlasViewport, zoomAtlasViewport } from "../model";
+import { clampAtlasViewport } from "../model";
+import {
+  GRAPH_WORLD_SIZE,
+  screenPointToWorldPoint,
+  visibleWorldRectForViewport,
+  visibleWorldRectToMinimapRect,
+  worldPointToLayerPoint,
+  worldPointToScreenPoint,
+  type GraphScreenPoint,
+  type GraphWorldPoint
+} from "./geometry";
 
 export interface RendererViewport {
   x: number;
@@ -39,8 +49,6 @@ export const DEFAULT_RENDERER_VIEWPORT: RendererViewport = {
 const WHEEL_LINE_HEIGHT_PX = 18;
 const WHEEL_PAGE_HEIGHT_PX = 720;
 const WHEEL_ZOOM_SPEED = 0.0016;
-const WORLD_WIDTH = 1000;
-const WORLD_HEIGHT = 680;
 const COMFORTABLE_ANCHOR_MIN_X = 0.18;
 const COMFORTABLE_ANCHOR_MAX_X = 0.78;
 const COMFORTABLE_ANCHOR_MIN_Y = 0.18;
@@ -91,14 +99,20 @@ export function viewportAfterWheelZoom(
   options: RendererViewportOptions = {}
 ): RendererViewport {
   const normalizedDelta = normalizeWheelDelta(delta);
-  const zoomFactor = Math.exp(-normalizedDelta * WHEEL_ZOOM_SPEED);
-  return zoomAtlasViewport(
-    normalizeRendererViewport(viewport),
-    zoomFactor,
-    screenPoint,
-    viewportSize,
-    viewportOptions(options)
-  ) as RendererViewport;
+  const zoomFactor = clamp(Math.exp(-normalizedDelta * WHEEL_ZOOM_SPEED), 0.2, 5);
+  const safe = normalizeRendererViewport(viewport);
+  const size = normalizeViewportSize(viewportSize);
+  const point = clampScreenPointToViewport(screenPoint, size);
+  const opts = viewportOptions(options);
+  const nextScale = clamp(safe.scale * zoomFactor, opts.minScale, opts.maxScale);
+  const anchorWorld = screenPointToWorldPoint(point, safe, size);
+  const anchorLayer = worldPointToLayerPoint(anchorWorld, size);
+
+  return clampAtlasViewport({
+    x: point.x - nextScale * anchorLayer.x,
+    y: point.y - nextScale * anchorLayer.y,
+    scale: nextScale
+  }, size, opts) as RendererViewport;
 }
 
 export function panRendererViewport(
@@ -125,10 +139,27 @@ export function fitRendererViewportToPoints(
   options: RendererViewportOptions = {}
 ): RendererViewport {
   const bounds = boundsForPoints(points);
-  return fitAtlasViewport(bounds, viewportSize, {
-    padding: 0.82,
-    ...viewportOptions(options)
-  }) as RendererViewport;
+  const size = normalizeViewportSize(viewportSize);
+  const opts = viewportOptions(options);
+  const scale = clamp(
+    Math.min(
+      GRAPH_WORLD_SIZE.width * 0.82 / Math.max(1, bounds.width || 1),
+      GRAPH_WORLD_SIZE.height * 0.82 / Math.max(1, bounds.height || 1)
+    ),
+    opts.minScale,
+    opts.maxScale
+  );
+  const center = {
+    x: (bounds.minX + bounds.maxX) / 2,
+    y: (bounds.minY + bounds.maxY) / 2
+  };
+  const centerLayer = worldPointToLayerPoint(center, size);
+
+  return clampAtlasViewport({
+    x: size.width / 2 - scale * centerLayer.x,
+    y: size.height / 2 - scale * centerLayer.y,
+    scale
+  }, size, opts) as RendererViewport;
 }
 
 export function centerRendererViewportOnPoint(
@@ -138,7 +169,16 @@ export function centerRendererViewportOnPoint(
   options: RendererViewportOptions = {}
 ): RendererViewport {
   const safe = normalizeRendererViewport(viewport);
-  return centerAtlasViewportOnPoint(point, viewportSize, safe.scale, viewportOptions(options)) as RendererViewport;
+  const size = normalizeViewportSize(viewportSize);
+  const opts = viewportOptions(options);
+  const scale = clamp(safe.scale, opts.minScale, opts.maxScale);
+  const layerPoint = worldPointToLayerPoint(point, size);
+
+  return clampAtlasViewport({
+    x: size.width / 2 - scale * layerPoint.x,
+    y: size.height / 2 - scale * layerPoint.y,
+    scale
+  }, size, opts) as RendererViewport;
 }
 
 export function viewportAfterResize(
@@ -151,13 +191,14 @@ export function viewportAfterResize(
   const previous = normalizeViewportSize(previousSize);
   const next = normalizeViewportSize(nextSize);
   const anchorPoint = options.anchorPoint || viewportCenterPoint(safe, previous);
-  const previousScreen = modelPointToScreen(anchorPoint, safe, previous);
+  const previousScreen = worldPointToScreenPoint(anchorPoint, safe, previous);
   const desiredXRatio = clamp(previousScreen.x / previous.width, COMFORTABLE_ANCHOR_MIN_X, COMFORTABLE_ANCHOR_MAX_X);
   const desiredYRatio = clamp(previousScreen.y / previous.height, COMFORTABLE_ANCHOR_MIN_Y, COMFORTABLE_ANCHOR_MAX_Y);
+  const nextAnchorLayer = worldPointToLayerPoint(anchorPoint, next);
 
   return clampAtlasViewport({
-    x: next.width * desiredXRatio - safe.scale * (anchorPoint.x / WORLD_WIDTH * next.width),
-    y: next.height * desiredYRatio - safe.scale * (anchorPoint.y / WORLD_HEIGHT * next.height),
+    x: next.width * desiredXRatio - safe.scale * nextAnchorLayer.x,
+    y: next.height * desiredYRatio - safe.scale * nextAnchorLayer.y,
     scale: safe.scale
   }, next, viewportOptions(options)) as RendererViewport;
 }
@@ -166,11 +207,13 @@ export function rendererViewportToMinimapRect(
   viewport: Partial<RendererViewport> | null | undefined,
   viewportSize: RendererViewportSize
 ): { x: number; y: number; width: number; height: number } {
-  return atlasViewportToMinimapRect(normalizeRendererViewport(viewport), viewportSize) as {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
+  const worldRect = visibleWorldRectForViewport(normalizeRendererViewport(viewport), normalizeViewportSize(viewportSize));
+  const minimapRect = visibleWorldRectToMinimapRect(worldRect);
+  return {
+    x: minimapRect.x,
+    y: minimapRect.y,
+    width: Math.max(2, minimapRect.width),
+    height: Math.max(2, minimapRect.height)
   };
 }
 
@@ -201,22 +244,23 @@ function finiteNumber(value: unknown, fallback: number): number {
 
 function normalizeViewportSize(size: RendererViewportSize): RendererViewportSize {
   return {
-    width: Math.max(1, finiteNumber(size.width, WORLD_WIDTH)),
-    height: Math.max(1, finiteNumber(size.height, WORLD_HEIGHT))
+    width: Math.max(1, finiteNumber(size.width, GRAPH_WORLD_SIZE.width)),
+    height: Math.max(1, finiteNumber(size.height, GRAPH_WORLD_SIZE.height))
   };
 }
 
-function viewportCenterPoint(viewport: RendererViewport, size: RendererViewportSize): RendererPoint {
+function viewportCenterPoint(viewport: RendererViewport, size: RendererViewportSize): GraphWorldPoint {
+  const center = screenPointToWorldPoint({ x: size.width / 2, y: size.height / 2 }, viewport, size);
   return {
-    x: clamp(((size.width / 2 - viewport.x) / viewport.scale) / size.width * WORLD_WIDTH, 0, WORLD_WIDTH),
-    y: clamp(((size.height / 2 - viewport.y) / viewport.scale) / size.height * WORLD_HEIGHT, 0, WORLD_HEIGHT)
+    x: clamp(center.x, 0, GRAPH_WORLD_SIZE.width),
+    y: clamp(center.y, 0, GRAPH_WORLD_SIZE.height)
   };
 }
 
-function modelPointToScreen(point: RendererPoint, viewport: RendererViewport, size: RendererViewportSize): RendererPoint {
+function clampScreenPointToViewport(point: RendererPoint, size: RendererViewportSize): GraphScreenPoint {
   return {
-    x: viewport.x + viewport.scale * (point.x / WORLD_WIDTH * size.width),
-    y: viewport.y + viewport.scale * (point.y / WORLD_HEIGHT * size.height)
+    x: clamp(finiteNumber(point.x, size.width / 2), 0, size.width),
+    y: clamp(finiteNumber(point.y, size.height / 2), 0, size.height)
   };
 }
 
@@ -237,10 +281,10 @@ function viewportOptions(options: RendererViewportOptions): Required<RendererVie
 
 function boundsForPoints(points: RendererPoint[]): { minX: number; minY: number; maxX: number; maxY: number; width: number; height: number } {
   if (!points.length) {
-    return { minX: 0, minY: 0, maxX: 1000, maxY: 680, width: 1000, height: 680 };
+    return { minX: 0, minY: 0, maxX: GRAPH_WORLD_SIZE.width, maxY: GRAPH_WORLD_SIZE.height, width: GRAPH_WORLD_SIZE.width, height: GRAPH_WORLD_SIZE.height };
   }
-  let minX = 1000;
-  let minY = 680;
+  let minX: number = GRAPH_WORLD_SIZE.width;
+  let minY: number = GRAPH_WORLD_SIZE.height;
   let maxX = 0;
   let maxY = 0;
   for (const point of points) {

@@ -3,8 +3,8 @@
   "status": {
     "overall": "pending",
     "phase": "phase-1",
-    "task": "1.2",
-    "next_allowed_action": "Execute phase-1 task 1.2: narrow Viewport to camera responsibilities. Start by reading the progress file and running git log --oneline -15 plus npm run test --workspace=@llm-wiki/graph-engine."
+    "task": "1.3",
+    "next_allowed_action": "Execute phase-1 task 1.3: document and test pin/layout bounds compatibility. Start by reading the progress file and running git log --oneline -15 plus npm run test --workspace=@llm-wiki/graph-engine."
   },
   "execution_rules": {
     "branch": "codex/graph-interaction-architecture",
@@ -156,9 +156,14 @@
         },
         {
           "check": "Viewport camera behavior remains compatible with existing tests",
-          "status": "pending",
+          "status": "completed",
           "evidence": [
-            "Task 1.1 did not change viewport.ts behavior, but full graph-engine tests and graph-engine build passed after exporting Geometry. Final completion remains with task 1.2, which narrows viewport responsibilities."
+            "Task 1.1 did not change viewport.ts behavior, but full graph-engine tests and graph-engine build passed after exporting Geometry.",
+            "Task 1.2 narrowed viewport.ts to camera operations while preserving existing public helpers.",
+            "viewportAfterWheelZoom now uses Geometry screen/world/layer projection and keeps the world point under the pointer stable.",
+            "viewportAfterResize and rendererViewportToMinimapRect now use Geometry projection helpers while preserving selected-node comfort and minimap behavior.",
+            "node --import tsx --test packages/graph-engine/test/viewport.test.ts exited 0: 11 tests passed.",
+            "npm run test --workspace=@llm-wiki/graph-engine exited 0 after task 1.2 work: 42 suites, 161 tests, 161 pass, 0 fail."
           ]
         },
         {
@@ -191,8 +196,23 @@
         {
           "id": "1.2",
           "title": "Narrow Viewport to camera responsibilities",
-          "status": "pending",
-          "verification": [],
+          "status": "completed",
+          "verification": [
+            "Read progress file and plan; current unit was phase-1 task 1.2.",
+            "git log --oneline -15 exited 0 before task 1.2 work; branch head was f20f940 docs: record graph geometry commit.",
+            "npm run test --workspace=@llm-wiki/graph-engine exited 0 before task 1.2 work: 42 suites, 160 tests, 160 pass, 0 fail.",
+            "packages/graph-engine/src/render/viewport.ts now imports Geometry helpers and no longer owns duplicate world-size constants or private modelPointToScreen projection math.",
+            "viewportAfterWheelZoom now computes its pointer anchor through screenPointToWorldPoint and worldPointToLayerPoint, while preserving public helper signature and camera clamping.",
+            "fitRendererViewportToPoints and centerRendererViewportOnPoint now compute camera placement through Geometry world-to-layer projection and preserve existing helper exports.",
+            "viewportAfterResize now uses worldPointToScreenPoint and worldPointToLayerPoint to keep the selected node in the same comfort band after host resize.",
+            "rendererViewportToMinimapRect now maps visibleWorldRectForViewport through visibleWorldRectToMinimapRect and keeps the existing minimum minimap viewport size.",
+            "Added viewport tests proving wheel zoom keeps the same world point under the pointer and minimap rectangles match Geometry projection output.",
+            "node --import tsx --test packages/graph-engine/test/viewport.test.ts exited 0: 11 tests passed.",
+            "npm run test --workspace=@llm-wiki/graph-engine exited 0 after task 1.2 work: 42 suites, 161 tests, 161 pass, 0 fail.",
+            "npm run typecheck --workspace=@llm-wiki/graph-engine exited 0 after fixing a narrow literal-type inference in boundsForPoints.",
+            "npm run build --workspace=@llm-wiki/graph-engine exited 0 and generated both engine.esm.js and engine.iife.js.",
+            "git diff --check exited 0."
+          ],
           "commit": null
         },
         {
@@ -500,6 +520,19 @@
         "Verified geometry single-file test, full graph-engine test, graph-engine typecheck, graph-engine build, and git diff --check all exited 0.",
         "Committed verified task 1.1 as fe1c69f83d2b0e18b0c2c7593420f98c4be95638.",
         "Advanced current task pointer to phase-1 task 1.2; phase-1 remains pending because viewport narrowing and pin/layout bounds compatibility are not complete."
+      ]
+    },
+    {
+      "turn": "phase-1-task-1.2",
+      "status": "completed",
+      "evidence": [
+        "Read progress file and plan; current unit was phase-1 task 1.2.",
+        "Ran git log --oneline -15 and npm run test --workspace=@llm-wiki/graph-engine before changing code; both exited 0.",
+        "Narrowed viewport.ts to camera responsibilities by routing wheel zoom, fit/center, resize anchors, center calculation, and minimap viewport projection through Geometry helpers.",
+        "Kept public viewport helper exports compatible and did not change node drag, click, wheel target, hover, or community interaction wiring in this task.",
+        "Added viewport tests for pointer-anchored wheel zoom and minimap projection through Geometry.",
+        "Verified viewport single-file test, full graph-engine test, graph-engine typecheck, graph-engine build, and git diff --check all exited 0.",
+        "Advanced current task pointer to phase-1 task 1.3; phase-1 remains pending because pin/layout bounds compatibility is not complete."
       ]
     }
   ]

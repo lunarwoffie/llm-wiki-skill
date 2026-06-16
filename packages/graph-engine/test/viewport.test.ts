@@ -8,9 +8,13 @@ import {
   normalizeWheelDelta,
   panRendererViewport,
   rendererViewportToMinimapRect,
+  screenPointToWorldPoint,
+  visibleWorldRectForViewport,
+  visibleWorldRectToMinimapRect,
   rendererViewportToTransform,
   viewportAfterResize,
-  viewportAfterWheelZoom
+  viewportAfterWheelZoom,
+  worldPointToScreenPoint
 } from "../src/render";
 import type { GraphData, PinMap } from "../src/types";
 
@@ -96,6 +100,16 @@ describe("renderer viewport state", () => {
     assert.equal(panned.y, zoomed.y - 25);
   });
 
+  it("keeps the world point under the pointer stable during wheel zoom", () => {
+    const viewport = { x: -180, y: 64, scale: 1.25 };
+    const size = { width: 1170, height: 856 };
+    const pointer = { x: 420, y: 315 };
+    const anchoredWorldPoint = screenPointToWorldPoint(pointer, viewport, size);
+    const zoomed = viewportAfterWheelZoom(viewport, { deltaY: -100, deltaMode: 0 }, pointer, size);
+
+    assertPointNear(worldPointToScreenPoint(anchoredWorldPoint, zoomed, size), pointer);
+  });
+
   it("fits graph points into the viewport", () => {
     const fitted = fitRendererViewportToPoints(
       [{ x: 120, y: 80 }, { x: 880, y: 600 }],
@@ -134,15 +148,19 @@ describe("renderer viewport state", () => {
   });
 
   it("maps the current viewport to a minimap rectangle", () => {
+    const viewport = { x: -250, y: -170, scale: 2 };
+    const size = { width: 1000, height: 680 };
     const rect = rendererViewportToMinimapRect(
-      { x: -250, y: -170, scale: 2 },
-      { width: 1000, height: 680 }
+      viewport,
+      size
     );
+    const geometryRect = visibleWorldRectToMinimapRect(visibleWorldRectForViewport(viewport, size));
 
     assert.ok(rect.x > 0);
     assert.ok(rect.y > 0);
     assert.ok(rect.width > 2);
     assert.ok(rect.height > 2);
+    assertPointNear(rect, geometryRect);
   });
 
   it("coalesces viewport writes to one requestAnimationFrame callback", () => {
@@ -165,3 +183,12 @@ describe("renderer viewport state", () => {
     assert.deepEqual(writes, [{ x: 30, y: 0, scale: 1 }]);
   });
 });
+
+function assertNear(actual: number, expected: number, message?: string): void {
+  assert.ok(Math.abs(actual - expected) < 0.01, `${message ?? "number"}: expected ${expected}, got ${actual}`);
+}
+
+function assertPointNear(actual: { x: number; y: number }, expected: { x: number; y: number }): void {
+  assertNear(actual.x, expected.x, "x");
+  assertNear(actual.y, expected.y, "y");
+}
