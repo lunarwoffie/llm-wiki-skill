@@ -3,8 +3,8 @@
   "status": {
     "overall": "pending",
     "phase": "phase-1",
-    "task": "1.1",
-    "next_allowed_action": "Commit task 1.1 direct dependency changes, then record that commit hash before moving to task 1.2."
+    "task": "1.2",
+    "next_allowed_action": "Run the baseline smoke check, then define graph-owned target and blocker contracts for task 1.2."
   },
   "execution_rules": {
     "parent_branch": "codex/graph-interaction-architecture",
@@ -226,7 +226,7 @@
               "status": "passed"
             }
           ],
-          "commit": null
+          "commit": "0d77a76"
         },
         {
           "id": "1.2",
@@ -698,6 +698,15 @@
         "npm ls d3-quadtree --workspace=@llm-wiki/graph-engine passed",
         "npm run test --workspace=@llm-wiki/graph-engine passed: 198 tests, 0 failed",
         "npm run typecheck --workspace=@llm-wiki/graph-engine passed"
+      ]
+    },
+    {
+      "timestamp": "2026-06-16T14:58:00.000Z",
+      "phase": "phase-1",
+      "task": "1.1",
+      "action": "Recorded d3-quadtree direct dependency commit hash",
+      "evidence": [
+        "commit: 0d77a76 build(graph): declare d3 quadtree dependency"
       ]
     }
   ]
