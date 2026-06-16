@@ -3,8 +3,8 @@
   "status": {
     "overall": "pending",
     "phase": "phase-0",
-    "task": "0.1",
-    "next_allowed_action": "Commit the clean-start progress evidence, then record that commit hash before moving to task 0.2."
+    "task": "0.2",
+    "next_allowed_action": "Run the baseline smoke check, then write the graph interaction risk audit for task 0.2."
   },
   "execution_rules": {
     "parent_branch": "codex/graph-interaction-architecture",
@@ -108,9 +108,9 @@
         },
         {
           "check": "A clean-start progress commit is recorded before implementation code changes.",
-          "status": "pending",
+          "status": "passed",
           "evidence": [
-            "clean-start evidence ready; commit hash will be recorded after commit"
+            "f827f01 docs: record graph six-layer clean start"
           ]
         }
       ],
@@ -131,7 +131,7 @@
               "status": "passed"
             }
           ],
-          "commit": null
+          "commit": "f827f01"
         },
         {
           "id": "0.2",
@@ -590,6 +590,15 @@
       "evidence": [
         "branch: codex/graph-six-layer-architecture",
         "npm run test --workspace=@llm-wiki/graph-engine passed: 198 tests, 0 failed"
+      ]
+    },
+    {
+      "timestamp": "2026-06-16T13:38:00.000Z",
+      "phase": "phase-0",
+      "task": "0.1",
+      "action": "Recorded clean-start progress commit hash",
+      "evidence": [
+        "commit: f827f01 docs: record graph six-layer clean start"
       ]
     }
   ]
