@@ -1,0 +1,505 @@
+{
+  "plan": "docs/plans/2026-06-16-graph-six-layer-architecture-phased-plan.md",
+  "status": {
+    "overall": "pending",
+    "phase": "phase-0",
+    "task": "0.1",
+    "next_allowed_action": "Create the dedicated implementation branch from the current branch, run the smoke check, update this progress file with evidence, then commit the clean-start progress update."
+  },
+  "execution_rules": {
+    "parent_branch": "codex/graph-interaction-architecture",
+    "branch": "codex/graph-six-layer-architecture",
+    "smoke_check": "npm run test --workspace=@llm-wiki/graph-engine",
+    "commit_each_verified_task": true,
+    "no_commit_on_failed_verification": true,
+    "never_push_merge_or_amend": true,
+    "advance_after_verified_phase": true,
+    "no_user_confirmation_between_phases": true,
+    "only_flip_status_fields": true,
+    "no_new_dependencies_without_user_decision": true
+  },
+  "decision_log": [
+    {
+      "decision": "Use an L-level phased plan",
+      "reason": "The work spans graph-engine architecture, workbench integration, offline HTML, browser regression scripts, SpatialIndex, community wash behavior, and old renderer cleanup.",
+      "source": "spec-to-goal-plan sizing step",
+      "status": "recorded"
+    },
+    {
+      "decision": "Create a child implementation branch only when execution starts",
+      "reason": "The current step is document planning. Code implementation needs a dedicated branch from the current architecture branch so the previous work remains reviewable.",
+      "source": "user direction and AGENTS.md branch rule",
+      "status": "recorded"
+    },
+    {
+      "decision": "Keep DOM and SVG for this architecture pass",
+      "reason": "The known failures come from interaction ownership and browser default behavior, not proven rendering throughput limits.",
+      "source": "docs/spark/2026-06-16-graph-six-layer-architecture-design.md",
+      "status": "recorded"
+    },
+    {
+      "decision": "Reuse existing Node tests and browser regression scripts by default",
+      "reason": "The repo already has graph-engine tests and Playwright-driven regression scripts through npx; adding a new dependency is not required for the plan.",
+      "source": "repo inspection",
+      "status": "recorded"
+    },
+    {
+      "decision": "SpatialIndex must become the actual graph hit-testing source",
+      "reason": "The user explicitly wanted this recorded so it is not forgotten, and the design rejects interface-only completion.",
+      "source": "docs/spark/2026-06-16-graph-six-layer-architecture-design.md",
+      "status": "recorded"
+    },
+    {
+      "decision": "Keep static-renderer.ts only as a thin compatibility shell if it remains",
+      "reason": "The desired cleanup is deleting old renderer responsibilities, not forcing a risky filename deletion when a narrow shell preserves public API compatibility.",
+      "source": "design review and implementation surface inspection",
+      "status": "recorded"
+    }
+  ],
+  "phases": [
+    {
+      "id": "phase-0",
+      "goal": "Open the implementation branch and record the full interaction risk audit before changing behavior.",
+      "status": "pending",
+      "acceptance": [
+        {
+          "check": "Current branch is codex/graph-six-layer-architecture with no unrelated worktree changes.",
+          "status": "pending",
+          "evidence": []
+        },
+        {
+          "check": "npm run test --workspace=@llm-wiki/graph-engine exits 0 before feature work begins.",
+          "status": "pending",
+          "evidence": []
+        },
+        {
+          "check": "The interaction risk audit names expected behavior, owner layer, verification method, and target phase for every listed risk.",
+          "status": "pending",
+          "evidence": []
+        },
+        {
+          "check": "A clean-start progress commit is recorded before implementation code changes.",
+          "status": "pending",
+          "evidence": []
+        }
+      ],
+      "tasks": [
+        {
+          "id": "0.1",
+          "title": "Create implementation branch and clean-start progress commit",
+          "status": "pending",
+          "verification": [],
+          "commit": null
+        },
+        {
+          "id": "0.2",
+          "title": "Write the graph interaction risk audit",
+          "status": "pending",
+          "verification": [],
+          "commit": null
+        },
+        {
+          "id": "0.3",
+          "title": "Map existing and missing test coverage to target phases",
+          "status": "pending",
+          "verification": [],
+          "commit": null
+        }
+      ]
+    },
+    {
+      "id": "phase-1",
+      "goal": "Create GraphFacade and make the six architecture owners explicit while preserving public API compatibility.",
+      "status": "pending",
+      "acceptance": [
+        {
+          "check": "createGraphEngine remains compatible for workbench and offline HTML callers.",
+          "status": "pending",
+          "evidence": []
+        },
+        {
+          "check": "GraphFacade is the only layer that knows both graph internals and host callbacks.",
+          "status": "pending",
+          "evidence": []
+        },
+        {
+          "check": "Boundary tests prove renderer modules do not own host callbacks or gesture meaning.",
+          "status": "pending",
+          "evidence": []
+        },
+        {
+          "check": "npm run test, typecheck, and build for @llm-wiki/graph-engine exit 0, and @llm-wiki-agent/web typecheck exits 0.",
+          "status": "pending",
+          "evidence": []
+        }
+      ],
+      "tasks": [
+        {
+          "id": "1.1",
+          "title": "Extract GraphFacade around the current public graph engine API",
+          "status": "pending",
+          "verification": [],
+          "commit": null
+        },
+        {
+          "id": "1.2",
+          "title": "Declare the six owner layers in code exports and tests",
+          "status": "pending",
+          "verification": [],
+          "commit": null
+        },
+        {
+          "id": "1.3",
+          "title": "Add facade and renderer boundary tests",
+          "status": "pending",
+          "verification": [],
+          "commit": null
+        }
+      ]
+    },
+    {
+      "id": "phase-2",
+      "goal": "Make GraphGestures the sole raw input and browser-default policy owner.",
+      "status": "pending",
+      "acceptance": [
+        {
+          "check": "Graph-owned wheel, trackpad-like wheel, pointer, and keyboard behavior is routed through GraphGestures.",
+          "status": "pending",
+          "evidence": []
+        },
+        {
+          "check": "Graph-owned surfaces do not trigger browser page zoom, native text selection, or native drag selection.",
+          "status": "pending",
+          "evidence": []
+        },
+        {
+          "check": "Fast node drag release persists the final released position.",
+          "status": "pending",
+          "evidence": []
+        },
+        {
+          "check": "Workbench and offline browser regressions exit 0.",
+          "status": "pending",
+          "evidence": []
+        }
+      ],
+      "tasks": [
+        {
+          "id": "2.1",
+          "title": "Move root wheel, pointer, and keyboard event ownership into GraphGestures controller",
+          "status": "pending",
+          "verification": [],
+          "commit": null
+        },
+        {
+          "id": "2.2",
+          "title": "Implement graph-owned browser default behavior policy",
+          "status": "pending",
+          "verification": [],
+          "commit": null
+        },
+        {
+          "id": "2.3",
+          "title": "Commit fast-release drag using final intent coordinates",
+          "status": "pending",
+          "verification": [],
+          "commit": null
+        },
+        {
+          "id": "2.4",
+          "title": "Cover cancellation and blocker boundaries in tests and browser scripts",
+          "status": "pending",
+          "verification": [],
+          "commit": null
+        }
+      ]
+    },
+    {
+      "id": "phase-3",
+      "goal": "Close coordinate and runtime state loops through GraphViewport and GraphState.",
+      "status": "pending",
+      "acceptance": [
+        {
+          "check": "No old renderer-local coordinate formulas drive graph behavior.",
+          "status": "pending",
+          "evidence": []
+        },
+        {
+          "check": "Hover, selection, focus, active drag, pins, and viewport have one GraphState-owned path.",
+          "status": "pending",
+          "evidence": []
+        },
+        {
+          "check": "Hover and edge previews stay attached after zoom, pan, drag, and drawer resize.",
+          "status": "pending",
+          "evidence": []
+        },
+        {
+          "check": "Workbench and offline browser regressions exit 0.",
+          "status": "pending",
+          "evidence": []
+        }
+      ],
+      "tasks": [
+        {
+          "id": "3.1",
+          "title": "Remove renderer-local coordinate calculations that bypass GraphViewport",
+          "status": "pending",
+          "verification": [],
+          "commit": null
+        },
+        {
+          "id": "3.2",
+          "title": "Drive hover, selection, focus, drag, pins, and viewport from GraphState snapshots",
+          "status": "pending",
+          "verification": [],
+          "commit": null
+        },
+        {
+          "id": "3.3",
+          "title": "Handle graph data refresh while dragging without stale state",
+          "status": "pending",
+          "verification": [],
+          "commit": null
+        },
+        {
+          "id": "3.4",
+          "title": "Verify projected overlays after zoom, pan, drag, and drawer resize",
+          "status": "pending",
+          "verification": [],
+          "commit": null
+        }
+      ]
+    },
+    {
+      "id": "phase-4",
+      "goal": "Split GraphRenderer into focused drawing modules and slim static-renderer.ts into a compatibility shell.",
+      "status": "pending",
+      "acceptance": [
+        {
+          "check": "Renderer modules receive snapshots or render models and draw only.",
+          "status": "pending",
+          "evidence": []
+        },
+        {
+          "check": "static-renderer.ts no longer binds root graph wheel, pointer, or dblclick listeners.",
+          "status": "pending",
+          "evidence": []
+        },
+        {
+          "check": "Renderer boundary tests prevent renderer modules from owning gesture meaning or host callbacks.",
+          "status": "pending",
+          "evidence": []
+        },
+        {
+          "check": "graph-engine test, typecheck, and build exit 0.",
+          "status": "pending",
+          "evidence": []
+        }
+      ],
+      "tasks": [
+        {
+          "id": "4.1",
+          "title": "Extract node, edge, community wash, minimap, and overlay drawing modules",
+          "status": "pending",
+          "verification": [],
+          "commit": null
+        },
+        {
+          "id": "4.2",
+          "title": "Extract toolbar, search, legend, and offline reader drawing modules",
+          "status": "pending",
+          "verification": [],
+          "commit": null
+        },
+        {
+          "id": "4.3",
+          "title": "Reduce static-renderer.ts to composition and compatibility only",
+          "status": "pending",
+          "verification": [],
+          "commit": null
+        },
+        {
+          "id": "4.4",
+          "title": "Add renderer boundary checks",
+          "status": "pending",
+          "verification": [],
+          "commit": null
+        }
+      ]
+    },
+    {
+      "id": "phase-5",
+      "goal": "Make SpatialIndex the real graph hit-testing source.",
+      "status": "pending",
+      "acceptance": [
+        {
+          "check": "SpatialIndex covers node, edge, community wash, blank, overlap priority, and out-of-world cases.",
+          "status": "pending",
+          "evidence": []
+        },
+        {
+          "check": "GraphGestures uses SpatialIndex for graph-owned object hits.",
+          "status": "pending",
+          "evidence": []
+        },
+        {
+          "check": "DOM stacking order no longer determines graph object intent.",
+          "status": "pending",
+          "evidence": []
+        },
+        {
+          "check": "Workbench and offline browser regressions exit 0.",
+          "status": "pending",
+          "evidence": []
+        }
+      ],
+      "tasks": [
+        {
+          "id": "5.1",
+          "title": "Implement SpatialIndex with 96 world-unit grid cells",
+          "status": "pending",
+          "verification": [],
+          "commit": null
+        },
+        {
+          "id": "5.2",
+          "title": "Run SpatialIndex beside old hit classification and resolve mismatches",
+          "status": "pending",
+          "verification": [],
+          "commit": null
+        },
+        {
+          "id": "5.3",
+          "title": "Switch graph-owned hit testing to SpatialIndex",
+          "status": "pending",
+          "verification": [],
+          "commit": null
+        },
+        {
+          "id": "5.4",
+          "title": "Delete or isolate old DOM-order graph hit classification",
+          "status": "pending",
+          "verification": [],
+          "commit": null
+        }
+      ]
+    },
+    {
+      "id": "phase-6",
+      "goal": "Complete community wash soft-boundary behavior.",
+      "status": "pending",
+      "acceptance": [
+        {
+          "check": "Dragged or pinned outliers influence wash shape only within caps.",
+          "status": "pending",
+          "evidence": []
+        },
+        {
+          "check": "Nodes can be dragged outside community washes without changing membership.",
+          "status": "pending",
+          "evidence": []
+        },
+        {
+          "check": "Node hits outrank community wash hits, and community hits outrank blank hits.",
+          "status": "pending",
+          "evidence": []
+        },
+        {
+          "check": "Community wash, workbench, and offline browser regressions exit 0.",
+          "status": "pending",
+          "evidence": []
+        }
+      ],
+      "tasks": [
+        {
+          "id": "6.1",
+          "title": "Lock community wash cap fixtures",
+          "status": "pending",
+          "verification": [],
+          "commit": null
+        },
+        {
+          "id": "6.2",
+          "title": "Apply bounded outlier influence without membership mutation",
+          "status": "pending",
+          "verification": [],
+          "commit": null
+        },
+        {
+          "id": "6.3",
+          "title": "Use SpatialIndex priority for node, community, and blank hits",
+          "status": "pending",
+          "verification": [],
+          "commit": null
+        },
+        {
+          "id": "6.4",
+          "title": "Verify wash behavior in workbench and offline browser paths",
+          "status": "pending",
+          "verification": [],
+          "commit": null
+        }
+      ]
+    },
+    {
+      "id": "phase-7",
+      "goal": "Remove old interaction paths and complete dual-target final verification.",
+      "status": "pending",
+      "acceptance": [
+        {
+          "check": "Full verification command set exits 0.",
+          "status": "pending",
+          "evidence": []
+        },
+        {
+          "check": "static-renderer.ts no longer owns raw graph interaction, coordinate conversion, or graph hit testing.",
+          "status": "pending",
+          "evidence": []
+        },
+        {
+          "check": "Workbench and offline browser evidence artifacts are recorded.",
+          "status": "pending",
+          "evidence": []
+        },
+        {
+          "check": "Progress file records completed overall status and residual risk.",
+          "status": "pending",
+          "evidence": []
+        }
+      ],
+      "tasks": [
+        {
+          "id": "7.1",
+          "title": "Delete old renderer-owned interaction, coordinate, hit-test, and hidden-state paths",
+          "status": "pending",
+          "verification": [],
+          "commit": null
+        },
+        {
+          "id": "7.2",
+          "title": "Refresh browser regression evidence for desktop, narrow, and offline fixtures",
+          "status": "pending",
+          "verification": [],
+          "commit": null
+        },
+        {
+          "id": "7.3",
+          "title": "Run final verification command set",
+          "status": "pending",
+          "verification": [],
+          "commit": null
+        },
+        {
+          "id": "7.4",
+          "title": "Mark plan complete and record residual risk",
+          "status": "pending",
+          "verification": [],
+          "commit": null
+        }
+      ]
+    }
+  ],
+  "residual_risk": [],
+  "turn_log": []
+}
