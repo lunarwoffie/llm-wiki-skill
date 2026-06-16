@@ -3,8 +3,8 @@
   "status": {
     "overall": "pending",
     "phase": "phase-2",
-    "task": "2.3",
-    "next_allowed_action": "Run the baseline smoke check, then commit fast-release drag using final intent coordinates for task 2.3."
+    "task": "2.4",
+    "next_allowed_action": "Run the baseline smoke check, then limit keyboard ownership to graph focus and active gestures for task 2.4."
   },
   "execution_rules": {
     "parent_branch": "codex/graph-interaction-architecture",
@@ -329,8 +329,13 @@
         },
         {
           "check": "Fast node drag release persists the final released position.",
-          "status": "pending",
-          "evidence": []
+          "status": "passed",
+          "evidence": [
+            "commitGraphNodeDrag accepts a finalWorldPoint and applies it to the simulation before ending and pinning the drag.",
+            "static-renderer passes the pointerup-derived node drag target into commitGraphNodeDrag, so a missing final pointermove cannot commit an old position.",
+            "node-drag-lifecycle.test.ts covers committing a fast release after the last move point differs from the final pointer target.",
+            "tests/graph-default-behavior.regression-1.sh records a browser fast-release drag where the node pins at the release point, not the intermediate move point."
+          ]
         },
         {
           "check": "Workbench and offline browser regressions exit 0 with page zoom metrics recorded.",
@@ -398,9 +403,35 @@
         {
           "id": "2.3",
           "title": "Commit fast-release drag using final intent coordinates",
-          "status": "pending",
-          "verification": [],
-          "commit": null
+          "status": "completed",
+          "verification": [
+            {
+              "command": "node --import tsx --test packages/graph-engine/test/node-drag-lifecycle.test.ts",
+              "result": "4 tests passed, 0 failed",
+              "status": "passed"
+            },
+            {
+              "command": "npm run test --workspace=@llm-wiki/graph-engine",
+              "result": "215 tests passed, 0 failed",
+              "status": "passed"
+            },
+            {
+              "command": "npm run typecheck --workspace=@llm-wiki/graph-engine",
+              "result": "tsc -p tsconfig.json --noEmit exited 0",
+              "status": "passed"
+            },
+            {
+              "command": "npm run build --workspace=@llm-wiki/graph-engine",
+              "result": "vite build and declaration emit exited 0",
+              "status": "passed"
+            },
+            {
+              "command": "bash tests/graph-default-behavior.regression-1.sh",
+              "result": "PASS: graph default behavior regression; fast-release evidence pinned node A at the release point after only an intermediate pointermove.",
+              "status": "passed"
+            }
+          ],
+          "commit": "2321248"
         },
         {
           "id": "2.4",
