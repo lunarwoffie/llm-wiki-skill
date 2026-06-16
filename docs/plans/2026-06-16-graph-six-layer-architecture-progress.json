@@ -4,7 +4,7 @@
     "overall": "pending",
     "phase": "phase-1",
     "task": "1.3",
-    "next_allowed_action": "Run the baseline smoke check, then implement the SpatialIndex facade using d3-quadtree for task 1.3."
+    "next_allowed_action": "Run the baseline smoke check, then add interaction contract tests independent of DOM stacking order for task 1.4."
   },
   "execution_rules": {
     "parent_branch": "codex/graph-interaction-architecture",
@@ -190,8 +190,12 @@
         },
         {
           "check": "SpatialIndex covers node, edge, community wash, blank, overlap priority, and out-of-world cases.",
-          "status": "pending",
-          "evidence": []
+          "status": "passed",
+          "evidence": [
+            "packages/graph-engine/src/layout/spatial-index.ts implements GraphSpatialIndex using d3-quadtree for node candidates and a unified hitTest API for node, edge, community wash, and graph blank targets.",
+            "packages/graph-engine/test/spatial-index.test.ts covers node bounds, edge tolerance, community ellipse hits, blank fallback, node-over-edge/community priority, edge-over-community priority, nodes outside the old 1000x680 world, and drag/pin rebuild behavior.",
+            "GraphSpatialIndex snapshots node coordinates at construction so moving nodes requires an explicit rebuild instead of mutating quadtree coordinates in place."
+          ]
         },
         {
           "check": "Graph-owned target and blocker contracts are covered without relying on DOM stacking order.",
@@ -204,8 +208,12 @@
         },
         {
           "check": "graph-engine test, typecheck, and build exit 0.",
-          "status": "pending",
-          "evidence": []
+          "status": "passed",
+          "evidence": [
+            "npm run test --workspace=@llm-wiki/graph-engine -> 208 tests passed, 0 failed",
+            "npm run typecheck --workspace=@llm-wiki/graph-engine -> tsc -p tsconfig.json --noEmit exited 0",
+            "npm run build --workspace=@llm-wiki/graph-engine -> vite build and declaration emit exited 0"
+          ]
         }
       ],
       "tasks": [
@@ -253,9 +261,25 @@
         {
           "id": "1.3",
           "title": "Implement SpatialIndex facade using d3-quadtree for node search",
-          "status": "pending",
-          "verification": [],
-          "commit": null
+          "status": "completed",
+          "verification": [
+            {
+              "command": "npm run test --workspace=@llm-wiki/graph-engine",
+              "result": "208 tests passed, 0 failed",
+              "status": "passed"
+            },
+            {
+              "command": "npm run typecheck --workspace=@llm-wiki/graph-engine",
+              "result": "tsc -p tsconfig.json --noEmit exited 0",
+              "status": "passed"
+            },
+            {
+              "command": "npm run build --workspace=@llm-wiki/graph-engine",
+              "result": "vite build and declaration emit exited 0",
+              "status": "passed"
+            }
+          ],
+          "commit": "4d14401"
         },
         {
           "id": "1.4",
