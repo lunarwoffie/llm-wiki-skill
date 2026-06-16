@@ -3,8 +3,8 @@
   "status": {
     "overall": "pending",
     "phase": "phase-0",
-    "task": "0.2",
-    "next_allowed_action": "Execute phase-0 task 0.2: record pure regression probe shape and commit only passing helpers. Start by reading the progress file and running git log --oneline -15 plus npm run test --workspace=@llm-wiki/graph-engine."
+    "task": "0.3",
+    "next_allowed_action": "Execute phase-0 task 0.3: record workbench and offline HTML baseline behavior. Start by reading the progress file and running git log --oneline -15 plus npm run test --workspace=@llm-wiki/graph-engine."
   },
   "execution_rules": {
     "branch": "codex/graph-interaction-architecture",
@@ -48,7 +48,8 @@
           "status": "completed",
           "evidence": [
             "Recorded five regressions in task 0.1 verification: community wash wheel, node wheel, drag jump under zoom/pan, node movement constrained by mixed clamp/input handling, and hover/edge preview drift.",
-            "Each regression includes current trigger/cause, expected target behavior, and target phase in the execution plan: phases 3, 4, and 5."
+            "Each regression includes current trigger/cause, expected target behavior, and target phase in the execution plan: phases 3, 4, and 5.",
+            "Task 0.2 recorded the pure test probe shapes that will cover those regressions in geometry.test.ts, gestures.test.ts, overlays tests, and render-model fixtures without adding premature failing assertions."
           ]
         },
         {
@@ -100,8 +101,18 @@
         {
           "id": "0.2",
           "title": "Record pure regression probe shape and commit only passing helpers",
-          "status": "pending",
-          "verification": [],
+          "status": "completed",
+          "verification": [
+            "Read progress file and plan; current unit was phase-0 task 0.2.",
+            "git log --oneline -15 exited 0 after task 0.1 commits; branch head was c7100f7 docs: record graph baseline commit before task 0.2 progress update.",
+            "npm run test --workspace=@llm-wiki/graph-engine exited 0 before task 0.2 recording: 41 suites, 150 tests, 150 pass, 0 fail.",
+            "Current graph-engine test runner confirmed from packages/graph-engine/package.json: node --import tsx --test test/*.test.ts; future probe files must match packages/graph-engine/test/*.test.ts.",
+            "geometry.test.ts probe shape recorded for phase 1: worldPointToScreenPoint and screenPointToWorldPoint inverse checks under scale 0.5, 1, and 2.25; viewport pan/zoom projection; drawer/host resize anchor behavior; root client point to graph screen point; screen point to world point without silent drag-target clamping; explicit client/screen/world/layer/svg/minimap coordinate naming.",
+            "gestures.test.ts probe shape recorded for phase 3: wheel over blank, node, community wash, and edge returns zoom; wheel over search, toolbar, legend, drawer, minimap, and text editing control returns blocked; pointerdown over node returns node drag candidate; pointerdown over community wash returns community click candidate without blocking wheel; pointerdown over blank returns blank pan candidate.",
+            "gesture state-machine probe shape recorded for phase 3: click-vs-drag threshold, node drag start/move/end intents, no drawer click after drag, community click cancellation after movement threshold, pointercancel and lostpointercapture cleanup, and shared handling for mouse wheel and touchpad scroll.",
+            "overlay and wash probe shape recorded for phase 5 follow-through: projected node hover anchor, projected edge midpoint anchor, preview bounds after viewport/drawer resize, community wash non-fence behavior, and capped outlier wash response fixtures.",
+            "No test helper or fixture was created in task 0.2 because no passing helper is needed before Geometry/Gesture modules exist; this avoids committing empty scaffolding or failing regression assertions ahead of the implementation phase."
+          ],
           "commit": null
         },
         {
@@ -417,6 +428,17 @@
         "Recorded public API, workbench usage, offline HTML usage, and current root-cause baselines for the known graph interaction regressions.",
         "Advanced current task pointer to phase-0 task 0.2; phase-0 remains pending because 0.2 and 0.3 are not complete.",
         "Committed verified task 0.1 as 66d1f265d442b817c09c7c80e4a0b7bb9dcb4ad3."
+      ]
+    },
+    {
+      "turn": "phase-0-task-0.2",
+      "status": "completed",
+      "evidence": [
+        "Read progress file and plan; current unit was phase-0 task 0.2.",
+        "Ran git log --oneline -15 and npm run test --workspace=@llm-wiki/graph-engine before changing progress; both exited 0, with graph-engine reporting 150 passing tests.",
+        "Recorded the future pure regression probe shape for Geometry, Gestures, gesture state-machine cleanup, overlays, and capped community wash fixtures.",
+        "Created no helper or fixture because current modules do not yet exist and empty scaffolding would not improve verification.",
+        "Advanced current task pointer to phase-0 task 0.3; phase-0 remains pending because browser/offline baseline evidence is not complete."
       ]
     }
   ]
