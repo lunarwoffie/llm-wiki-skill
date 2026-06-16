@@ -13,6 +13,10 @@ export type GraphGestureTargetKind =
   | "text-control"
   | "unknown";
 
+export type GraphOwnedTargetKind = "graph-blank" | "node" | "community-wash" | "edge";
+export type GraphGestureBlockerTargetKind = Exclude<GraphGestureTargetKind, GraphOwnedTargetKind>;
+export type GraphGestureTargetOwnership = "graph-owned" | "graph-blocker";
+
 export interface GraphGestureTargetLike {
   closest?: (selector: string) => GraphGestureTargetLike | null;
   dataset?: Record<string, string | undefined>;
@@ -33,6 +37,29 @@ export type GraphGestureTarget =
   | { kind: "drawer" }
   | { kind: "text-control" }
   | { kind: "unknown" };
+
+export const GRAPH_OWNED_TARGET_KINDS = ["graph-blank", "node", "community-wash", "edge"] as const satisfies readonly GraphOwnedTargetKind[];
+export const GRAPH_GESTURE_BLOCKER_TARGET_KINDS = [
+  "minimap",
+  "toolbar",
+  "search",
+  "legend",
+  "drawer",
+  "text-control",
+  "unknown"
+] as const satisfies readonly GraphGestureBlockerTargetKind[];
+
+export const GRAPH_GESTURE_SELECTORS = {
+  textControl: "textarea, select, [contenteditable=\"true\"], [data-graph-text-control=\"true\"]",
+  search: ".graph-search",
+  toolbar: ".graph-toolbar",
+  legend: ".community-legend",
+  drawer: ".graph-reader, .graph-selection-panel, [data-graph-drawer=\"true\"]",
+  minimap: ".mini-map",
+  node: ".node",
+  communityWash: ".community-wash",
+  edge: ".edge"
+} as const;
 
 export type GraphWheelTargetDecision =
   | { intent: "zoom"; target: GraphGestureTarget }
@@ -107,50 +134,45 @@ export type GraphGestureIntent =
   | { kind: "blank-pan-end"; pointerId: number; screenPoint: { x: number; y: number } }
   | { kind: "blank-pan-cancel"; pointerId: number; reason: "pointercancel" | "lostpointercapture" | "escape" };
 
-const TEXT_CONTROL_SELECTOR = "textarea, select, [contenteditable=\"true\"], [data-graph-text-control=\"true\"]";
-
-const SEARCH_SELECTOR = ".graph-search";
-const TOOLBAR_SELECTOR = ".graph-toolbar";
-const LEGEND_SELECTOR = ".community-legend";
-const DRAWER_SELECTOR = ".graph-reader, .graph-selection-panel, [data-graph-drawer=\"true\"]";
-const MINIMAP_SELECTOR = ".mini-map";
-const NODE_SELECTOR = ".node";
-const COMMUNITY_WASH_SELECTOR = ".community-wash";
-const EDGE_SELECTOR = ".edge";
-
 export function classifyGraphEventTarget(target: GraphGestureTargetLike | null | undefined): GraphGestureTarget {
   if (!target) return { kind: "unknown" };
-  if (isTextEditingTarget(target) || closest(target, TEXT_CONTROL_SELECTOR)) return { kind: "text-control" };
-  if (closest(target, SEARCH_SELECTOR)) return { kind: "search" };
-  if (closest(target, LEGEND_SELECTOR)) return { kind: "legend" };
-  if (closest(target, TOOLBAR_SELECTOR)) return { kind: "toolbar" };
-  if (closest(target, DRAWER_SELECTOR)) return { kind: "drawer" };
-  if (closest(target, MINIMAP_SELECTOR)) return { kind: "minimap" };
+  if (isTextEditingTarget(target) || closest(target, GRAPH_GESTURE_SELECTORS.textControl)) return { kind: "text-control" };
+  if (closest(target, GRAPH_GESTURE_SELECTORS.search)) return { kind: "search" };
+  if (closest(target, GRAPH_GESTURE_SELECTORS.legend)) return { kind: "legend" };
+  if (closest(target, GRAPH_GESTURE_SELECTORS.toolbar)) return { kind: "toolbar" };
+  if (closest(target, GRAPH_GESTURE_SELECTORS.drawer)) return { kind: "drawer" };
+  if (closest(target, GRAPH_GESTURE_SELECTORS.minimap)) return { kind: "minimap" };
 
-  const node = closest(target, NODE_SELECTOR);
+  const node = closest(target, GRAPH_GESTURE_SELECTORS.node);
   if (node) return { kind: "node", id: dataValue(node, "id", "nodeId") };
 
-  const communityWash = closest(target, COMMUNITY_WASH_SELECTOR);
+  const communityWash = closest(target, GRAPH_GESTURE_SELECTORS.communityWash);
   if (communityWash) return { kind: "community-wash", id: dataValue(communityWash, "communityId", "id") };
 
-  const edge = closest(target, EDGE_SELECTOR);
+  const edge = closest(target, GRAPH_GESTURE_SELECTORS.edge);
   if (edge) return { kind: "edge", id: dataValue(edge, "edgeId", "id") };
 
   return { kind: "graph-blank" };
 }
 
+export function graphGestureTargetOwnership(target: GraphGestureTarget): GraphGestureTargetOwnership {
+  return isGraphOwnedGestureTarget(target) ? "graph-owned" : "graph-blocker";
+}
+
+export function isGraphOwnedGestureTarget(target: GraphGestureTarget): target is Extract<GraphGestureTarget, { kind: GraphOwnedTargetKind }> {
+  return (GRAPH_OWNED_TARGET_KINDS as readonly GraphGestureTargetKind[]).includes(target.kind);
+}
+
+export function isGraphGestureBlockerTarget(target: GraphGestureTarget): target is Extract<GraphGestureTarget, { kind: GraphGestureBlockerTargetKind }> {
+  return !isGraphOwnedGestureTarget(target);
+}
+
 export function classifyGraphWheelTarget(target: GraphGestureTargetLike | null | undefined, event: GraphWheelEventLike = {}): GraphWheelTargetDecision {
   const graphTarget = classifyGraphEventTarget(target);
   if (event.ctrlKey || event.metaKey) return { intent: "blocked", target: graphTarget };
-  switch (graphTarget.kind) {
-    case "graph-blank":
-    case "node":
-    case "community-wash":
-    case "edge":
-      return { intent: "zoom", target: graphTarget };
-    default:
-      return { intent: "blocked", target: graphTarget };
-  }
+  return isGraphOwnedGestureTarget(graphTarget)
+    ? { intent: "zoom", target: graphTarget }
+    : { intent: "blocked", target: graphTarget };
 }
 
 export function classifyGraphPointerDownTarget(target: GraphGestureTargetLike | null | undefined): GraphPointerDownTargetDecision {

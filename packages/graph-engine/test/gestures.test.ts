@@ -2,10 +2,17 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  GRAPH_GESTURE_BLOCKER_TARGET_KINDS,
+  GRAPH_GESTURE_SELECTORS,
+  GRAPH_OWNED_TARGET_KINDS,
   GraphGestureStateMachine,
   classifyGraphEventTarget,
   classifyGraphPointerDownTarget,
   classifyGraphWheelTarget,
+  graphGestureTargetOwnership,
+  isGraphGestureBlockerTarget,
+  isGraphOwnedGestureTarget,
+  type GraphGestureTarget,
   type GraphGestureTargetLike
 } from "../src/render";
 
@@ -39,6 +46,51 @@ class FakeTarget implements GraphGestureTargetLike {
 }
 
 describe("graph gesture target classifier", () => {
+  it("declares graph-owned targets and gesture blockers as a stable contract", () => {
+    assert.deepEqual([...GRAPH_OWNED_TARGET_KINDS], ["graph-blank", "node", "community-wash", "edge"]);
+    assert.deepEqual([...GRAPH_GESTURE_BLOCKER_TARGET_KINDS], [
+      "minimap",
+      "toolbar",
+      "search",
+      "legend",
+      "drawer",
+      "text-control",
+      "unknown"
+    ]);
+    assert.equal(GRAPH_GESTURE_SELECTORS.node, ".node");
+    assert.equal(GRAPH_GESTURE_SELECTORS.communityWash, ".community-wash");
+    assert.equal(GRAPH_GESTURE_SELECTORS.drawer, ".graph-reader, .graph-selection-panel, [data-graph-drawer=\"true\"]");
+  });
+
+  it("classifies graph-owned targets separately from gesture blockers", () => {
+    const graphOwnedTargets: GraphGestureTarget[] = [
+      { kind: "graph-blank" },
+      { kind: "node", id: "node-a" },
+      { kind: "community-wash", id: "community-a" },
+      { kind: "edge", id: "edge-a" }
+    ];
+    const blockerTargets: GraphGestureTarget[] = [
+      { kind: "minimap" },
+      { kind: "toolbar" },
+      { kind: "search" },
+      { kind: "legend" },
+      { kind: "drawer" },
+      { kind: "text-control" },
+      { kind: "unknown" }
+    ];
+
+    for (const target of graphOwnedTargets) {
+      assert.equal(isGraphOwnedGestureTarget(target), true);
+      assert.equal(isGraphGestureBlockerTarget(target), false);
+      assert.equal(graphGestureTargetOwnership(target), "graph-owned");
+    }
+    for (const target of blockerTargets) {
+      assert.equal(isGraphOwnedGestureTarget(target), false);
+      assert.equal(isGraphGestureBlockerTarget(target), true);
+      assert.equal(graphGestureTargetOwnership(target), "graph-blocker");
+    }
+  });
+
   it("classifies graph target kinds and ids without a DOM dependency", () => {
     assert.deepEqual(classifyGraphEventTarget(blankTarget()), { kind: "graph-blank" });
 

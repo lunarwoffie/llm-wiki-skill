@@ -38,14 +38,28 @@ export {
 export type { GraphToolbarPanelState, GraphToolbarStorage } from "./toolbar";
 export { createStaticGraphRenderer } from "./static-renderer";
 export type { StaticGraphRenderer } from "./static-renderer";
-export { GraphGestureStateMachine, classifyGraphEventTarget, classifyGraphPointerDownTarget, classifyGraphWheelTarget } from "./gestures";
+export {
+  GRAPH_GESTURE_BLOCKER_TARGET_KINDS,
+  GRAPH_GESTURE_SELECTORS,
+  GRAPH_OWNED_TARGET_KINDS,
+  GraphGestureStateMachine,
+  classifyGraphEventTarget,
+  classifyGraphPointerDownTarget,
+  classifyGraphWheelTarget,
+  graphGestureTargetOwnership,
+  isGraphGestureBlockerTarget,
+  isGraphOwnedGestureTarget
+} from "./gestures";
 export type {
+  GraphGestureBlockerTargetKind,
   GraphGestureActiveState,
   GraphGestureIntent,
   GraphGestureStateMachineOptions,
+  GraphGestureTargetOwnership,
   GraphGestureTarget,
   GraphGestureTargetKind,
   GraphGestureTargetLike,
+  GraphOwnedTargetKind,
   GraphPointerEventLike,
   GraphPointerDownTargetDecision,
   GraphWheelEventLike,
