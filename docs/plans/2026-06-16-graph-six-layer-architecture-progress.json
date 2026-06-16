@@ -2,9 +2,9 @@
   "plan": "docs/plans/2026-06-16-graph-six-layer-architecture-phased-plan.md",
   "status": {
     "overall": "pending",
-    "phase": "phase-5",
-    "task": "5.4",
-    "next_allowed_action": "Add renderer boundary checks for task 5.4."
+    "phase": "phase-6",
+    "task": "6.1",
+    "next_allowed_action": "Begin Phase 6 community wash soft-boundary behavior."
   },
   "execution_rules": {
     "parent_branch": "codex/graph-interaction-architecture",
@@ -1089,27 +1089,41 @@
     {
       "id": "phase-5",
       "goal": "Split GraphRenderer into focused drawing modules and slim static-renderer.ts into a compatibility shell.",
-      "status": "pending",
+      "status": "completed",
       "acceptance": [
         {
           "check": "Renderer modules receive snapshots or render models and draw only.",
-          "status": "pending",
-          "evidence": []
+          "status": "passed",
+          "evidence": [
+            "packages/graph-engine/src/render/nodes.ts, edges.ts, community-washes.ts, minimap.ts, overlays.ts, hover-card.ts own focused drawing helpers.",
+            "packages/graph-engine/test/renderer-boundary.test.ts now checks drawing modules do not own raw graph gesture policy."
+          ]
         },
         {
           "check": "static-renderer.ts no longer binds root graph wheel, pointer, or dblclick listeners.",
-          "status": "pending",
-          "evidence": []
+          "status": "passed",
+          "evidence": [
+            "! rg -n \"root\\.addEventListener\\(\\\"(wheel|pointerdown|pointermove|pointerup|pointercancel|lostpointercapture|dblclick)\" packages/graph-engine/src/render/static-renderer.ts exited 0.",
+            "GraphGestureController in packages/graph-engine/src/render/gestures.ts owns root wheel, pointer, lostpointercapture, and dblclick bindings."
+          ]
         },
         {
           "check": "Renderer boundary tests prevent renderer modules from owning gesture meaning or host callbacks using runtime contracts.",
-          "status": "pending",
-          "evidence": []
+          "status": "passed",
+          "evidence": [
+            "renderer-boundary.test.ts keeps host callback identifiers out of layout and renderer modules.",
+            "renderer-boundary.test.ts keeps graph object hit classification calls inside GraphGestures.",
+            "renderer-boundary.test.ts prevents drawing modules from attaching global graph gesture listeners at runtime."
+          ]
         },
         {
           "check": "graph-engine test, typecheck, and build exit 0.",
-          "status": "pending",
-          "evidence": []
+          "status": "passed",
+          "evidence": [
+            "npm run test --workspace=@llm-wiki/graph-engine -> 247 tests passed, 0 failed.",
+            "npm run typecheck --workspace=@llm-wiki/graph-engine exited 0.",
+            "npm run build --workspace=@llm-wiki/graph-engine exited 0."
+          ]
         }
       ],
       "tasks": [
@@ -1265,9 +1279,55 @@
         {
           "id": "5.4",
           "title": "Add renderer boundary checks",
-          "status": "pending",
-          "verification": [],
-          "commit": null
+          "status": "completed",
+          "verification": [
+            {
+              "command": "node --import tsx --test packages/graph-engine/test/renderer-boundary.test.ts",
+              "result": "5 tests passed, 0 failed",
+              "status": "passed"
+            },
+            {
+              "command": "npm run test --workspace=@llm-wiki/graph-engine",
+              "result": "247 tests passed, 0 failed",
+              "status": "passed"
+            },
+            {
+              "command": "npm run typecheck --workspace=@llm-wiki/graph-engine",
+              "result": "tsc -p tsconfig.json --noEmit exited 0",
+              "status": "passed"
+            },
+            {
+              "command": "git diff --check",
+              "result": "No whitespace errors",
+              "status": "passed"
+            },
+            {
+              "command": "npm run build --workspace=@llm-wiki/graph-engine",
+              "result": "vite build and declaration emit exited 0",
+              "status": "passed"
+            },
+            {
+              "command": "npm run typecheck --workspace=@llm-wiki-agent/web",
+              "result": "graph-engine prebuild and tsc -b --noEmit exited 0",
+              "status": "passed"
+            },
+            {
+              "command": "bash tests/graph-workbench-interactions.regression-1.sh",
+              "result": "First run failed at the community drag pointer-distance assertion, unchanged test-only diff; immediate rerun passed with PASS: graph workbench interaction regression.",
+              "status": "passed"
+            },
+            {
+              "command": "bash tests/graph-offline-phase-6.regression-1.sh",
+              "result": "PASS: phase 6 offline graph regression",
+              "status": "passed"
+            },
+            {
+              "command": "! rg -n \"root\\.addEventListener\\(\\\"(wheel|pointerdown|pointermove|pointerup|pointercancel|lostpointercapture|dblclick)\" packages/graph-engine/src/render/static-renderer.ts",
+              "result": "No root graph wheel, pointer, or dblclick listener binding remains in static-renderer.ts",
+              "status": "passed"
+            }
+          ],
+          "commit": "74994f2"
         }
       ]
     },
