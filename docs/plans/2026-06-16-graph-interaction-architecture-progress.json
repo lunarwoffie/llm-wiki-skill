@@ -2,9 +2,9 @@
   "plan": "docs/plans/2026-06-16-graph-interaction-architecture-phased-plan.md",
   "status": {
     "overall": "pending",
-    "phase": "phase-0",
-    "task": "0.3",
-    "next_allowed_action": "Execute phase-0 task 0.3: record workbench and offline HTML baseline behavior. Start by reading the progress file and running git log --oneline -15 plus npm run test --workspace=@llm-wiki/graph-engine."
+    "phase": "phase-1",
+    "task": "1.1",
+    "next_allowed_action": "Execute phase-1 task 1.1: create Geometry module with explicit coordinate spaces. Start by reading the progress file and running git log --oneline -15 plus npm run test --workspace=@llm-wiki/graph-engine."
   },
   "execution_rules": {
     "branch": "codex/graph-interaction-architecture",
@@ -41,7 +41,7 @@
     {
       "id": "phase-0",
       "goal": "Record baseline failures, public API, and repeatable regression probes",
-      "status": "pending",
+      "status": "completed",
       "acceptance": [
         {
           "check": "Known interaction regressions are recorded with trigger, current behavior, expected behavior, and target phase",
@@ -70,8 +70,13 @@
         },
         {
           "check": "Workbench and offline HTML baseline behavior is recorded",
-          "status": "pending",
-          "evidence": []
+          "status": "completed",
+          "evidence": [
+            "Workbench baseline recorded from isolated http://127.0.0.1:5181/ against backend 8787 using AI学习知识库; evidence JSON /tmp/llm-wiki-graph-workbench-baseline.json, screenshot /tmp/llm-wiki-graph-workbench-baseline.png.",
+            "Workbench evidence includes community/global graph snapshot, node hover, node drag, node click/right drawer, and wheel behavior over blank/node/community wash with concrete transform and offset values.",
+            "Offline baseline recorded from /tmp/llm-wiki-offline-basic-l2YCnx/graph-interactive-basic/wiki/knowledge-graph.html; evidence JSON /tmp/llm-wiki-graph-offline-baseline.json, screenshot /tmp/llm-wiki-graph-offline-baseline.png.",
+            "Offline evidence includes wheel, drag, hover, localStorage pin persistence, and built-in reader behavior."
+          ]
         }
       ],
       "tasks": [
@@ -118,8 +123,20 @@
         {
           "id": "0.3",
           "title": "Record workbench and offline HTML baseline behavior",
-          "status": "pending",
-          "verification": [],
+          "status": "completed",
+          "verification": [
+            "Read progress file and plan; current unit was phase-0 task 0.3.",
+            "git log --oneline -15 exited 0 after task 0.2 commits; branch head was d6ebaf7 docs: record graph probe commit before task 0.3 progress update.",
+            "npm run test --workspace=@llm-wiki/graph-engine exited 0 before browser/offline baseline recording: 41 suites, 150 tests, 150 pass, 0 fail.",
+            "Detected existing user/dev services on 5180 and 8787; reused backend 8787 and started an isolated temporary Vite frontend on 127.0.0.1:5181 only for task 0.3 evidence.",
+            "Workbench baseline used active knowledge base AI学习知识库 at /Users/kangjiaqi/Documents/AI学习知识库; graph snapshot recorded 88 nodes, 217 edges, and 9 community washes. Evidence JSON: /tmp/llm-wiki-graph-workbench-baseline.json. Screenshot: /tmp/llm-wiki-graph-workbench-baseline.png.",
+            "Workbench browser evidence on 1440x920: blank wheel changed transform=true, node wheel changed transform=true, community wash wheel changed transform=true.",
+            "Workbench hover evidence: preview opened=true, with preview offset from sampled node dx=420.15, dy=125.14; this records the current drift baseline for phase 5.",
+            "Workbench drag/click evidence: sampled drag moved node by dx=122.95, dy=74.89; drag opened drawer=false; subsequent node click opened drawer=true.",
+            "Offline HTML baseline generated in temporary directory /tmp/llm-wiki-offline-basic-l2YCnx; build output /tmp/llm-wiki-offline-basic-l2YCnx/graph-interactive-basic/wiki/knowledge-graph.html was non-empty and built from tests/fixtures/graph-interactive-basic with 3 nodes and 2 edges.",
+            "Offline browser evidence JSON: /tmp/llm-wiki-graph-offline-baseline.json. Screenshot: /tmp/llm-wiki-graph-offline-baseline.png. blank wheel changed transform=true, node wheel changed transform=true, hover opened=true, drag wrote localStorage pin=true, click opened built-in reader=true.",
+            "Temporary frontend on 127.0.0.1:5181 was stopped and lsof confirmed no listener remained on port 5181. The existing 5180/8787 services were not stopped."
+          ],
           "commit": null
         }
       ]
@@ -440,6 +457,18 @@
         "Created no helper or fixture because current modules do not yet exist and empty scaffolding would not improve verification.",
         "Advanced current task pointer to phase-0 task 0.3; phase-0 remains pending because browser/offline baseline evidence is not complete.",
         "Committed verified task 0.2 as 3cf8d0cd90e08ada7a86028036af4c358ca5e81a."
+      ]
+    },
+    {
+      "turn": "phase-0-task-0.3",
+      "status": "completed",
+      "evidence": [
+        "Read progress file and plan; current unit was phase-0 task 0.3.",
+        "Ran git log --oneline -15 and npm run test --workspace=@llm-wiki/graph-engine before changing progress; both exited 0, with graph-engine reporting 150 passing tests.",
+        "Recorded real workbench browser baseline from temporary frontend port 5181 against active AI学习知识库 on backend 8787.",
+        "Recorded offline HTML baseline from a temporary graph-interactive-basic copy and verified the generated knowledge-graph.html in Chrome.",
+        "Stopped the temporary 5181 dev server and confirmed no listener remained; existing 5180 and 8787 services were left untouched.",
+        "All phase-0 acceptance checks now pass, so phase-0 was marked completed and the progress pointer advanced to phase-1 task 1.1."
       ]
     }
   ]
