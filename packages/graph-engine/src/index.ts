@@ -1,5 +1,6 @@
 export * from "./types";
 export * from "./graph-node";
+export * from "./layout";
 export * from "./model";
 export * from "./render";
 export * from "./select";

@@ -39,6 +39,22 @@ export type { GraphToolbarPanelState, GraphToolbarStorage } from "./toolbar";
 export { createStaticGraphRenderer } from "./static-renderer";
 export type { StaticGraphRenderer } from "./static-renderer";
 export {
+  DEFAULT_GRAPH_EDGE_HIT_TOLERANCE,
+  DEFAULT_GRAPH_NODE_FALLBACK_RADIUS,
+  GraphSpatialIndex,
+  createGraphSpatialIndex
+} from "../layout";
+export type {
+  GraphSpatialCommunityLike,
+  GraphSpatialEdgeLike,
+  GraphSpatialHitKind,
+  GraphSpatialHitTarget,
+  GraphSpatialIndexInput,
+  GraphSpatialNodeLike,
+  GraphSpatialPoint,
+  GraphSpatialRect
+} from "../layout";
+export {
   GRAPH_GESTURE_BLOCKER_TARGET_KINDS,
   GRAPH_GESTURE_SELECTORS,
   GRAPH_OWNED_TARGET_KINDS,
