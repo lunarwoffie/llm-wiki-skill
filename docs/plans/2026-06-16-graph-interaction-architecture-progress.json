@@ -3,8 +3,8 @@
   "status": {
     "overall": "pending",
     "phase": "phase-5",
-    "task": "5.1",
-    "next_allowed_action": "Execute phase-5 task 5.1: extract hover and edge preview positioning through projected screen anchors. Start by reading the progress file and running git log --oneline -15 plus npm run test --workspace=@llm-wiki/graph-engine."
+    "task": "5.2",
+    "next_allowed_action": "Execute phase-5 task 5.2: make community wash non-blocking with threshold click behavior. Start by reading the progress file and running git log --oneline -15 plus npm run test --workspace=@llm-wiki/graph-engine."
   },
   "execution_rules": {
     "branch": "codex/graph-interaction-architecture",
@@ -535,8 +535,15 @@
       "acceptance": [
         {
           "check": "Hover and edge previews are positioned from projected screen anchors",
-          "status": "pending",
-          "evidence": []
+          "status": "completed",
+          "evidence": [
+            "packages/graph-engine/src/render/overlays.ts now owns node hover anchors, edge midpoint anchors, and bounded preview positioning from projected screen points.",
+            "static-renderer.ts no longer positions hover previews with root width/height percentage formulas; node and edge previews use current runtime viewport and viewport size.",
+            "commitViewport now refreshes motion overlays, so an already-open hover preview follows zoom and pan instead of staying at its old screen position.",
+            "packages/graph-engine/test/overlays.test.ts covers projected node anchors, projected edge midpoint anchors, missing edge endpoint fallback, and viewport bounds.",
+            "Headless Chrome verification against /tmp/llm-wiki-hover-w1JhOd/graph-interactive-basic/wiki/knowledge-graph.html confirmed node preview stayed anchored after wheel zoom: opened delta was x=18.0088, bottom=-24.0010; zoomed delta was x=17.8679, bottom=-24.1307.",
+            "Headless Chrome verification confirmed edge preview stayed anchored after wheel zoom: opened delta was x=16.0006, bottom=-16.0045; zoomed delta was x=16.0028, bottom=-15.9965."
+          ]
         },
         {
           "check": "Community wash never acts as wheel or drag fence",
@@ -553,9 +560,23 @@
         {
           "id": "5.1",
           "title": "Extract overlay positioning helpers",
-          "status": "pending",
-          "verification": [],
-          "commit": null
+          "status": "completed",
+          "verification": [
+            "Read progress file and plan; current unit was phase-5 task 5.1.",
+            "Ran git log --oneline -15 and npm run test --workspace=@llm-wiki/graph-engine before continuing; graph-engine tests exited 0.",
+            "Added overlay helpers for node hover anchors, edge hover anchors, and bounded preview positioning.",
+            "Replaced renderer-local hover percentage positioning with projected screen anchors from the shared Geometry/RuntimeState path.",
+            "Refreshed motion overlays on viewport commits so open hover previews follow zoom and pan.",
+            "Verified node --import tsx --test packages/graph-engine/test/overlays.test.ts exited 0: 4 tests passed.",
+            "Verified npm run test --workspace=@llm-wiki/graph-engine exited 0: 48 suites, 193 tests passed.",
+            "Verified npm run typecheck --workspace=@llm-wiki/graph-engine exited 0.",
+            "Verified npm run build --workspace=@llm-wiki/graph-engine exited 0 and generated both engine.esm.js and engine.iife.js.",
+            "Verified git diff --check exited 0.",
+            "Verified freshly generated offline HTML in headless Chrome using the local Chrome executable: node hover preview stayed anchored to node A before and after node wheel zoom; edge hover preview stayed anchored to edge e1 before and after edge wheel zoom.",
+            "Committed verified task 5.1 as e8b7015ea5c8a62ac0f8f8361be5111ddce8543b.",
+            "Advanced current task pointer to phase-5 task 5.2; phase-5 remains pending because community wash non-blocking behavior and capped wash response still need the planned tasks."
+          ],
+          "commit": "e8b7015ea5c8a62ac0f8f8361be5111ddce8543b"
         },
         {
           "id": "5.2",
@@ -812,6 +833,20 @@
         "Offline browser check confirmed: click wrote 0 pins, real drag wrote 1 pin, pointercancel wrote 0 pins and cleared drag state.",
         "Committed verified task 4.2 as 7d458e542037bf615e9bd17fe19c1c658164bd9e.",
         "All phase-4 acceptance checks now pass, so phase-4 was marked completed and the progress pointer advanced to phase-5 task 5.1."
+      ]
+    },
+    {
+      "turn": "phase-5-task-5.1",
+      "status": "completed",
+      "evidence": [
+        "Read progress file and plan; current unit was phase-5 task 5.1.",
+        "Added tested overlay helpers for node hover anchors, edge midpoint anchors, and bounded preview placement.",
+        "Replaced static renderer hover percentage positioning with projected screen anchors from current viewport state.",
+        "Refreshed motion overlays on viewport commits, so open previews follow wheel zoom and pan instead of freezing at the old screen position.",
+        "Verified overlay single-file test, full graph-engine test suite, graph-engine typecheck, graph-engine build, and git diff --check all exited 0.",
+        "Verified freshly generated offline HTML in headless Chrome: node preview stayed anchored after node wheel zoom and edge preview stayed anchored after edge wheel zoom.",
+        "Committed verified task 5.1 as e8b7015ea5c8a62ac0f8f8361be5111ddce8543b.",
+        "Advanced current task pointer to phase-5 task 5.2; phase-5 remains pending because community wash non-blocking behavior and capped wash response still need the planned tasks."
       ]
     }
   ]
