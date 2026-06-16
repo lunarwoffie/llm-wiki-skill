@@ -2045,6 +2045,11 @@ const STATIC_RENDERER_CSS = `
   min-height: 520px;
   height: 100%;
   overflow: hidden;
+  overscroll-behavior: contain;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-user-drag: none;
   color: var(--ink);
   font-family: var(--font-ui);
   background:
@@ -2087,6 +2092,9 @@ const STATIC_RENDERER_CSS = `
   transform: translateY(0);
 }
 .graph-search-input {
+  touch-action: auto;
+  user-select: text;
+  -webkit-user-select: text;
   min-width: 0;
   border: 1px solid color-mix(in srgb, var(--rule) 78%, transparent);
   border-radius: 8px;
@@ -2139,6 +2147,8 @@ const STATIC_RENDERER_CSS = `
   background: color-mix(in srgb, var(--surface) 58%, transparent);
 }
 .graph-toolbar-button {
+  user-select: none;
+  -webkit-user-select: none;
   min-height: 28px;
   border: 0;
   border-radius: 6px;
@@ -2360,6 +2370,9 @@ const STATIC_RENDERER_CSS = `
   padding: 14px;
   opacity: 0;
   pointer-events: none;
+  touch-action: auto;
+  user-select: text;
+  -webkit-user-select: text;
   transform: translateY(8px);
   transition: opacity .16s ease, transform .16s ease;
 }
@@ -2870,6 +2883,9 @@ const STATIC_RENDERER_CSS = `
   box-shadow: var(--soft-shadow);
   opacity: 0;
   pointer-events: none;
+  touch-action: auto;
+  user-select: text;
+  -webkit-user-select: text;
   transform: translateY(-4px);
   transition: opacity .18s ease, transform .18s ease;
 }
@@ -2920,6 +2936,9 @@ const STATIC_RENDERER_CSS = `
 .graph-reader-body {
   min-height: 0;
   overflow: auto;
+  touch-action: auto;
+  user-select: text;
+  -webkit-user-select: text;
   padding: 12px 14px 14px;
 }
 .graph-reader-source {

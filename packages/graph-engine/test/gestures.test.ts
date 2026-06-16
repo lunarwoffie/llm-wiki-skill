@@ -115,14 +115,22 @@ describe("graph gesture target classifier", () => {
     assert.equal(classifyGraphWheelTarget(edgeTarget("edge-a")).intent, "zoom");
   });
 
-  it("blocks browser zoom shortcut wheels instead of silently hijacking page zoom", () => {
+  it("routes browser zoom shortcut wheels to graph zoom on graph-owned targets", () => {
     assert.deepEqual(classifyGraphWheelTarget(nodeTarget("node-a"), { metaKey: true }), {
-      intent: "blocked",
+      intent: "zoom",
       target: { kind: "node", id: "node-a" }
     });
     assert.deepEqual(classifyGraphWheelTarget(blankTarget(), { ctrlKey: true }), {
-      intent: "blocked",
+      intent: "zoom",
       target: { kind: "graph-blank" }
+    });
+    assert.deepEqual(classifyGraphWheelTarget(communityWashTarget("community-a"), { ctrlKey: true }), {
+      intent: "zoom",
+      target: { kind: "community-wash", id: "community-a" }
+    });
+    assert.deepEqual(classifyGraphWheelTarget(edgeTarget("edge-a"), { metaKey: true }), {
+      intent: "zoom",
+      target: { kind: "edge", id: "edge-a" }
     });
   });
 
@@ -138,6 +146,8 @@ describe("graph gesture target classifier", () => {
       new FakeTarget({ isContentEditable: true })
     ]) {
       assert.equal(classifyGraphWheelTarget(target).intent, "blocked");
+      assert.equal(classifyGraphWheelTarget(target, { ctrlKey: true }).intent, "blocked");
+      assert.equal(classifyGraphWheelTarget(target, { metaKey: true }).intent, "blocked");
     }
   });
 
@@ -328,10 +338,16 @@ describe("graph gesture controller", () => {
     assert.equal(wheel.defaultPrevented, true);
     assert.deepEqual(zoomed, [{ target: "node", deltaY: 24 }]);
 
-    root.dispatch("pointerdown", pointerDomEvent(nodeTarget("node-a"), 21, 10, 10));
+    const pointerDown = pointerDomEvent(nodeTarget("node-a"), 21, 10, 10);
+    root.dispatch("pointerdown", pointerDown);
+    assert.equal(pointerDown.defaultPrevented, true);
     assert.equal(root.hasPointerCapture(21), true);
-    root.dispatch("pointermove", pointerDomEvent(nodeTarget("node-a"), 21, 20, 18));
-    root.dispatch("pointerup", pointerDomEvent(nodeTarget("node-a"), 21, 20, 18));
+    const pointerMove = pointerDomEvent(nodeTarget("node-a"), 21, 20, 18);
+    root.dispatch("pointermove", pointerMove);
+    assert.equal(pointerMove.defaultPrevented, true);
+    const pointerUp = pointerDomEvent(nodeTarget("node-a"), 21, 20, 18);
+    root.dispatch("pointerup", pointerUp);
+    assert.equal(pointerUp.defaultPrevented, true);
     assert.equal(root.hasPointerCapture(21), false);
     assert.deepEqual(intents, [
       { kind: "node-drag-start", nodeId: "node-a", pointerId: 21, screenPoint: { x: 20, y: 18 } },
@@ -343,6 +359,57 @@ describe("graph gesture controller", () => {
     controller.destroy();
     root.dispatch("wheel", wheelDomEvent(nodeTarget("node-b"), 12));
     assert.deepEqual(zoomed, [{ target: "node", deltaY: 24 }]);
+  });
+
+  it("prevents browser default zoom for shortcut wheels over graph-owned targets", () => {
+    const root = new FakeGestureRoot();
+    const zoomed: Array<{ target: string; ctrlKey: boolean; metaKey: boolean }> = [];
+    const controller = new GraphGestureController(root as unknown as HTMLElement, {
+      targetFromEventTarget: (target) => target as GraphGestureTargetLike | null,
+      pointerEventFromPointerEvent: (event) => pointer(event.pointerId, event.clientX, event.clientY, { shiftKey: event.shiftKey }),
+      onWheelZoom: (event, decision) => {
+        event.preventDefault();
+        zoomed.push({ target: decision.target.kind, ctrlKey: event.ctrlKey, metaKey: event.metaKey });
+      },
+      onGestureIntents: () => {}
+    });
+
+    const nodeWheel = wheelDomEvent(nodeTarget("node-a"), -18, { ctrlKey: true });
+    root.dispatch("wheel", nodeWheel);
+    assert.equal(nodeWheel.defaultPrevented, true);
+
+    const blankWheel = wheelDomEvent(blankTarget(), -12, { metaKey: true });
+    root.dispatch("wheel", blankWheel);
+    assert.equal(blankWheel.defaultPrevented, true);
+
+    const searchWheel = wheelDomEvent(controlTarget(".graph-search"), -8, { ctrlKey: true });
+    root.dispatch("wheel", searchWheel);
+    assert.equal(searchWheel.defaultPrevented, false);
+
+    assert.deepEqual(zoomed, [
+      { target: "node", ctrlKey: true, metaKey: false },
+      { target: "graph-blank", ctrlKey: false, metaKey: true }
+    ]);
+
+    controller.destroy();
+  });
+
+  it("does not prevent browser defaults over gesture blocker pointer targets", () => {
+    const root = new FakeGestureRoot();
+    const controller = new GraphGestureController(root as unknown as HTMLElement, {
+      targetFromEventTarget: (target) => target as GraphGestureTargetLike | null,
+      pointerEventFromPointerEvent: (event) => pointer(event.pointerId, event.clientX, event.clientY, { shiftKey: event.shiftKey }),
+      onWheelZoom: () => {},
+      onGestureIntents: () => {}
+    });
+
+    const searchPointerDown = pointerDomEvent(controlTarget(".graph-search"), 31, 10, 10);
+    root.dispatch("pointerdown", searchPointerDown);
+
+    assert.equal(searchPointerDown.defaultPrevented, false);
+    assert.equal(root.hasPointerCapture(31), false);
+
+    controller.destroy();
   });
 });
 
@@ -411,14 +478,18 @@ class FakeGestureRoot {
   }
 }
 
-function wheelDomEvent(target: GraphGestureTargetLike, deltaY: number): WheelEvent & { defaultPrevented: boolean } {
+function wheelDomEvent(
+  target: GraphGestureTargetLike,
+  deltaY: number,
+  options: { ctrlKey?: boolean; metaKey?: boolean } = {}
+): WheelEvent & { defaultPrevented: boolean } {
   let defaultPrevented = false;
   return {
     target,
     deltaY,
     deltaMode: 0,
-    ctrlKey: false,
-    metaKey: false,
+    ctrlKey: options.ctrlKey === true,
+    metaKey: options.metaKey === true,
     preventDefault: () => {
       defaultPrevented = true;
     },
@@ -434,15 +505,22 @@ function pointerDomEvent(
   clientX: number,
   clientY: number,
   options: { button?: number; shiftKey?: boolean } = {}
-): PointerEvent {
+): PointerEvent & { defaultPrevented: boolean } {
+  let defaultPrevented = false;
   return {
     target,
     pointerId,
     clientX,
     clientY,
     button: options.button ?? 0,
-    shiftKey: options.shiftKey === true
-  } as PointerEvent;
+    shiftKey: options.shiftKey === true,
+    preventDefault: () => {
+      defaultPrevented = true;
+    },
+    get defaultPrevented() {
+      return defaultPrevented;
+    }
+  } as PointerEvent & { defaultPrevented: boolean };
 }
 
 function matchesSelf(target: FakeTarget, selector: string): boolean {

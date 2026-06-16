@@ -184,7 +184,6 @@ export function classifyGraphWheelTarget(target: GraphGestureTargetLike | null |
 }
 
 export function classifyGraphWheelTargetFromGraphTarget(graphTarget: GraphGestureTarget, event: GraphWheelEventLike = {}): GraphWheelTargetDecision {
-  if (event.ctrlKey || event.metaKey) return { intent: "blocked", target: graphTarget };
   return isGraphOwnedGestureTarget(graphTarget)
     ? { intent: "zoom", target: graphTarget }
     : { intent: "blocked", target: graphTarget };
@@ -459,6 +458,7 @@ export class GraphGestureController {
     if (event.button !== 0) return;
     const decision = classifyGraphPointerDownTarget(this.eventTarget(event.target));
     if (decision.intent === "blocked") return;
+    event.preventDefault();
     this.options.onPointerDown?.(event, decision);
     this.stateMachine.pointerDown(decision, this.options.pointerEventFromPointerEvent(event));
     this.emitActiveState();
@@ -466,15 +466,18 @@ export class GraphGestureController {
   };
 
   private readonly handlePointerMove = (event: PointerEvent): void => {
+    if (this.stateMachine.snapshot()) event.preventDefault();
     this.applyIntents(this.stateMachine.pointerMove(this.options.pointerEventFromPointerEvent(event)), event);
   };
 
   private readonly handlePointerUp = (event: PointerEvent): void => {
+    if (this.stateMachine.snapshot()) event.preventDefault();
     this.applyIntents(this.stateMachine.pointerUp(this.options.pointerEventFromPointerEvent(event)), event);
     if (this.root.hasPointerCapture(event.pointerId)) this.root.releasePointerCapture(event.pointerId);
   };
 
   private readonly handlePointerCancel = (event: PointerEvent): void => {
+    if (this.stateMachine.snapshot()) event.preventDefault();
     this.applyIntents(this.stateMachine.pointerCancel({ pointerId: event.pointerId }), event);
     if (this.root.hasPointerCapture(event.pointerId)) this.root.releasePointerCapture(event.pointerId);
   };
