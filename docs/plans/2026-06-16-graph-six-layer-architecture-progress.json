@@ -3,8 +3,8 @@
   "status": {
     "overall": "pending",
     "phase": "phase-7",
-    "task": "7.3",
-    "next_allowed_action": "Run final verification command set."
+    "task": "7.4",
+    "next_allowed_action": "Mark plan complete and record residual risk."
   },
   "execution_rules": {
     "parent_branch": "codex/graph-interaction-architecture",
@@ -1510,8 +1510,18 @@
       "acceptance": [
         {
           "check": "Full verification command set exits 0.",
-          "status": "pending",
-          "evidence": []
+          "status": "passed",
+          "evidence": [
+            "npm run test --workspace=@llm-wiki/graph-engine -> 252 tests passed, 0 failed.",
+            "npm run typecheck --workspace=@llm-wiki/graph-engine -> exited 0.",
+            "npm run build --workspace=@llm-wiki/graph-engine -> exited 0.",
+            "npm run test --workspace=@llm-wiki-agent/web -> 29 tests passed, 0 failed.",
+            "npm run typecheck --workspace=@llm-wiki-agent/web -> exited 0.",
+            "npm run build --workspace=@llm-wiki-agent/web -> exited 0 with only the existing Vite large chunk warning.",
+            "bash tests/graph-community-wash-interactions.regression-1.sh -> PASS.",
+            "bash tests/graph-workbench-interactions.regression-1.sh -> PASS.",
+            "bash tests/graph-offline-phase-6.regression-1.sh -> PASS."
+          ]
         },
         {
           "check": "static-renderer.ts no longer owns raw graph interaction, coordinate conversion, or graph hit testing.",
@@ -1626,8 +1636,69 @@
         {
           "id": "7.3",
           "title": "Run final verification command set",
-          "status": "pending",
-          "verification": [],
+          "status": "completed",
+          "verification": [
+            {
+              "command": "npm run test --workspace=@llm-wiki/graph-engine",
+              "result": "252 tests passed, 0 failed",
+              "status": "passed"
+            },
+            {
+              "command": "npm run typecheck --workspace=@llm-wiki/graph-engine",
+              "result": "tsc -p tsconfig.json --noEmit exited 0",
+              "status": "passed"
+            },
+            {
+              "command": "npm run build --workspace=@llm-wiki/graph-engine",
+              "result": "vite build and declaration emit exited 0",
+              "status": "passed"
+            },
+            {
+              "command": "npm run test --workspace=@llm-wiki-agent/web",
+              "result": "29 tests passed, 0 failed",
+              "status": "passed"
+            },
+            {
+              "command": "npm run typecheck --workspace=@llm-wiki-agent/web",
+              "result": "graph-engine prebuild and tsc -b --noEmit exited 0",
+              "status": "passed"
+            },
+            {
+              "command": "npm run build --workspace=@llm-wiki-agent/web",
+              "result": "graph-engine prebuild and vite build exited 0; Vite reported the existing large chunk warning.",
+              "status": "passed"
+            },
+            {
+              "command": "bash tests/graph-community-wash-interactions.regression-1.sh",
+              "result": "PASS: graph community wash interaction regression",
+              "status": "passed"
+            },
+            {
+              "command": "bash tests/graph-workbench-interactions.regression-1.sh",
+              "result": "PASS: graph workbench interaction regression",
+              "status": "passed"
+            },
+            {
+              "command": "bash tests/graph-offline-phase-6.regression-1.sh",
+              "result": "PASS: phase 6 offline graph regression",
+              "status": "passed"
+            },
+            {
+              "command": "! rg -n \"root\\.addEventListener\\(\\\"(wheel|pointerdown|pointermove|pointerup|pointercancel|lostpointercapture|dblclick)\" packages/graph-engine/src/render/static-renderer.ts",
+              "result": "No root graph event bindings remain in static-renderer.ts",
+              "status": "passed"
+            },
+            {
+              "command": "rg -n \"screenPointToWorldPoint|worldPointToScreenPoint|rootClientPointToScreenPoint|classifyGraphWheelTarget|classifyGraphPointerDownTarget|SpatialIndex\" packages/graph-engine/src",
+              "result": "Ownership remains in geometry, viewport, simulation bridge, overlays, gestures, and layout SpatialIndex.",
+              "status": "passed"
+            },
+            {
+              "command": "git diff --check",
+              "result": "No whitespace errors",
+              "status": "passed"
+            }
+          ],
           "commit": null
         },
         {
