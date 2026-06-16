@@ -3,8 +3,8 @@
   "status": {
     "overall": "pending",
     "phase": "phase-4",
-    "task": "4.3",
-    "next_allowed_action": "Run the baseline smoke check, then define host and offline facade capability contracts for task 4.3."
+    "task": "4.4",
+    "next_allowed_action": "Add facade and renderer boundary tests for task 4.4."
   },
   "execution_rules": {
     "parent_branch": "codex/graph-interaction-architecture",
@@ -964,9 +964,55 @@
         {
           "id": "4.3",
           "title": "Define host and offline facade capability contracts",
-          "status": "pending",
-          "verification": [],
-          "commit": null
+          "status": "completed",
+          "verification": [
+            {
+              "command": "node --import tsx --test packages/graph-engine/test/facade.test.ts",
+              "result": "3 tests passed, 0 failed; covers facade lifecycle, refreshed data selection resolution, and separate workbench/offline/standalone capability contracts",
+              "status": "passed"
+            },
+            {
+              "command": "npm run typecheck --workspace=@llm-wiki/graph-engine",
+              "result": "tsc -p tsconfig.json --noEmit exited 0",
+              "status": "passed"
+            },
+            {
+              "command": "npm run typecheck --workspace=@llm-wiki-agent/web",
+              "result": "graph-engine prebuild and tsc -b --noEmit exited 0",
+              "status": "passed"
+            },
+            {
+              "command": "bash tests/graph-html-toolbar.regression-1.sh",
+              "result": "PASS: graph HTML toolbar regression",
+              "status": "passed"
+            },
+            {
+              "command": "npm run test --workspace=@llm-wiki/graph-engine",
+              "result": "242 tests passed, 0 failed",
+              "status": "passed"
+            },
+            {
+              "command": "npm run build --workspace=@llm-wiki/graph-engine",
+              "result": "vite build and declaration emit exited 0",
+              "status": "passed"
+            },
+            {
+              "command": "bash tests/graph-offline-phase-6.regression-1.sh",
+              "result": "PASS: phase 6 offline graph regression",
+              "status": "passed"
+            },
+            {
+              "command": "bash tests/graph-workbench-interactions.regression-1.sh",
+              "result": "PASS: graph workbench interaction regression",
+              "status": "passed"
+            },
+            {
+              "command": "git diff --check",
+              "result": "No whitespace errors",
+              "status": "passed"
+            }
+          ],
+          "commit": "1fc1fb9"
         },
         {
           "id": "4.4",
