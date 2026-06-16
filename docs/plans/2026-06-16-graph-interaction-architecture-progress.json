@@ -3,8 +3,8 @@
   "status": {
     "overall": "pending",
     "phase": "phase-3",
-    "task": "3.1",
-    "next_allowed_action": "Execute phase-3 task 3.1: define the graph event target classifier. Start by reading the progress file and running git log --oneline -15 plus npm run test --workspace=@llm-wiki/graph-engine."
+    "task": "3.2",
+    "next_allowed_action": "Execute phase-3 task 3.2: extract gesture threshold and intent state machine. Start by reading the progress file and running git log --oneline -15 plus npm run test --workspace=@llm-wiki/graph-engine."
   },
   "execution_rules": {
     "branch": "codex/graph-interaction-architecture",
@@ -338,7 +338,13 @@
         {
           "check": "Wheel, pointer, click, drag, community, minimap, and UI blocker classification has one tested path",
           "status": "pending",
-          "evidence": []
+          "evidence": [
+            "Task 3.1 added packages/graph-engine/src/render/gestures.ts with classifyGraphEventTarget, classifyGraphWheelTarget, and classifyGraphPointerDownTarget.",
+            "gestures.test.ts uses a fake target adapter rather than a DOM dependency and covers graph-blank, node, community-wash, edge, minimap, toolbar, search, legend, drawer, and text-control target kinds.",
+            "gestures.test.ts proves wheel over blank, node, community wash, and edge returns zoom while wheel over search, toolbar, legend, drawer, minimap, textarea, text input, and contenteditable targets returns blocked.",
+            "gestures.test.ts proves pointerdown over node returns node-drag-candidate, over community wash returns community-click-candidate, over blank returns blank-pan-candidate, and over minimap, toolbar, and text input returns blocked.",
+            "The full acceptance remains pending until task 3.2 adds click-vs-drag threshold and gesture sequence tests."
+          ]
         },
         {
           "check": "Renderer delegates gesture interpretation instead of owning scattered target rules",
@@ -350,9 +356,25 @@
         {
           "id": "3.1",
           "title": "Define graph event target classifier",
-          "status": "pending",
-          "verification": [],
-          "commit": null
+          "status": "completed",
+          "verification": [
+            "Read progress file and plan; current unit was phase-3 task 3.1.",
+            "git log --oneline -15 exited 0 before task 3.1 work; branch head was 4dc67a7 docs: record renderer runtime state commit.",
+            "npm run test --workspace=@llm-wiki/graph-engine exited 0 before task 3.1 work: 43 suites, 169 tests, 169 pass, 0 fail.",
+            "Created packages/graph-engine/src/render/gestures.ts with target classification and first intent decisions for wheel and pointerdown.",
+            "The classifier distinguishes graph-blank, node, community-wash, edge, minimap, toolbar, search, legend, drawer, text-control, and unknown targets through a small fake-target-compatible adapter interface.",
+            "classifyGraphWheelTarget returns zoom for blank, node, community wash, and edge; it returns blocked for search, toolbar, legend, drawer, minimap, and text editing targets.",
+            "classifyGraphPointerDownTarget returns node-drag-candidate for node, community-click-candidate for community wash, blank-pan-candidate for blank canvas, and blocked for controls.",
+            "Exported gesture classifier functions and types through packages/graph-engine/src/render/index.ts.",
+            "Added packages/graph-engine/test/gestures.test.ts with 5 tests and no DOM test dependency.",
+            "node --import tsx --test packages/graph-engine/test/gestures.test.ts exited 0: 5 tests passed.",
+            "npm run test --workspace=@llm-wiki/graph-engine exited 0 after task 3.1 work: 44 suites, 174 tests, 174 pass, 0 fail.",
+            "npm run typecheck --workspace=@llm-wiki/graph-engine exited 0.",
+            "npm run build --workspace=@llm-wiki/graph-engine exited 0 and generated both engine.esm.js and engine.iife.js.",
+            "git diff --check exited 0.",
+            "Advanced current task pointer to phase-3 task 3.2; phase-3 remains pending because the gesture threshold state machine and renderer wiring are not yet complete."
+          ],
+          "commit": "c55dbb0370924951fffa0cdfc865a68b62a78ecc"
         },
         {
           "id": "3.2",
