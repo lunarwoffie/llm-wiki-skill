@@ -3,8 +3,8 @@
   "status": {
     "overall": "pending",
     "phase": "phase-4",
-    "task": "4.2",
-    "next_allowed_action": "Run the baseline smoke check, then declare the six owner layers in code exports and tests for task 4.2."
+    "task": "4.3",
+    "next_allowed_action": "Run the baseline smoke check, then define host and offline facade capability contracts for task 4.3."
   },
   "execution_rules": {
     "parent_branch": "codex/graph-interaction-architecture",
@@ -931,9 +931,35 @@
         {
           "id": "4.2",
           "title": "Declare the six owner layers in code exports and tests",
-          "status": "pending",
-          "verification": [],
-          "commit": null
+          "status": "completed",
+          "verification": [
+            {
+              "command": "npm run test --workspace=@llm-wiki/graph-engine",
+              "result": "241 tests passed, 0 failed",
+              "status": "passed"
+            },
+            {
+              "command": "node --import tsx --test packages/graph-engine/test/architecture.test.ts",
+              "result": "4 tests passed, 0 failed; covers exported six-layer owner contract, entrypoints, host callback ownership, and browser event policy ownership",
+              "status": "passed"
+            },
+            {
+              "command": "npm run typecheck --workspace=@llm-wiki/graph-engine",
+              "result": "tsc -p tsconfig.json --noEmit exited 0",
+              "status": "passed"
+            },
+            {
+              "command": "npm run build --workspace=@llm-wiki/graph-engine",
+              "result": "vite build and declaration emit exited 0",
+              "status": "passed"
+            },
+            {
+              "command": "git diff --check",
+              "result": "No whitespace errors",
+              "status": "passed"
+            }
+          ],
+          "commit": "c72d27e"
         },
         {
           "id": "4.3",
