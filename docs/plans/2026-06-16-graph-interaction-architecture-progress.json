@@ -2,9 +2,9 @@
   "plan": "docs/plans/2026-06-16-graph-interaction-architecture-phased-plan.md",
   "status": {
     "overall": "pending",
-    "phase": "phase-2",
-    "task": "2.2",
-    "next_allowed_action": "Execute phase-2 task 2.2: wire state snapshots into the renderer shell. Start by reading the progress file and running git log --oneline -15 plus npm run test --workspace=@llm-wiki/graph-engine."
+    "phase": "phase-3",
+    "task": "3.1",
+    "next_allowed_action": "Execute phase-3 task 3.1: define the graph event target classifier. Start by reading the progress file and running git log --oneline -15 plus npm run test --workspace=@llm-wiki/graph-engine."
   },
   "execution_rules": {
     "branch": "codex/graph-interaction-architecture",
@@ -248,7 +248,7 @@
     {
       "id": "phase-2",
       "goal": "Create the graph runtime state skeleton before gesture wiring",
-      "status": "pending",
+      "status": "completed",
       "acceptance": [
         {
           "check": "Viewport, hover, single selection, multi selection, community focus, pins, positions, and active gesture have one graph-local state owner",
@@ -264,8 +264,20 @@
         },
         {
           "check": "Renderer reads runtime state snapshots without moving host drawer state into graph-engine",
-          "status": "pending",
-          "evidence": []
+          "status": "completed",
+          "evidence": [
+            "packages/graph-engine/src/render/static-renderer.ts now initializes createGraphRuntimeState with viewport, render positions, pins, selection, and focus.",
+            "Renderer render() syncs pins, selection, and focus into GraphRuntimeState, then rebuilds the renderable graph from the runtime snapshot rather than independent renderer-only state.",
+            "Viewport commit, wheel zoom, blank pan, resize anchoring, minimap viewport updates, and search focus centering read or write the runtime viewport snapshot.",
+            "Node hover, edge hover, and community hover targets are mirrored into runtime hover state, while hover positioning remains unchanged for the later overlay phase.",
+            "Pin set/reset, pin unpin, drag-end pin writes, and simulation cold-start fixed positions read or write the runtime pin snapshot.",
+            "Node drag and blank pan mark runtime active gesture state; isDragging now reads the runtime gesture snapshot.",
+            "Host drawer, search input text, toolbar panel state, and diff animation state remain outside GraphRuntimeState.",
+            "npm run test --workspace=@llm-wiki/graph-engine exited 0 after task 2.2 work: 43 suites, 169 tests, 169 pass, 0 fail.",
+            "npm run typecheck --workspace=@llm-wiki/graph-engine exited 0.",
+            "npm run build --workspace=@llm-wiki/graph-engine exited 0 and generated both engine.esm.js and engine.iife.js.",
+            "git diff --check exited 0."
+          ]
         }
       ],
       "tasks": [
@@ -294,9 +306,27 @@
         {
           "id": "2.2",
           "title": "Wire state snapshots into the renderer shell",
-          "status": "pending",
-          "verification": [],
-          "commit": null
+          "status": "completed",
+          "verification": [
+            "Read progress file and plan; current unit was phase-2 task 2.2.",
+            "git log --oneline -15 exited 0 before task 2.2 work; branch head was 0a7d3be docs: record runtime state commit.",
+            "npm run test --workspace=@llm-wiki/graph-engine exited 0 before task 2.2 work: 43 suites, 169 tests, 169 pass, 0 fail.",
+            "packages/graph-engine/src/render/static-renderer.ts now imports createGraphRuntimeState and initializes a graph-local runtime state owner with viewport, current positions, pins, selection, and focus.",
+            "render() now syncs incoming renderer state into GraphRuntimeState and rebuilds the renderable graph from the runtime snapshot for pins, selected node or selection, and community focus.",
+            "applyMotionFrame now commits simulation positions into GraphRuntimeState before rebuilding the graph from the runtime snapshot.",
+            "Viewport update paths for commitViewport, wheel zoom, blank pan, resize, minimap viewport, and search focus centering now read or write the runtime viewport snapshot.",
+            "Pin update paths for setPins, resetLayout, node double-click unpin, drag-end pin persistence, and simulation fixed-position startup now read or write the runtime pin snapshot.",
+            "Hover paths for node preview, edge preview, and community legend hover now mirror their active target into GraphRuntimeState while preserving the existing preview positioning behavior for phase 5.",
+            "Active node-drag and blank-pan gestures now write runtime active gesture state, and StaticGraphRenderer.isDragging reads that runtime gesture state.",
+            "Host drawer, search query/input state, toolbar panel state, and diff animation state were not moved into GraphRuntimeState.",
+            "Task 2.2 intentionally did not change user-visible gesture behavior: wheel target classification remains for phase 3, drag projection remains for phase 4, and projected overlay positioning remains for phase 5.",
+            "npm run test --workspace=@llm-wiki/graph-engine exited 0 after task 2.2 work: 43 suites, 169 tests, 169 pass, 0 fail.",
+            "npm run typecheck --workspace=@llm-wiki/graph-engine exited 0.",
+            "npm run build --workspace=@llm-wiki/graph-engine exited 0 and generated both engine.esm.js and engine.iife.js.",
+            "git diff --check exited 0.",
+            "All phase-2 acceptance checks now pass, so phase-2 was marked completed and the progress pointer advanced to phase-3 task 3.1."
+          ],
+          "commit": "9fa83068399278c15bdf3ac61ca901a0e846bdae"
         }
       ]
     },
