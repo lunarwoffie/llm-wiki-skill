@@ -294,6 +294,29 @@ describe("buildRenderableGraph", () => {
     assert.ok(outlier.point.x > community.wash.cx + community.wash.rx, "pinned member may sit outside the capped visual wash");
   });
 
+  it("lets a dragged core member reshape the wash within caps without changing membership", () => {
+    const before = buildRenderableGraph(outlierCommunityGraph(), { theme: "shan-shui" });
+    const after = buildRenderableGraph(outlierCommunityGraph(), {
+      theme: "shan-shui",
+      positions: {
+        "core-a": { x: 980, y: 650 }
+      }
+    });
+    const beforeCommunity = before.communities.find((item) => item.id === "c1");
+    const afterCommunity = after.communities.find((item) => item.id === "c1");
+    const dragged = after.nodes.find((node) => node.id === "core-a");
+
+    assert.ok(beforeCommunity?.wash);
+    assert.ok(afterCommunity?.wash);
+    assert.ok(dragged);
+    assert.equal(dragged.community, "c1");
+    assert.equal(afterCommunity.nodeCount, beforeCommunity.nodeCount);
+    assert.notEqual(afterCommunity.wash.cx, beforeCommunity.wash.cx);
+    assert.ok(afterCommunity.wash.cx > beforeCommunity.wash.cx, "wash should move toward the dragged member");
+    assert.equal(afterCommunity.wash.rx, 190);
+    assert.equal(afterCommunity.wash.ry, 142.8);
+  });
+
   it("preserves community focus after a member is dragged beyond the wash cap", () => {
     const graph = buildRenderableGraph(outlierCommunityGraph(), {
       theme: "shan-shui",
