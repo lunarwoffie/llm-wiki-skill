@@ -22,6 +22,27 @@ Every position-sensitive behavior should use one shared model:
 
 The implementation should not be an MVP patch and should not be a full renderer rewrite. It should keep DOM+SVG for now, preserve the public engine API, and carve the graph front-end into explicit, testable modules only where doing so directly removes a duplicated rule or fixes a named regression.
 
+## First Slice Status
+
+As of 2026-06-16, the first delivery slice has landed as shared graph-engine work rather than a renderer migration. It keeps the existing public engine API, DOM+SVG renderer, workbench drawer ownership, offline built-in reader path, and persisted pin format.
+
+Delivered boundaries:
+
+- Geometry and camera: one tested route for world, screen, layer, SVG, and minimap projection; projection helpers do not silently clamp drag targets.
+- Gestures: wheel, pointer, click, drag, community click, blank pan, UI blocker, and minimap blocker classification now share one tested path.
+- Runtime state: viewport, hover, selected/focused graph item, pins, active gesture, and simulation proposals have one graph-local owner for the interaction slice.
+- Overlays: node and edge hover previews are anchored from projected positions and are repositioned after viewport, drawer, and drag changes.
+- Simulation bridge: node dragging preserves the grab offset, stays attached to the pointer under pan/zoom, and persists pins without firing a node click.
+- Community wash: washes are visual membership regions, not drag fences; they allow wheel zoom, allow nodes to leave, and respond to outliers only within tested caps.
+- Dual-host verification: both the workbench graph and generated offline HTML use the same engine behavior.
+
+Deferred gates:
+
+- Spatial index: add only after profiling shows current centralized classification or O(n) hit testing is the bottleneck at real user graph sizes.
+- Canvas/WebGL: migrate only after profiling proves DOM+SVG rendering is the bottleneck at real user graph sizes.
+- Density policy cleanup: revisit only if readability or scale problems remain after the interaction foundation is stable.
+- Minimap drag navigation: add only after a product decision makes the minimap an active navigation control; the first slice treats it as a status/control blocker.
+
 ## Context
 
 Product decisions already point in this direction:
