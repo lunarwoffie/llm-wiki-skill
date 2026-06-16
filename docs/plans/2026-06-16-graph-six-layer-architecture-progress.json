@@ -3,8 +3,8 @@
   "status": {
     "overall": "pending",
     "phase": "phase-3",
-    "task": "3.3",
-    "next_allowed_action": "Run the baseline smoke check, then make world size layout-bounds-driven instead of a hard 1000x680 interaction cage for task 3.3."
+    "task": "3.4",
+    "next_allowed_action": "Run the baseline smoke check, then preserve old workbench and offline pin data under new bounds for task 3.4."
   },
   "execution_rules": {
     "parent_branch": "codex/graph-interaction-architecture",
@@ -544,8 +544,15 @@
         },
         {
           "check": "Layout bounds, minimap, fit, SpatialIndex, and hover anchors support nodes outside the old 1000x680 world.",
-          "status": "pending",
-          "evidence": []
+          "status": "passed",
+          "evidence": [
+            "RenderableGraph now exposes worldBounds derived from rendered node positions, including live positions and pinned positions outside the old default world.",
+            "geometry.ts projection helpers, minimap helpers, viewport helpers, overlay anchors, and drag screen/world conversion all accept GraphWorldBounds while preserving the default 1000x680 fallback.",
+            "static-renderer.ts passes graph.worldBounds through fit, pan, wheel zoom, drawer resize, minimap viewport, hover anchors, node drag, SVG viewBox, and motion-frame base-position updates.",
+            "render-model.test.ts covers live dragged positions and pinned positions outside the old default world expanding render bounds instead of clamping.",
+            "geometry.test.ts and viewport.test.ts cover expanded bounds round trips, CSS projection, minimap projection, fit/center, and viewport minimap rectangles.",
+            "graph-workbench-interactions, graph-offline-phase-6, and graph-default-behavior regressions all exit 0 after dynamic world bounds."
+          ]
         },
         {
           "check": "Workbench and offline browser regressions exit 0, including old pin compatibility.",
@@ -658,9 +665,55 @@
         {
           "id": "3.3",
           "title": "Make world size layout-bounds-driven instead of a hard 1000x680 interaction cage",
-          "status": "pending",
-          "verification": [],
-          "commit": null
+          "status": "completed",
+          "verification": [
+            {
+              "command": "node --import tsx --test packages/graph-engine/test/geometry.test.ts packages/graph-engine/test/viewport.test.ts packages/graph-engine/test/render-model.test.ts packages/graph-engine/test/simulation-bridge.test.ts packages/graph-engine/test/overlays.test.ts",
+              "result": "52 tests passed, 0 failed",
+              "status": "passed"
+            },
+            {
+              "command": "npm run test --workspace=@llm-wiki/graph-engine",
+              "result": "227 tests passed, 0 failed",
+              "status": "passed"
+            },
+            {
+              "command": "npm run typecheck --workspace=@llm-wiki/graph-engine",
+              "result": "tsc -p tsconfig.json --noEmit exited 0",
+              "status": "passed"
+            },
+            {
+              "command": "npm run build --workspace=@llm-wiki/graph-engine",
+              "result": "vite build and declaration emit exited 0",
+              "status": "passed"
+            },
+            {
+              "command": "bash tests/graph-workbench-interactions.regression-1.sh",
+              "result": "PASS: graph workbench interaction regression",
+              "status": "passed"
+            },
+            {
+              "command": "bash tests/graph-offline-phase-6.regression-1.sh",
+              "result": "PASS: phase 6 offline graph regression",
+              "status": "passed"
+            },
+            {
+              "command": "bash tests/graph-default-behavior.regression-1.sh",
+              "result": "PASS: graph default behavior regression",
+              "status": "passed"
+            },
+            {
+              "command": "rg -n \"rootRect\\.width \\*|rootRect\\.height \\*|eventToGraphPoint|clientX.*WORLD|clientY.*WORLD\" packages/graph-engine/src/render/static-renderer.ts",
+              "result": "No matches",
+              "status": "passed"
+            },
+            {
+              "command": "git diff --check",
+              "result": "No whitespace errors",
+              "status": "passed"
+            }
+          ],
+          "commit": "f43dfcd"
         },
         {
           "id": "3.4",
