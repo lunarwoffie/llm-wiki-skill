@@ -3,8 +3,8 @@
   "status": {
     "overall": "pending",
     "phase": "phase-1",
-    "task": "1.2",
-    "next_allowed_action": "Commit task 1.2 target and blocker contracts, then record that commit hash before moving to task 1.3."
+    "task": "1.3",
+    "next_allowed_action": "Run the baseline smoke check, then implement the SpatialIndex facade using d3-quadtree for task 1.3."
   },
   "execution_rules": {
     "parent_branch": "codex/graph-interaction-architecture",
@@ -248,7 +248,7 @@
               "status": "passed"
             }
           ],
-          "commit": null
+          "commit": "fc72c47"
         },
         {
           "id": "1.3",
@@ -734,6 +734,15 @@
         "packages/graph-engine/test/gestures.test.ts covers stable ownership groups",
         "npm run test --workspace=@llm-wiki/graph-engine passed: 200 tests, 0 failed",
         "npm run typecheck --workspace=@llm-wiki/graph-engine passed"
+      ]
+    },
+    {
+      "timestamp": "2026-06-16T15:22:00.000Z",
+      "phase": "phase-1",
+      "task": "1.2",
+      "action": "Recorded graph-owned target and blocker contract commit hash",
+      "evidence": [
+        "commit: fc72c47 refactor(graph): define gesture target ownership"
       ]
     }
   ]
