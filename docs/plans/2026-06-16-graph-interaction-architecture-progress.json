@@ -3,8 +3,8 @@
   "status": {
     "overall": "pending",
     "phase": "phase-5",
-    "task": "5.2",
-    "next_allowed_action": "Execute phase-5 task 5.2: make community wash non-blocking with threshold click behavior. Start by reading the progress file and running git log --oneline -15 plus npm run test --workspace=@llm-wiki/graph-engine."
+    "task": "5.3",
+    "next_allowed_action": "Execute phase-5 task 5.3: implement capped community wash response fixtures. Start by reading the progress file and running git log --oneline -15 plus npm run test --workspace=@llm-wiki/graph-engine."
   },
   "execution_rules": {
     "branch": "codex/graph-interaction-architecture",
@@ -547,8 +547,14 @@
         },
         {
           "check": "Community wash never acts as wheel or drag fence",
-          "status": "pending",
-          "evidence": []
+          "status": "completed",
+          "evidence": [
+            "tests/browser/graph-community-wash-interactions.mjs verifies community wash wheel zoom, threshold click behavior, movement cancellation, and node drag beyond the initial wash bounds in generated offline HTML.",
+            "tests/graph-community-wash-interactions.regression-1.sh builds the graph engine, generates offline HTML, and runs the browser regression through Playwright using local Chrome when available.",
+            "Browser evidence on the basic fixture selected multi-node community t1: wheel over wash changed transform from translate(0px, 0px) scale(1) to translate(-626.307px, -392.892px) scale(2.45).",
+            "Browser evidence confirmed clicking the t1 wash showed only nodes A and B; moving on the wash past threshold left nodes A, B, and C visible.",
+            "Browser evidence confirmed dragging node A outside the initial t1 wash wrote a pin and ended without a stuck drag state; initial wash right was about 603.65px and final node center x was about 846.83px."
+          ]
         },
         {
           "check": "Community wash response to outliers is capped by deterministic fixture tests",
@@ -581,9 +587,23 @@
         {
           "id": "5.2",
           "title": "Make community wash non-blocking with threshold click behavior",
-          "status": "pending",
-          "verification": [],
-          "commit": null
+          "status": "completed",
+          "verification": [
+            "Read progress file and plan; current unit was phase-5 task 5.2.",
+            "Ran git log --oneline -15 and npm run test --workspace=@llm-wiki/graph-engine before continuing; graph-engine tests exited 0.",
+            "Audited renderer gesture wiring and confirmed community wash wheel/click/movement behavior already routes through the shared gesture classifier and state machine.",
+            "Added browser regression coverage for community wash wheel zoom, multi-node community click, movement-threshold cancellation, and node drag beyond the initial wash bounds.",
+            "Verified node --check tests/browser/graph-community-wash-interactions.mjs exited 0.",
+            "Verified node --import tsx --test packages/graph-engine/test/gestures.test.ts exited 0: 14 tests passed.",
+            "Verified npm run test --workspace=@llm-wiki/graph-engine exited 0: 48 suites, 193 tests passed.",
+            "Verified npm run typecheck --workspace=@llm-wiki/graph-engine exited 0.",
+            "Verified npm run build --workspace=@llm-wiki/graph-engine exited 0 and generated both engine.esm.js and engine.iife.js.",
+            "Verified bash tests/graph-community-wash-interactions.regression-1.sh exited 0 and printed PASS.",
+            "Verified git diff --check exited 0.",
+            "Committed verified task 5.2 as 68d51bf3bc97637ab25184f64816f6805f7e9c0e.",
+            "Advanced current task pointer to phase-5 task 5.3; phase-5 remains pending because capped wash response still needs the planned task."
+          ],
+          "commit": "68d51bf3bc97637ab25184f64816f6805f7e9c0e"
         },
         {
           "id": "5.3",
@@ -847,6 +867,19 @@
         "Verified freshly generated offline HTML in headless Chrome: node preview stayed anchored after node wheel zoom and edge preview stayed anchored after edge wheel zoom.",
         "Committed verified task 5.1 as e8b7015ea5c8a62ac0f8f8361be5111ddce8543b.",
         "Advanced current task pointer to phase-5 task 5.2; phase-5 remains pending because community wash non-blocking behavior and capped wash response still need the planned tasks."
+      ]
+    },
+    {
+      "turn": "phase-5-task-5.2",
+      "status": "completed",
+      "evidence": [
+        "Read progress file and plan; current unit was phase-5 task 5.2.",
+        "Audited renderer gesture wiring and confirmed community wash wheel/click/movement behavior already routes through the shared gesture classifier and state machine.",
+        "Added browser regression coverage for community wash wheel zoom, multi-node community click, movement-threshold cancellation, and node drag beyond initial wash bounds.",
+        "Verified gesture single-file test, full graph-engine test suite, graph-engine typecheck, graph-engine build, community wash browser regression, and git diff --check all exited 0.",
+        "Browser regression evidence: community t1 wash wheel changed transform, click showed only A/B, movement above threshold kept A/B/C visible, and dragging A beyond the initial wash wrote a pin without stuck dragging.",
+        "Committed verified task 5.2 as 68d51bf3bc97637ab25184f64816f6805f7e9c0e.",
+        "Advanced current task pointer to phase-5 task 5.3; phase-5 remains pending because capped wash response still needs the planned task."
       ]
     }
   ]
