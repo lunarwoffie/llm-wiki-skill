@@ -286,6 +286,9 @@ async function assertPinPersistsAfterReload(page, id) {
   assert.notEqual(key, "", "offline graph pins key should be exposed");
   const before = await page.evaluate((key) => JSON.parse(window.localStorage.getItem(key) || "{}"), key);
   assert.ok(Object.keys(before).length >= 1, "offline drag should write at least one pin");
+  for (const pin of Object.values(before)) {
+    assert.equal(pin.coordinateSpace, "world", "offline persisted pins should be explicit world coordinates");
+  }
   await page.reload();
   await page.waitForSelector("[data-llm-wiki-graph-root='true']");
   await page.waitForSelector(`.node[data-id="${cssString(id)}"][data-pinned="true"]`);

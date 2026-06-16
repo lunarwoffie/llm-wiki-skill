@@ -10,6 +10,7 @@ import { wikiPathForGraphNode } from "../graph-node";
 import { getCommunityColor } from "../themes";
 import { computeCommunityWash } from "./community-wash";
 import { GRAPH_WORLD_SIZE, worldBoundsForPoints, worldPointToCssPercentPoint, worldPointToMinimapPoint, type GraphWorldBounds } from "./geometry";
+import { pinPositionToWorldPoint } from "./pin-position";
 
 export type DensityMode = "card" | "compact-card" | "point-plus-focus" | "overview";
 export type NodeDisplayMode = "card" | "compact-card" | "point" | "overview";
@@ -440,10 +441,7 @@ function renderPointForNode(node: AtlasNode, options: Pick<BuildRenderableGraphO
   }
   const pin = options.pins?.[pinKeyForNode(node)];
   if (pin) {
-    return {
-      x: normalizePinnedWorldX(pin.x),
-      y: normalizePinnedWorldY(pin.y)
-    };
+    return pinPositionToWorldPoint(pin);
   }
   return atlasNodePoint(node) as RenderPosition;
 }
@@ -459,16 +457,6 @@ function edgeCurveOffset(sourcePoint: RenderPosition, targetPoint: RenderPositio
   const sourceYPercent = (sourcePoint.y - worldBounds.minY) / worldBounds.height * 100;
   const targetYPercent = (targetPoint.y - worldBounds.minY) / worldBounds.height * 100;
   return Math.max(-76, Math.min(76, (sourceYPercent - targetYPercent) * 1.8 + (clampWeight(edge.weight) - 0.5) * 24));
-}
-
-function normalizePinnedWorldX(value: number): number {
-  const numeric = finitePositionCoordinate(value);
-  return numeric > 100 ? numeric : numeric / 100 * GRAPH_WORLD_SIZE.width;
-}
-
-function normalizePinnedWorldY(value: number): number {
-  const numeric = finitePositionCoordinate(value);
-  return numeric > 100 ? numeric : numeric / 100 * GRAPH_WORLD_SIZE.height;
 }
 
 function finitePositionCoordinate(value: unknown): number {

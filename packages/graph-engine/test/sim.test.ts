@@ -15,7 +15,7 @@ describe("LiveGraphSimulation", () => {
     const graph = buildRenderableGraph(sampleGraph(), {
       theme: "shan-shui",
       pins: {
-        "wiki/near.md": { x: 800, y: 340 }
+        "wiki/near.md": { x: 800, y: 340, coordinateSpace: "world" }
       }
     });
     const simulation = createLiveGraphSimulation(graph);
@@ -82,7 +82,7 @@ describe("PinState", () => {
     const pinned = pins.pin("drag", { x: 412.5, y: -88.2 });
     assert.equal(pins.isPinned("drag"), true);
     assert.deepEqual(pinned.pins, {
-      "wiki/drag.md": { x: 412.5, y: -88.2 }
+      "wiki/drag.md": { x: 412.5, y: -88.2, coordinateSpace: "world" }
     });
     assert.deepEqual(pinned.pinnedNodeIds, ["drag"]);
 
@@ -97,13 +97,13 @@ describe("PinState", () => {
   it("normalizes initial pins and exposes render positions for known graph nodes only", () => {
     const graph = buildRenderableGraph(sampleGraph(), { theme: "shan-shui" });
     const pins = {
-      "wiki/near.md": { x: 130, y: 245.7 },
+      "wiki/near.md": { x: 130, y: 245.7, coordinateSpace: "world" as const },
       "wiki/missing.md": { x: 999, y: 999 }
     };
     const state = new PinState(graph, pins).snapshot();
 
     assert.deepEqual(state.pins, {
-      "wiki/near.md": { x: 130, y: 245.7 }
+      "wiki/near.md": { x: 130, y: 245.7, coordinateSpace: "world" }
     });
     assert.deepEqual(pinsToPositions(graph, state.pins), {
       near: { x: 130, y: 245.7 }
@@ -113,7 +113,7 @@ describe("PinState", () => {
   it("keeps wiki-relative pin format readable and separate from projection math", () => {
     const graph = buildRenderableGraph(sampleGraph(), { theme: "shan-shui" });
     const pins: PinMap = {
-      "wiki/drag.md": { x: -42.5, y: 812.75 },
+      "wiki/drag.md": { x: -42.5, y: 812.75, coordinateSpace: "world" },
       "wiki/near.md": { x: Number.NaN, y: 245.7 }
     };
     const beforeProjection = structuredClone(pins);
@@ -126,12 +126,29 @@ describe("PinState", () => {
     assert.ok(roundTrip.x < 0, "projection round trip should preserve an out-of-world finite pin x");
     assert.ok(roundTrip.y > 680, "projection round trip should preserve an out-of-world finite pin y");
     assert.deepEqual(state.pins, {
-      "wiki/drag.md": { x: -42.5, y: 812.75 },
+      "wiki/drag.md": { x: -42.5, y: 812.75, coordinateSpace: "world" },
       "wiki/near.md": { x: 0, y: 245.7 }
     });
     assert.deepEqual(pinsToPositions(graph, state.pins), {
       drag: { x: -42.5, y: 812.75 },
       near: { x: 0, y: 245.7 }
+    });
+  });
+
+  it("separates old percent pins from new world pins", () => {
+    const graph = buildRenderableGraph(sampleGraph(), { theme: "shan-shui" });
+    const pins = new PinState(graph, {
+      "wiki/drag.md": { x: 8, y: 12, coordinateSpace: "world" },
+      "wiki/near.md": { x: 13, y: 50 }
+    }).snapshot();
+
+    assert.deepEqual(pins.pins, {
+      "wiki/drag.md": { x: 8, y: 12, coordinateSpace: "world" },
+      "wiki/near.md": { x: 13, y: 50 }
+    });
+    assert.deepEqual(pinsToPositions(graph, pins.pins), {
+      drag: { x: 8, y: 12 },
+      near: { x: 130, y: 340 }
     });
   });
 });

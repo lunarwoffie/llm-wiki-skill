@@ -182,15 +182,18 @@ export interface Community {
   members?: NodeId[];
 }
 
+export type PinCoordinateSpace = "world" | "legacy-percent";
+
 export interface PinPosition {
   x: number;
   y: number;
+  coordinateSpace?: PinCoordinateSpace;
 }
 
 export type PinMap = Record<WikiPath, PinPosition>;
 
 export interface GraphLayoutFile {
-  version: 1;
+  version: 1 | 2;
   pins: PinMap;
   updatedAt: string;
 }

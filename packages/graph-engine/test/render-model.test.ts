@@ -121,7 +121,7 @@ describe("buildRenderableGraph", () => {
     const graph = buildRenderableGraph(sampleGraph(), {
       theme: "shan-shui",
       pins: {
-        "wiki/entity.md": { x: 800, y: 340 }
+        "wiki/entity.md": { x: 800, y: 340, coordinateSpace: "world" }
       }
     });
 
@@ -132,13 +132,40 @@ describe("buildRenderableGraph", () => {
     assert.deepEqual(pinned.point, { x: 800, y: 340 });
   });
 
+  it("keeps explicit world pins readable even when coordinates look like old percentages", () => {
+    const graph = buildRenderableGraph(sampleGraph(), {
+      theme: "shan-shui",
+      pins: {
+        "wiki/entity.md": { x: 80, y: -42.5, coordinateSpace: "world" }
+      }
+    });
+
+    const pinned = graph.nodes.find((node) => node.id === "entity");
+    assert.ok(pinned);
+    assert.deepEqual(pinned.point, { x: 80, y: -42.5 });
+    assert.ok(graph.worldBounds.minY < 0);
+  });
+
+  it("continues to read old percent pins without a coordinate-space marker", () => {
+    const graph = buildRenderableGraph(sampleGraph(), {
+      theme: "shan-shui",
+      pins: {
+        "wiki/entity.md": { x: 80, y: 50 }
+      }
+    });
+
+    const pinned = graph.nodes.find((node) => node.id === "entity");
+    assert.ok(pinned);
+    assert.deepEqual(pinned.point, { x: 800, y: 340 });
+  });
+
   it("infers wiki-relative source paths for graph data without source_path", () => {
     const data = sampleGraph();
     data.nodes = data.nodes.map(({ source_path: _sourcePath, ...node }) => node);
     const graph = buildRenderableGraph(data, {
       theme: "shan-shui",
       pins: {
-        "wiki/topics/topic.md": { x: 900, y: 408 }
+        "wiki/topics/topic.md": { x: 900, y: 408, coordinateSpace: "world" }
       }
     });
 
@@ -306,7 +333,7 @@ describe("buildRenderableGraph", () => {
     const graph = buildRenderableGraph(outlierCommunityGraph(), {
       theme: "shan-shui",
       pins: {
-        "wiki/outlier.md": { x: 1240, y: 816 }
+        "wiki/outlier.md": { x: 1240, y: 816, coordinateSpace: "world" }
       }
     });
     const outlier = graph.nodes.find((node) => node.id === "outlier");

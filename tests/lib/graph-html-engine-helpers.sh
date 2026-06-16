@@ -70,7 +70,7 @@ build_graph_html_fixture_with_layout() {
 {
   "version": 1,
   "pins": {
-    "/fake/wiki/entities/A.md": { "x": 240, "y": 180 }
+    "/fake/wiki/entities/A.md": { "x": 240, "y": 180, "coordinateSpace": "world" }
   },
   "updatedAt": "2026-06-12T00:00:00.000Z"
 }

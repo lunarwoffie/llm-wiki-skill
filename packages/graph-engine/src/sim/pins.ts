@@ -1,5 +1,6 @@
 import type { NodeId, PinMap, PinPosition, WikiPath } from "../types";
 import type { RenderPositionMap, RenderableGraph } from "../render";
+import { normalizeStoredPinPosition, normalizeWorldPinPosition, pinPositionToWorldPoint } from "../render/pin-position";
 
 export interface PinStateSnapshot {
   pins: PinMap;
@@ -30,7 +31,7 @@ export class PinState {
     if (!key) throw new Error(`Cannot pin unknown graph node: ${id}`);
     this.pins = {
       ...this.pins,
-      [key]: normalizePosition(position)
+      [key]: normalizeWorldPinPosition(position)
     };
     return this.snapshot();
   }
@@ -64,7 +65,7 @@ export function pinsToPositions(graph: RenderableGraph, pins: PinMap): RenderPos
   for (const node of graph.nodes) {
     const key = pinKeyForNode(node);
     const pin = pins[key];
-    if (pin) positions[node.id] = normalizePosition(pin);
+    if (pin) positions[node.id] = pinPositionToWorldPoint(pin);
   }
   return positions;
 }
@@ -73,24 +74,11 @@ function normalizePinMap(pins: PinMap, knownPaths: Map<WikiPath, NodeId>): PinMa
   const normalized: PinMap = {};
   for (const [key, value] of Object.entries(pins)) {
     if (!knownPaths.has(key)) continue;
-    normalized[key] = normalizePosition(value);
+    normalized[key] = normalizeStoredPinPosition(value);
   }
   return normalized;
 }
 
-function normalizePosition(position: PinPosition): PinPosition {
-  return {
-    x: finiteNumber(position.x),
-    y: finiteNumber(position.y)
-  };
-}
-
 function pinKeyForNode(node: { sourcePath?: string; id: string }): WikiPath {
   return node.sourcePath || node.id;
-}
-
-function finiteNumber(value: unknown): number {
-  const numeric = Number(value);
-  if (!Number.isFinite(numeric)) return 0;
-  return numeric;
 }

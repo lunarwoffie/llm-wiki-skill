@@ -567,7 +567,7 @@ export async function putGraphLayout(kbPath: string, pins: PinMap): Promise<Grap
 	const res = await fetch(`/api/graph/layout?${kbQuery(kbPath)}`, {
 		method: "PUT",
 		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify({ version: 1, pins }),
+		body: JSON.stringify({ version: 2, pins }),
 	});
 	const json = (await res.json()) as GraphLayoutApiResult | { ok: false; error?: string };
 	if (!res.ok || !json.ok) throw new Error(("error" in json && json.error) || `HTTP ${res.status}`);

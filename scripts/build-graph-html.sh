@@ -119,7 +119,7 @@ NODE_COUNT_HTML=$(html_escape_text "$NODE_COUNT")
 EDGE_COUNT_HTML=$(html_escape_text "$EDGE_COUNT")
 BUILD_DATE_SHORT_HTML=$(html_escape_text "$BUILD_DATE_SHORT")
 
-layout_json='{"version":1,"pins":{},"updatedAt":""}'
+layout_json='{"version":2,"pins":{},"updatedAt":""}'
 if [ -f "$LAYOUT" ]; then
   if layout_json_candidate=$(jq -c '{version:(.version // 1), pins:(.pins // {}), updatedAt:(.updatedAt // "")}' "$LAYOUT" 2>/dev/null); then
     layout_json="$layout_json_candidate"

@@ -6,7 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
-import { diffGraphData, type GraphData, type GraphDiff } from "@llm-wiki/graph-engine";
+import { diffGraphData, type GraphData, type GraphDiff, type PinCoordinateSpace } from "@llm-wiki/graph-engine";
 
 const execFileAsync = promisify(execFile);
 
@@ -15,8 +15,8 @@ export type GraphReadResult =
 	| { ok: true; needsBuild: false; graphPath: string; data: GraphData };
 
 export type GraphLayoutFile = {
-	version: 1;
-	pins: Record<string, { x: number; y: number }>;
+	version: 1 | 2;
+	pins: Record<string, { x: number; y: number; coordinateSpace?: PinCoordinateSpace }>;
 	updatedAt: string;
 };
 
@@ -349,7 +349,7 @@ function defaultGraphWatchController(): KnowledgeBaseGraphWatcher {
 }
 
 function emptyGraphLayout(): GraphLayoutFile {
-	return { version: 1, pins: {}, updatedAt: "" };
+	return { version: 2, pins: {}, updatedAt: "" };
 }
 
 function normalizeGraphLayout(input: unknown): GraphLayoutFile {
@@ -359,14 +359,17 @@ function normalizeGraphLayout(input: unknown): GraphLayoutFile {
 	for (const [key, value] of Object.entries(pins)) {
 		if (!isSafeLayoutKey(key)) continue;
 		if (!value || typeof value !== "object") continue;
-		const point = value as { x?: unknown; y?: unknown };
+		const point = value as { x?: unknown; y?: unknown; coordinateSpace?: unknown };
 		const x = Number(point.x);
 		const y = Number(point.y);
 		if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
 		normalized[key] = { x, y };
+		if (isPinCoordinateSpace(point.coordinateSpace)) {
+			normalized[key].coordinateSpace = point.coordinateSpace;
+		}
 	}
 	return {
-		version: 1,
+		version: 2,
 		pins: normalized,
 		updatedAt: typeof (input as { updatedAt?: unknown } | null)?.updatedAt === "string"
 			? String((input as { updatedAt?: unknown }).updatedAt)
@@ -376,4 +379,8 @@ function normalizeGraphLayout(input: unknown): GraphLayoutFile {
 
 function isSafeLayoutKey(key: string): boolean {
 	return key.startsWith("wiki/") && !key.includes("..") && !path.isAbsolute(key);
+}
+
+function isPinCoordinateSpace(value: unknown): value is PinCoordinateSpace {
+	return value === "world" || value === "legacy-percent";
 }

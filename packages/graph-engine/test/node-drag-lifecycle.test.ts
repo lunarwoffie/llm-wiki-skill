@@ -19,7 +19,7 @@ describe("graph node drag lifecycle", () => {
 
     assert.deepEqual(result.pinPosition, { x: 460, y: 300 });
     assert.deepEqual(result.pins, {
-      "wiki/drag.md": { x: 460, y: 300 }
+      "wiki/drag.md": { x: 460, y: 300, coordinateSpace: "world" }
     });
     assert.deepEqual(result.pinnedNodeIds, ["drag"]);
     assert.equal(simulation.nodes.find((node) => node.id === "drag")?.fx, 460);
@@ -44,7 +44,7 @@ describe("graph node drag lifecycle", () => {
 
     assert.deepEqual(result.pinPosition, { x: 620, y: 410 });
     assert.deepEqual(result.pins, {
-      "wiki/drag.md": { x: 620, y: 410 }
+      "wiki/drag.md": { x: 620, y: 410, coordinateSpace: "world" }
     });
     assert.equal(simulation.nodes.find((node) => node.id === "drag")?.fx, 620);
     assert.equal(simulation.nodes.find((node) => node.id === "drag")?.fy, 410);
@@ -78,14 +78,14 @@ describe("graph node drag lifecycle", () => {
 
   it("cancels a pinned drag by restoring the previous pin and keeping it fixed", () => {
     const pins: PinMap = {
-      "wiki/drag.md": { x: 320, y: 240 }
+      "wiki/drag.md": { x: 320, y: 240, coordinateSpace: "world" }
     };
     const graph = buildRenderableGraph(sampleGraph(), { theme: "shan-shui", pins });
     const simulation = createLiveGraphSimulation(graph);
     const pinState = new PinState(graph, pins);
     const startWorldPoint = pins["wiki/drag.md"];
     assert.ok(startWorldPoint);
-    assert.deepEqual(startWorldPoint, { x: 320, y: 240 });
+    assert.deepEqual(startWorldPoint, { x: 320, y: 240, coordinateSpace: "world" });
 
     simulation.beginDrag("drag");
     simulation.dragTo("drag", { x: 700, y: 500 });
