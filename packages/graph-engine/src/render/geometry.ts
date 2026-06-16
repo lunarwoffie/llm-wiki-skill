@@ -5,12 +5,22 @@ export interface GraphWorldPoint {
   y: number;
 }
 
+export interface GraphWorldSize {
+  width: number;
+  height: number;
+}
+
 export interface GraphScreenPoint {
   x: number;
   y: number;
 }
 
 export interface GraphLayerPoint {
+  x: number;
+  y: number;
+}
+
+export interface GraphCssPercentPoint {
   x: number;
   y: number;
 }
@@ -78,6 +88,14 @@ export function worldPointToLayerPoint(worldPoint: GraphWorldPoint, viewportSize
   };
 }
 
+export function worldPointToCssPercentPoint(worldPoint: GraphWorldPoint, worldSize: GraphWorldSize = GRAPH_WORLD_SIZE): GraphCssPercentPoint {
+  const size = normalizeWorldSize(worldSize);
+  return {
+    x: finiteNumber(worldPoint.x, 0) / size.width * 100,
+    y: finiteNumber(worldPoint.y, 0) / size.height * 100
+  };
+}
+
 export function layerPointToWorldPoint(layerPoint: GraphLayerPoint, viewportSize: RendererViewportSize): GraphWorldPoint {
   const size = normalizeViewportSize(viewportSize);
   return {
@@ -118,6 +136,17 @@ export function worldDeltaToLayerDelta(worldDelta: GraphWorldPoint, viewportSize
     x: finiteNumber(worldDelta.x, 0) / GRAPH_WORLD_SIZE.width * size.width,
     y: finiteNumber(worldDelta.y, 0) / GRAPH_WORLD_SIZE.height * size.height
   };
+}
+
+export function worldPointDeltaToLayerDelta(
+  previousWorldPoint: GraphWorldPoint,
+  nextWorldPoint: GraphWorldPoint,
+  viewportSize: RendererViewportSize
+): GraphLayerPoint {
+  return worldDeltaToLayerDelta({
+    x: finiteNumber(nextWorldPoint.x, 0) - finiteNumber(previousWorldPoint.x, 0),
+    y: finiteNumber(nextWorldPoint.y, 0) - finiteNumber(previousWorldPoint.y, 0)
+  }, viewportSize);
 }
 
 export function layerDeltaToWorldDelta(layerDelta: GraphLayerPoint, viewportSize: RendererViewportSize): GraphWorldPoint {
@@ -207,6 +236,22 @@ export function rendererPointToScreenPoint(point: RendererPoint): GraphScreenPoi
   };
 }
 
+export function defaultGraphViewportSize(): RendererViewportSize {
+  return {
+    width: GRAPH_WORLD_SIZE.width,
+    height: GRAPH_WORLD_SIZE.height
+  };
+}
+
+export function sideExitWorldAnchor(worldPoint: GraphWorldPoint, margin = 80, worldSize: GraphWorldSize = GRAPH_WORLD_SIZE): GraphWorldPoint {
+  const size = normalizeWorldSize(worldSize);
+  const safeMargin = Math.max(0, finiteNumber(margin, 80));
+  return {
+    x: finiteNumber(worldPoint.x, 0) < size.width / 2 ? -safeMargin : size.width + safeMargin,
+    y: clamp(finiteNumber(worldPoint.y, 0), safeMargin, Math.max(safeMargin, size.height - safeMargin))
+  };
+}
+
 function normalizeViewport(viewport: RendererViewport): RendererViewport {
   return {
     x: finiteNumber(viewport.x, 0),
@@ -216,6 +261,13 @@ function normalizeViewport(viewport: RendererViewport): RendererViewport {
 }
 
 function normalizeViewportSize(size: RendererViewportSize): RendererViewportSize {
+  return {
+    width: Math.max(1, finiteNumber(size.width, GRAPH_WORLD_SIZE.width)),
+    height: Math.max(1, finiteNumber(size.height, GRAPH_WORLD_SIZE.height))
+  };
+}
+
+function normalizeWorldSize(size: GraphWorldSize): GraphWorldSize {
   return {
     width: Math.max(1, finiteNumber(size.width, GRAPH_WORLD_SIZE.width)),
     height: Math.max(1, finiteNumber(size.height, GRAPH_WORLD_SIZE.height))

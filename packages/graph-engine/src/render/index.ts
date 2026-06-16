@@ -106,16 +106,20 @@ export type {
 export {
   GRAPH_MINIMAP_VIEWBOX,
   GRAPH_WORLD_SIZE,
+  defaultGraphViewportSize,
   layerDeltaToWorldDelta,
   layerPointToWorldPoint,
   minimapPointToWorldPoint,
   rendererPointToScreenPoint,
   rootClientPointToScreenPoint,
   screenPointToWorldPoint,
+  sideExitWorldAnchor,
   svgPointToWorldPoint,
   visibleWorldRectForViewport,
   visibleWorldRectToMinimapRect,
   worldDeltaToLayerDelta,
+  worldPointDeltaToLayerDelta,
+  worldPointToCssPercentPoint,
   worldPointToLayerPoint,
   worldPointToMinimapPoint,
   worldPointToScreenPoint,
@@ -123,6 +127,7 @@ export {
 } from "./geometry";
 export type {
   GraphClientPoint,
+  GraphCssPercentPoint,
   GraphDomRectLike,
   GraphLayerPoint,
   GraphMinimapPoint,
@@ -130,7 +135,8 @@ export type {
   GraphScreenPoint,
   GraphSvgPoint,
   GraphWorldPoint,
-  GraphWorldRect
+  GraphWorldRect,
+  GraphWorldSize
 } from "./geometry";
 export {
   DEFAULT_RENDERER_VIEWPORT,

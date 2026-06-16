@@ -283,6 +283,22 @@ describe("buildRenderableGraph", () => {
     assert.equal(community.wash.rx, 190);
     assert.equal(community.wash.ry, 142.8);
   });
+
+  it("preserves live drag positions outside the old default world", () => {
+    const graph = buildRenderableGraph(outlierCommunityGraph(), {
+      theme: "shan-shui",
+      positions: {
+        outlier: { x: 1240, y: 816 }
+      }
+    });
+    const outlier = graph.nodes.find((node) => node.id === "outlier");
+
+    assert.ok(outlier);
+    assert.deepEqual(outlier.point, { x: 1240, y: 816 });
+    assert.equal(outlier.x, 124);
+    assert.equal(outlier.y, 120);
+    assert.equal(outlier.community, "c1");
+  });
 });
 
 function communityWashStates(graph: ReturnType<typeof buildRenderableGraph>): Array<[string, boolean]> {

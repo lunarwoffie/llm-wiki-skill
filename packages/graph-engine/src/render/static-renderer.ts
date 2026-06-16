@@ -44,7 +44,13 @@ import {
 import { createGraphRuntimeState, type GraphRuntimeStateSnapshot } from "./state";
 import { resolveGraphSearchState, resolveNextGraphSearchFocus } from "./search";
 import { buildHoverPreview, type GraphHoverPreview } from "./preview";
-import { GRAPH_WORLD_SIZE, rootClientPointToScreenPoint, worldDeltaToLayerDelta, type GraphWorldPoint } from "./geometry";
+import {
+  defaultGraphViewportSize,
+  rootClientPointToScreenPoint,
+  sideExitWorldAnchor,
+  worldPointDeltaToLayerDelta,
+  type GraphWorldPoint
+} from "./geometry";
 import { beginGraphNodeDrag, resolveGraphNodeDragTarget } from "./simulation-bridge";
 import { cancelGraphNodeDrag, commitGraphNodeDrag, type GraphNodeDragSession } from "./node-drag-lifecycle";
 import { graphEdgeHoverAnchor, graphNodeHoverAnchor, resolveGraphHoverPreviewPosition } from "./overlays";
@@ -680,9 +686,7 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
       const element = dom.nodeElements.get(node.id);
       const base = dom.basePoints.get(node.id);
       if (!element || !base) continue;
-      const dx = node.point.x - base.x;
-      const dy = node.point.y - base.y;
-      const layerDelta = worldDeltaToLayerDelta({ x: dx, y: dy }, size);
+      const layerDelta = worldPointDeltaToLayerDelta(base, node.point, size);
       element.style.translate = `calc(-50% + ${round(layerDelta.x)}px) calc(-50% + ${round(layerDelta.y)}px)`;
       element.dataset.liveX = String(round(node.point.x));
       element.dataset.liveY = String(round(node.point.y));
@@ -802,6 +806,7 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
       selectedNodeId = id;
       options.onOpenPage?.(openPagePayloadForNode(data, id));
       render({ selectedNodeId: id, selection: null });
+      focusRenderedNode(id);
       return;
     }
     const nextSelection = shiftSelection(id, manualNodeIds.length ? manualNodeIds : selectedNodeIds(selection));
@@ -810,6 +815,11 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
     selectedNodeId = null;
     options.onSelectionChange?.(nextSelection);
     render({ selection: nextSelection });
+    focusRenderedNode(id);
+  }
+
+  function focusRenderedNode(id: NodeId): void {
+    dom.nodeElements.get(id)?.focus({ preventScroll: true });
   }
 
   function handleNodeDragStart(id: NodeId, event: PointerEvent): void {
@@ -1062,9 +1072,10 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
 
   function viewportSize(): { width: number; height: number } {
     const rect = root.getBoundingClientRect();
+    const fallback = defaultGraphViewportSize();
     return {
-      width: Math.max(1, rect.width || GRAPH_WORLD_SIZE.width),
-      height: Math.max(1, rect.height || GRAPH_WORLD_SIZE.height)
+      width: Math.max(1, rect.width || fallback.width),
+      height: Math.max(1, rect.height || fallback.height)
     };
   }
 
@@ -1158,10 +1169,7 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
       .find((candidate) => candidate !== id);
     const neighbor = neighborId ? graph.nodes.find((item) => item.id === neighborId) : null;
     if (neighbor) return neighbor.point;
-    return {
-      x: node.point.x < GRAPH_WORLD_SIZE.width / 2 ? -80 : GRAPH_WORLD_SIZE.width + 80,
-      y: clamp(node.point.y, 80, GRAPH_WORLD_SIZE.height - 80)
-    };
+    return sideExitWorldAnchor(node.point);
   }
 
   function renderReader(): void {

@@ -1,7 +1,6 @@
 import type { GraphData, GraphFocusInput, GraphTypeFilters, NodeId, PinMap, SelectionInput, ThemeId, WikiPath } from "../types";
 import {
   atlasNodePoint,
-  atlasPointToMinimap,
   buildAtlasModel,
   deriveAtlasLayout,
   getAtlasDensityMode,
@@ -10,7 +9,7 @@ import {
 import { wikiPathForGraphNode } from "../graph-node";
 import { getCommunityColor } from "../themes";
 import { computeCommunityWash } from "./community-wash";
-import { GRAPH_WORLD_SIZE } from "./geometry";
+import { GRAPH_WORLD_SIZE, worldPointToCssPercentPoint, worldPointToMinimapPoint } from "./geometry";
 
 export type DensityMode = "card" | "compact-card" | "point-plus-focus" | "overview";
 export type NodeDisplayMode = "card" | "compact-card" | "point" | "overview";
@@ -222,6 +221,7 @@ export function buildRenderableGraph(data: GraphData, options: BuildRenderableGr
       ? "card"
       : nodeDisplayMode(node, filteredDensityMode, selectedNodeId, previewNodeId, labelIds, importantIds);
     const point = renderPointForNode(node, options.positions);
+    const cssPoint = worldPointToCssPercentPoint(point);
     return {
       id: node.id,
       label: node.label,
@@ -229,8 +229,8 @@ export function buildRenderableGraph(data: GraphData, options: BuildRenderableGr
       kind: node.kind,
       community: node.community,
       sourcePath: wikiPathForGraphNode(node),
-      x: pointToPercentX(point.x),
-      y: pointToPercentY(point.y),
+      x: round(cssPoint.x),
+      y: round(cssPoint.y),
       point,
       displayMode,
       visualRole: nodeVisualRole(node, displayMode, isSelected ? node.id : selectedNodeId, previewNodeId, importantIds),
@@ -303,7 +303,7 @@ export function buildRenderableGraph(data: GraphData, options: BuildRenderableGr
     minimap: {
       path: MINIMAP_PATH,
       nodes: nodes.slice(0, 60).map((node) => {
-        const point = atlasPointToMinimap(node.point) as { x: number; y: number };
+        const point = worldPointToMinimapPoint(node.point);
         return {
           id: node.id,
           x: point.x,
@@ -446,19 +446,11 @@ function renderPointForNode(node: AtlasNode, positions?: RenderPositionMap): Ren
   const position = positions?.[node.id];
   if (position) {
     return {
-      x: clamp(position.x, 0, GRAPH_WORLD_SIZE.width),
-      y: clamp(position.y, 0, GRAPH_WORLD_SIZE.height)
+      x: finitePositionCoordinate(position.x),
+      y: finitePositionCoordinate(position.y)
     };
   }
   return atlasNodePoint(node) as RenderPosition;
-}
-
-function pointToPercentX(value: number): number {
-  return round(clamp(value, 0, GRAPH_WORLD_SIZE.width) / GRAPH_WORLD_SIZE.width * 100);
-}
-
-function pointToPercentY(value: number): number {
-  return round(clamp(value, 0, GRAPH_WORLD_SIZE.height) / GRAPH_WORLD_SIZE.height * 100);
 }
 
 function edgeCurveOffset(sourcePoint: RenderPosition, targetPoint: RenderPosition, edge: { weight?: number }): number {
@@ -473,6 +465,11 @@ function normalizePinnedX(value: number): number {
 
 function normalizePinnedY(value: number): number {
   return value > 100 ? clamp(value / GRAPH_WORLD_SIZE.height * 100, 0, 100) : clamp(value, 0, 100);
+}
+
+function finitePositionCoordinate(value: unknown): number {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : 0;
 }
 
 function resolveSelectedNodeIds(

@@ -8,10 +8,13 @@ import {
   minimapPointToWorldPoint,
   rootClientPointToScreenPoint,
   screenPointToWorldPoint,
+  sideExitWorldAnchor,
   svgPointToWorldPoint,
   visibleWorldRectForViewport,
   visibleWorldRectToMinimapRect,
   worldDeltaToLayerDelta,
+  worldPointDeltaToLayerDelta,
+  worldPointToCssPercentPoint,
   worldPointToLayerPoint,
   worldPointToMinimapPoint,
   worldPointToScreenPoint,
@@ -85,6 +88,16 @@ describe("graph geometry projection", () => {
     const roundTrip = layerDeltaToWorldDelta(layerDelta, VIEWPORT_SIZE);
 
     assertPointNear(roundTrip, worldDelta);
+    assertPointNear(
+      worldPointDeltaToLayerDelta({ x: 220, y: 180 }, { x: 270, y: 146 }, VIEWPORT_SIZE),
+      layerDelta
+    );
+  });
+
+  it("maps out-of-world positions to css percentages without clamping them", () => {
+    const cssPoint = worldPointToCssPercentPoint({ x: 1240, y: 816 });
+
+    assertPointNear(cssPoint, { x: 124, y: 120 });
   });
 
   it("keeps svg point naming explicit even while svg and world share the same domain", () => {
@@ -113,5 +126,10 @@ describe("graph geometry projection", () => {
     assert.ok(minimapRect.y > GRAPH_MINIMAP_VIEWBOX.y);
     assert.ok(minimapRect.width > 0);
     assert.ok(minimapRect.height > 0);
+  });
+
+  it("derives side anchors for isolated diff motion outside the default world", () => {
+    assert.deepEqual(sideExitWorldAnchor({ x: 120, y: 20 }), { x: -80, y: 80 });
+    assert.deepEqual(sideExitWorldAnchor({ x: 900, y: 900 }), { x: 1080, y: 600 });
   });
 });
