@@ -3,8 +3,8 @@
   "status": {
     "overall": "pending",
     "phase": "phase-3",
-    "task": "3.4",
-    "next_allowed_action": "Run the baseline smoke check, then preserve old workbench and offline pin data under new bounds for task 3.4."
+    "task": "3.5",
+    "next_allowed_action": "Run the baseline smoke check, then handle graph data refresh while dragging for task 3.5."
   },
   "execution_rules": {
     "parent_branch": "codex/graph-interaction-architecture",
@@ -556,8 +556,15 @@
         },
         {
           "check": "Workbench and offline browser regressions exit 0, including old pin compatibility.",
-          "status": "pending",
-          "evidence": []
+          "status": "passed",
+          "evidence": [
+            "PinCoordinateSpace now distinguishes explicit world pins from old percent pins, so new pins with small or negative coordinates are not misread as percentages.",
+            "GraphLayoutFile accepts version 1 and 2; workbench and offline writers now emit version 2 while old version 1 pin maps remain readable.",
+            "render-model.test.ts covers explicit world pins whose coordinates look like old percentages plus old unmarked percent pins.",
+            "sim.test.ts covers PinState preserving old percent pins and new explicit world pins through pinsToPositions.",
+            "workbench/server/src/graph.test.ts covers reading old layout files, preserving explicit world and legacy-percent coordinateSpace markers, and filtering invalid coordinateSpace values.",
+            "graph-offline-phase-6 browser regression verifies dragged offline pins persist to localStorage with coordinateSpace: world and survive reload."
+          ]
         }
       ],
       "tasks": [
@@ -718,9 +725,55 @@
         {
           "id": "3.4",
           "title": "Preserve old workbench and offline pin data under new bounds",
-          "status": "pending",
-          "verification": [],
-          "commit": null
+          "status": "completed",
+          "verification": [
+            {
+              "command": "npm run test --workspace=@llm-wiki/graph-engine",
+              "result": "230 tests passed, 0 failed",
+              "status": "passed"
+            },
+            {
+              "command": "npm run typecheck --workspace=@llm-wiki/graph-engine",
+              "result": "tsc -p tsconfig.json --noEmit exited 0",
+              "status": "passed"
+            },
+            {
+              "command": "npm run build --workspace=@llm-wiki/graph-engine",
+              "result": "vite build and declaration emit exited 0",
+              "status": "passed"
+            },
+            {
+              "command": "node --import tsx --test workbench/server/src/graph.test.ts",
+              "result": "5 tests passed, 0 failed",
+              "status": "passed"
+            },
+            {
+              "command": "npm run typecheck --workspace=@llm-wiki-agent/server",
+              "result": "tsc -p tsconfig.json --noEmit exited 0 after graph-engine declaration build",
+              "status": "passed"
+            },
+            {
+              "command": "npm run typecheck --workspace=@llm-wiki-agent/web",
+              "result": "graph-engine prebuild and tsc -b --noEmit exited 0",
+              "status": "passed"
+            },
+            {
+              "command": "bash tests/graph-workbench-interactions.regression-1.sh",
+              "result": "PASS: graph workbench interaction regression",
+              "status": "passed"
+            },
+            {
+              "command": "bash tests/graph-offline-phase-6.regression-1.sh",
+              "result": "PASS: phase 6 offline graph regression; evidence shows storedPins include coordinateSpace: world and pinnedCount 1 after reload",
+              "status": "passed"
+            },
+            {
+              "command": "git diff --check",
+              "result": "No whitespace errors",
+              "status": "passed"
+            }
+          ],
+          "commit": "ccce68d"
         },
         {
           "id": "3.5",
