@@ -3,8 +3,8 @@
   "status": {
     "overall": "pending",
     "phase": "phase-6",
-    "task": "6.1",
-    "next_allowed_action": "Begin Phase 6 community wash soft-boundary behavior."
+    "task": "6.2",
+    "next_allowed_action": "Let dragged or pinned outliers influence community wash within caps without changing membership."
   },
   "execution_rules": {
     "parent_branch": "codex/graph-interaction-architecture",
@@ -1366,9 +1366,35 @@
         {
           "id": "6.1",
           "title": "Lock community wash cap fixtures against expanded layout bounds",
-          "status": "pending",
-          "verification": [],
-          "commit": null
+          "status": "completed",
+          "verification": [
+            {
+              "command": "node --import tsx --test packages/graph-engine/test/community-wash.test.ts",
+              "result": "4 tests passed, 0 failed; includes a single extreme dragged outlier cap fixture.",
+              "status": "passed"
+            },
+            {
+              "command": "node --import tsx --test packages/graph-engine/test/community-wash.test.ts packages/graph-engine/test/render-model.test.ts",
+              "result": "27 tests passed, 0 failed; render model confirms expanded world bounds do not enlarge wash caps.",
+              "status": "passed"
+            },
+            {
+              "command": "npm run test --workspace=@llm-wiki/graph-engine",
+              "result": "249 tests passed, 0 failed",
+              "status": "passed"
+            },
+            {
+              "command": "npm run typecheck --workspace=@llm-wiki/graph-engine",
+              "result": "tsc -p tsconfig.json --noEmit exited 0",
+              "status": "passed"
+            },
+            {
+              "command": "git diff --check",
+              "result": "No whitespace errors",
+              "status": "passed"
+            }
+          ],
+          "commit": "e24f329"
         },
         {
           "id": "6.2",
