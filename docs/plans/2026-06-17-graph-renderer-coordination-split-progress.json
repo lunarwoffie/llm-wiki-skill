@@ -3,9 +3,9 @@
   "spec": "docs/spark/2026-06-17-static-renderer-coordination-split-design.md",
   "status": {
     "overall": "in_progress",
-    "phase": "phase-1",
-    "task": "1.3",
-    "next_allowed_action": "Move semantic commands and keyboard routing into controller; search-state fields are already in context."
+    "phase": "phase-2",
+    "task": "2.1",
+    "next_allowed_action": "Split render() into applyOptionChanges (state) + rebuildAndPaint (draw), behavior-preserving."
   },
   "execution_rules": {
     "branch": "feat/graph-renderer-coordination-split",
@@ -108,7 +108,7 @@
         "bash tests/graph-offline-phase-6.regression-1.sh exits 0",
         "controller.ts has no paint/mount* calls, no drawing-piece create* imports, no render-model computation"
       ],
-      "status": "in_progress",
+      "status": "completed",
       "tasks": [
         {
           "id": "1.0",
@@ -221,7 +221,48 @@
             }
           ]
         },
-        { "id": "1.3", "title": "Move semantic commands + keyboard routing into controller; search-state fields move into context", "status": "pending", "verification": [] }
+        {
+          "id": "1.3",
+          "title": "Move semantic commands + keyboard routing into controller; search-state fields move into context",
+          "status": "completed",
+          "verification": [
+            {
+              "command": "git log --oneline -15",
+              "exit": 0,
+              "evidence": "task 1.2 commit present: 7495c9d refactor: extract graph controller wiring [task 1.2]"
+            },
+            {
+              "command": "npm run test --workspace=@llm-wiki/graph-engine",
+              "exit": 0,
+              "evidence": "265 tests passed, 0 failed before starting 1.3 and after semantic command/keyboard move"
+            },
+            {
+              "command": "npm run typecheck --workspace=@llm-wiki/graph-engine",
+              "exit": 0,
+              "evidence": "tsc --noEmit completed after semantic command/keyboard move"
+            },
+            {
+              "command": "bash -lc '! rg -n \"\\\\bpaint\\\\b|mount[A-Z]|createGraphNodeElement|createGraphEdgeElement|createCommunityWashElement|buildRenderableGraph|createGraphMinimap\" packages/graph-engine/src/render/controller.ts'",
+              "exit": 0,
+              "evidence": "controller.ts has no paint/mount calls, drawing-piece create imports, or render-model build call matches"
+            },
+            {
+              "command": "git diff --check",
+              "exit": 0,
+              "evidence": "no whitespace errors"
+            },
+            {
+              "command": "bash tests/graph-workbench-interactions.regression-1.sh",
+              "exit": 0,
+              "evidence": "PASS: graph workbench interaction regression"
+            },
+            {
+              "command": "bash tests/graph-offline-phase-6.regression-1.sh",
+              "exit": 0,
+              "evidence": "PASS: phase 6 offline graph regression"
+            }
+          ]
+        }
       ]
     },
     {
@@ -235,7 +276,7 @@
         "stage-4.5 offline exits 0 and captured fps >= 45 (recorded)",
         "render-pipeline.ts does not call gesture classification or write semantic state"
       ],
-      "status": "pending",
+      "status": "in_progress",
       "tasks": [
         { "id": "2.1", "title": "Split render() into applyOptionChanges (state) + rebuildAndPaint (draw), behavior-preserving", "status": "pending", "verification": [] },
         { "id": "2.2", "title": "Extract render-pipeline.ts: rebuildAndPaint/paint/mount*/viewport commit/diff animation/sim frame, writing context graph/dom/pinState", "status": "pending", "verification": [] }
@@ -316,6 +357,11 @@
       "task": "1.2",
       "status": "completed",
       "notes": "Extracted controller.ts for gesture intent dispatch, viewport handler wiring, node click/drag, blank click, and node-drag helpers; static-renderer now creates and delegates to the controller."
+    },
+    {
+      "task": "1.3",
+      "status": "completed",
+      "notes": "Moved semantic commands, search commands, toolbar close, interaction clearing, community focus/select, reset/retreat, and document key routing into controller.ts; Phase 1 acceptance passed."
     }
   ]
 }

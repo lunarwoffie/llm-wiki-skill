@@ -28,16 +28,13 @@ import { buildCommunityLegend } from "./legend";
 import {
   DEFAULT_RENDERER_VIEWPORT,
   applyRendererViewportTransform,
-  centerRendererViewportOnPoint,
   createViewportFrameCommitter,
-  fitRendererViewportToPoints,
   rendererViewportToMinimapRect,
   viewportAfterResize,
   type RendererViewport,
   type ViewportFrameCommitOptions
 } from "./viewport";
 import { createGraphRuntimeState, type GraphRuntimeStateSnapshot } from "./state";
-import { resolveGraphSearchState, resolveNextGraphSearchFocus } from "./search";
 import { buildHoverPreview } from "./preview";
 import {
   defaultGraphViewportSize,
@@ -52,7 +49,6 @@ import { createGraphMinimap } from "./minimap";
 import { createEdgeHoverPreviewContent, createHoverPreviewContent } from "./hover-card";
 import { createCommunityLegend, createGraphToolbar, createSearchControl } from "./controls";
 import { renderOfflineReader, renderOfflineSelectionPanel } from "./offline-reader";
-import { classifyGraphKeyboardIntent, isTextEditingElement } from "./keyboard";
 import { createGraphRootElement, resetGraphRootScroll } from "./host-dom";
 import { createGraphHitTargetResolver } from "./hit-testing";
 import {
@@ -61,8 +57,6 @@ import {
 import {
   nextToolbarPanelState,
   readToolbarPanelState,
-  shouldBlankClickCloseToolbar,
-  toolbarPanelStateAfterBlankClick,
   writeToolbarPanelState
 } from "./toolbar";
 import type { GraphRenderContext, PaintedGraphDom } from "./render-context";
@@ -122,55 +116,6 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
   let context: GraphRenderContext;
   let controller: GraphController;
   root.addEventListener("scroll", resetRootScroll, { passive: true });
-  const handleDocumentKeydown = (event: KeyboardEvent) => {
-    const keyboardIntent = classifyGraphKeyboardIntent({
-      key: event.key,
-      ctrlKey: event.ctrlKey,
-      metaKey: event.metaKey,
-      graphFocused: isGraphKeyboardFocusActive(),
-      activeGesture: Boolean(context.gestureMachine.snapshot()),
-      textEditingTarget: isTextEditingElement(context.ownerDocument.activeElement),
-      searchActive: Boolean(context.searchOpen || context.searchQuery || context.searchFocusedNodeId),
-      toolbarOpen: shouldBlankClickCloseToolbar(context.toolbarPanelState),
-      interactionActive: hasInteractionState()
-    });
-
-    if (keyboardIntent === "blocked") return;
-
-    if (keyboardIntent === "open-search") {
-      event.preventDefault();
-      openSearch();
-      return;
-    }
-
-    event.preventDefault();
-    event.stopPropagation();
-
-    if (keyboardIntent === "close-search") {
-      closeSearch();
-      return;
-    }
-    if (keyboardIntent === "close-toolbar") {
-      closeToolbarPanel();
-      return;
-    }
-    if (keyboardIntent === "cancel-active-gesture") {
-      const intents = context.gestureMachine.escape();
-      if (intents.length) {
-        controller.onGestureIntents(intents, null);
-        controller.syncRuntimeGestureState();
-      }
-      return;
-    }
-
-    if (context.runtimeState.snapshot().focus) {
-      resetViewState();
-      return;
-    }
-    clearInteractionState();
-  };
-  ownerDocument.addEventListener("keydown", handleDocumentKeydown);
-
   const initialGraph = buildRenderableGraph(options.data, {
     pins: initialPins,
     theme: options.theme,
@@ -238,13 +183,12 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
     render,
     viewportSize,
     setViewportAnimating,
-    resetViewState,
-    selectCommunity,
-    closeToolbarPanel,
-    retreatFocusedView,
+    setGraphHover,
     applyMotionFrame,
-    markPinnedNodes
+    markPinnedNodes,
+    focusFitMaxScale: FOCUS_FIT_MAX_SCALE
   });
+  context.ownerDocument.addEventListener("keydown", controller.handleDocumentKeydown);
   context.gestureController = controller.bindViewportHandlers();
   bindResizeObserver();
 
@@ -302,7 +246,7 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
     context.lastEffectiveDensityMode = null;
     mountSearchControl();
     mountGraphToolbar();
-    applySearchQuery(context.searchQuery);
+    controller.applySearchQuery(context.searchQuery);
     applyCommunityHover();
     commitViewport(context.runtimeState.snapshot().viewport);
     if (context.activeDiff && context.root.dataset.diffState === "playing") markDiffElements(context.activeDiff);
@@ -328,7 +272,7 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
       return context.runtimeState.snapshot().activeGesture?.kind === "node-drag";
     },
     setData(nextData: GraphData, nextPins?: PinMap): void {
-      clearTransientInteractionForDataRefresh();
+      controller.clearTransientInteractionForDataRefresh();
       render({ data: nextData, pins: nextPins ?? context.runtimeState.snapshot().pins });
     },
     setTheme(nextTheme: ThemeId): void {
@@ -344,23 +288,23 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
       context.root.dataset.focus = pathOrId;
     },
     focusCommunity(id: CommunityId): void {
-      focusCommunity(id);
+      controller.focusCommunity(id);
     },
     setTypeFilters(filters: GraphTypeFilters): void {
       render({ typeFilters: filters });
     },
     resetView(): void {
-      resetViewState();
+      controller.resetViewState();
     },
     select(nextSelection: SelectionInput): void {
       context.runtimeState.setSelection(nextSelection, "selection-panel");
       render();
     },
     clearSelection(): void {
-      retreatFocusedView();
+      controller.retreatFocusedView();
     },
     clearInteraction(): void {
-      clearInteractionState();
+      controller.clearInteractionState();
     },
     resetLayout(): void {
       const nextState = context.pinState.reset();
@@ -376,7 +320,7 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
       context.resizeObserver?.disconnect();
       context.resizeObserver = null;
       context.root.removeEventListener("scroll", resetRootScroll);
-      context.ownerDocument.removeEventListener("keydown", handleDocumentKeydown);
+      context.ownerDocument.removeEventListener("keydown", controller.handleDocumentKeydown);
       context.gestureController?.destroy();
       context.gestureController = null;
       if (context.previewTimer) clearTimeout(context.previewTimer);
@@ -408,121 +352,20 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
     if (context.destroyed) throw new Error("Graph renderer has been destroyed");
   }
 
-  function clearInteractionState(): void {
-    context.searchFocusedNodeId = null;
-    if (context.previewTimer) {
-      clearTimeout(context.previewTimer);
-      context.previewTimer = null;
-    }
-    context.runtimeState.clearInteraction();
-    delete context.root.dataset.focus;
-    context.callbacks.onSelectionClearRequested?.();
-    render();
-  }
-
-  function clearTransientInteractionForDataRefresh(): void {
-    context.searchFocusedNodeId = null;
-    if (context.previewTimer) {
-      clearTimeout(context.previewTimer);
-      context.previewTimer = null;
-    }
-    for (const node of context.dom.nodeElements.values()) node.classList.remove("is-dragging");
-    delete context.root.dataset.dragging;
-    delete context.root.dataset.viewportDragging;
-    delete context.root.dataset.focus;
-    context.simulation?.endDrag();
-    context.gestureMachine.escape();
-    context.runtimeState.clearInteraction();
-    context.callbacks.onDragActiveChange?.(false);
-    context.callbacks.onSelectionClearRequested?.();
-  }
-
-  function hasInteractionState(): boolean {
-    const snapshot = context.runtimeState.snapshot();
-    return Boolean(snapshot.selection || snapshot.focus || context.root.dataset.focus);
-  }
-
-  function isGraphKeyboardFocusActive(): boolean {
-    const active = context.ownerDocument.activeElement;
-    if (active === context.root || Boolean(active && context.root.contains(active))) return true;
-    return false;
-  }
-
-  function openSearch(): void {
-    context.searchOpen = true;
-    context.root.dataset.searchOpen = "true";
-    if (context.dom.searchElement) context.dom.searchElement.dataset.state = "open";
-    if (context.dom.searchInput) {
-      context.dom.searchInput.focus();
-      context.dom.searchInput.select();
-    }
-  }
-
   function mountSearchControl(): void {
     const control = createSearchControl(context.ownerDocument, {
       open: context.searchOpen,
       query: context.searchQuery,
-      onOpen: () => openSearch(),
-      onQuery: (query) => applySearchQuery(query),
-      onNext: () => focusNextSearchResult(),
-      onClose: () => closeSearch()
+      onOpen: () => controller.openSearch(),
+      onQuery: (query) => controller.applySearchQuery(query),
+      onNext: () => controller.focusNextSearchResult(),
+      onClose: () => controller.closeSearch()
     });
     context.dom.searchElement = control.element;
     context.dom.searchInput = control.input;
     context.dom.searchStatusElement = control.status;
     context.root.prepend(control.element);
     context.root.dataset.searchOpen = context.searchOpen ? "true" : "false";
-  }
-
-  function applySearchQuery(query: string): void {
-    if (query !== context.searchQuery) context.searchFocusedNodeId = null;
-    context.searchQuery = query;
-    const state = resolveGraphSearchState(context.data.nodes, context.searchQuery, context.searchIndex);
-    context.searchIndex = state.searchIndex;
-    context.root.dataset.searchActive = state.query ? "true" : "false";
-    context.root.dataset.searchQuery = state.query;
-    if (!state.matchIds.includes(context.searchFocusedNodeId || "")) context.searchFocusedNodeId = null;
-    for (const node of state.nodes) {
-      const element = context.dom.nodeElements.get(node.id);
-      if (!element) continue;
-      element.dataset.searchState = node.searchState;
-      element.dataset.searchFocus = node.id === context.searchFocusedNodeId ? "true" : "false";
-    }
-    if (context.dom.searchInput && context.dom.searchInput.value !== context.searchQuery) context.dom.searchInput.value = context.searchQuery;
-    if (context.dom.searchStatusElement) {
-      const focusedIndex = context.searchFocusedNodeId ? state.matchIds.indexOf(context.searchFocusedNodeId) : -1;
-      context.dom.searchStatusElement.textContent = state.query
-        ? focusedIndex >= 0
-          ? `${focusedIndex + 1}/${state.matchIds.length}`
-          : `${state.matchIds.length} 个结果`
-        : "输入关键词";
-    }
-  }
-
-  function focusNextSearchResult(): void {
-    const state = resolveGraphSearchState(context.data.nodes, context.searchQuery, context.searchIndex);
-    context.searchIndex = state.searchIndex;
-    const next = resolveNextGraphSearchFocus(state.matchIds, context.searchFocusedNodeId);
-    context.searchFocusedNodeId = next.id;
-    if (!next.id) {
-      applySearchQuery(context.searchQuery);
-      return;
-    }
-    const node = context.graph.nodes.find((item) => item.id === next.id);
-    if (node) {
-      setViewportAnimating(true);
-      context.viewportCommitter.schedule(centerRendererViewportOnPoint(node.point, context.runtimeState.snapshot().viewport, viewportSize(), { worldBounds: context.graph.worldBounds }));
-    }
-    applySearchQuery(context.searchQuery);
-  }
-
-  function closeSearch(): void {
-    context.searchOpen = false;
-    context.searchFocusedNodeId = null;
-    if (context.dom.searchElement) context.dom.searchElement.dataset.state = "closed";
-    context.root.dataset.searchOpen = "false";
-    applySearchQuery("");
-    context.root.focus({ preventScroll: true });
   }
 
   function mountCommunityLegend(): void {
@@ -539,7 +382,7 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
         setGraphHover(id ? { kind: "community", id } : null);
         applyCommunityHover();
       },
-      onSelect: (id) => selectCommunity(id)
+      onSelect: (id) => controller.selectCommunity(id)
     });
     context.dom.legendElement = legend.element;
     context.dom.legendRows = legend.rows;
@@ -560,7 +403,7 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
         render({ typeFilters: { ...context.availableTypeFilters, [type]: enabled } });
       },
       onReset: () => {
-        resetViewState();
+        controller.resetViewState();
       }
     });
     if (context.dom.legendElement) toolbar.filtersPanel.appendChild(context.dom.legendElement);
@@ -575,52 +418,6 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
     context.root.dataset.toolbarOpen = context.toolbarPanelState === "closed" ? "false" : "true";
     context.toolbarContainer.dataset.toolbarPanel = context.toolbarPanelState;
     context.toolbarContainer.dataset.toolbarOpen = context.toolbarPanelState === "closed" ? "false" : "true";
-  }
-
-  function closeToolbarPanel(): void {
-    context.toolbarPanelState = toolbarPanelStateAfterBlankClick(context.toolbarPanelState);
-    writeToolbarPanelState(context.ownerDocument.defaultView?.localStorage, context.toolbarPanelState);
-    if (context.dom.toolbarPanelElement) context.dom.toolbarPanelElement.dataset.state = context.toolbarPanelState;
-    if (context.dom.toolbarElement) context.dom.toolbarElement.dataset.panel = context.toolbarPanelState;
-    context.root.dataset.toolbarPanel = context.toolbarPanelState;
-    context.root.dataset.toolbarOpen = "false";
-    context.toolbarContainer.dataset.toolbarPanel = context.toolbarPanelState;
-    context.toolbarContainer.dataset.toolbarOpen = "false";
-  }
-
-  function selectCommunity(id: string): void {
-    const nextSelection: SelectionInput = { kind: "community", id };
-    context.runtimeState.setSelection(nextSelection, "selection-panel");
-    context.callbacks.onSelectionInput?.(nextSelection);
-    focusCommunity(id);
-  }
-
-  function focusCommunity(id: string): void {
-    context.runtimeState.setFocus({ kind: "community", id });
-    render();
-    const points = context.graph.nodes.map((node) => node.point);
-    if (!points.length) return;
-    setViewportAnimating(true);
-    context.viewportCommitter.schedule(fitRendererViewportToPoints(points, viewportSize(), { maxScale: FOCUS_FIT_MAX_SCALE, worldBounds: context.graph.worldBounds }));
-  }
-
-  function resetViewState(): void {
-    context.searchFocusedNodeId = null;
-    context.runtimeState.clearInteraction();
-    delete context.root.dataset.focus;
-    context.callbacks.onSelectionClearRequested?.();
-    render();
-    setViewportAnimating(true);
-    context.viewportCommitter.schedule(fitRendererViewportToPoints(context.graph.nodes.map((node) => node.point), viewportSize(), { worldBounds: context.graph.worldBounds }));
-  }
-
-  function retreatFocusedView(): void {
-    context.searchFocusedNodeId = null;
-    setGraphHover(null);
-    context.runtimeState.setSelection(null);
-    delete context.root.dataset.focus;
-    context.callbacks.onSelectionClearRequested?.();
-    render();
   }
 
   function applyCommunityHover(): void {
@@ -921,7 +718,7 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
           }
         : null,
       rawNode: rawNode || null,
-      onClose: () => clearInteractionState()
+      onClose: () => controller.clearInteractionState()
     });
   }
 
@@ -939,7 +736,7 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
       selection,
       selectedNodes,
       facts: resolved?.facts || null,
-      onClose: () => clearInteractionState()
+      onClose: () => controller.clearInteractionState()
     });
   }
 
