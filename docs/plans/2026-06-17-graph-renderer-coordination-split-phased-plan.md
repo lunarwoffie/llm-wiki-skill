@@ -156,31 +156,143 @@ graph-renderer-root: 组装 + 委派; facade: 公开 API + host 回调
 
 ## 模块接口与共享上下文（Phase 1.0 定稿，eng-review 后写入）
 
-这是 Phase 1.0 要定稿、其余阶段依赖的契约。下面是 eng-review 已确定的骨架，执行时补全签名细节。
+这是 Phase 1.0 定稿、其余阶段依赖的契约。后续实现必须按这里搬迁；如果发现字段或入口缺口，先更新本节再移动代码。
 
 ### GraphRenderContext（root 创建并持有）
 
 | 类别 | 字段 | 写权 |
 |---|---|---|
-| 输入 | data, theme, typeFilters | root/命令侧（经 applyOptionChanges） |
-| 渲染产物 | graph, dom | **仅 pipeline 重建时写**；其余只读 |
-| 共享协调 | pinState, simulation | **controller 与 pipeline 都写** |
-| 运行期协作 | hitTargetResolver, viewportCommitter, pathCache | root 建；pipeline 重建后刷新 resolver |
-| 搜索态 | searchOpen, searchQuery, searchFocusedNodeId, searchIndex | controller（搜索命令） |
-| UI 态 | toolbarPanelState, legendCollapsed, density, lastViewportSize | controller/pipeline 各管其一 |
-| diff | activeDiff | pipeline（diff 动画） |
-| 定时器 | previewTimer, viewportAnimationTimer | 持有者模块写，destroy 统一清 |
-| render epoch（C2 新增） | renderEpoch | pipeline 每次 rebuild 递增；异步回调按它失效 |
-| 宿主 | root, ownerDocument, toolbarContainer, destroyed | root |
+| 输入与选项 | `data`, `theme`, `typeFilters`, `availableTypeFilters`, `callbacks` | root/命令侧经 `applyOptionChanges` 写；`callbacks` 只由 root 建立或替换 |
+| 渲染产物 | `graph`, `dom` | **仅 pipeline 重建/重绘时写**；controller/presenter/root 只读 |
+| 运行期权威 | `runtimeState` | semantic state 唯一权威；controller 调命令写，pipeline/presenter 读 snapshot |
+| 共享协调 | `pinState`, `simulation` | **controller 与 pipeline 都写**；controller 处理拖拽/unpin/reset，pipeline 处理重建/运动帧 |
+| 搜索态 | `searchOpen`, `searchQuery`, `searchFocusedNodeId`, `searchIndex` | controller 的搜索命令写；pipeline mount search control 时只读并经 `GraphCommands` 回调 |
+| UI 态 | `toolbarPanelState`, `legendCollapsed`, `lastEffectiveDensityMode`, `lastViewportSize` | toolbar/legend 命令写面板态；pipeline 写 density/viewportSize 缓存 |
+| diff 与生命周期 | `activeDiff`, `renderEpoch`, `destroyed` | pipeline 写 diff/epoch；root 写 destroyed；异步回调必须校验 epoch 或 destroyed |
+| 定时器与监听器 | `previewTimer`, `viewportAnimationTimer`, `resizeObserver`, `gestureMachine`, `gestureController` | 对应持有模块写；root `destroy` 统一清理并置空 |
+| 宿主平台 | `root`, `ownerDocument`, `toolbarContainer`, `hasExternalToolbarContainer` | root 创建后只读 |
+| 运行期协作 | `hitTargetResolver`, `viewportCommitter`, `pathCache` | root 创建；pipeline 重建后刷新 resolver/cache；controller 通过 resolver/committer 发起交互 |
 
-注：selection/focus/hover/pins/viewport **不进 context**，由 `runtimeState` 唯一持有，避免平行状态岛。
+`callbacks` 包含 `onNodeOpen`、`onSelectionInput`、`onSelectionClearRequested`、`onPinsChanged`、`onDragActiveChange`。这些是 host 边界，不作为 controller/pipeline/presenter 之间的直接依赖。
+
+注：selection/focus/hover/pins/viewport **不作为平行字段进入 context**，由 `runtimeState` 唯一持有；context 只持有 `runtimeState` 引用，避免双份状态。
 
 ### 四个接口（签名 Phase 1.0 定稿）
 
-- `GraphController`：`onGestureIntents`、`handleNode*`/`handleBlank*`、语义命令、键盘路由。读 context、写 `runtimeState`/`pinState`/`simulation`、切 `is-dragging`/`focus` 附着；**不画图、不计算渲染模型**。
-- `GraphRenderPipeline`：`rebuildAndPaint`、`paint`、`mount*`、相机提交、diff 动画。只读 state、写 `context.graph`/`dom`；**不做语义决策**；`mount*` 经 `GraphCommands` 回调。
-- `GraphOverlaysPresenter`：hover/edge preview、reader、selection panel 的贴位置与显示。读 context + viewport；管 hover 定时器；**不画主图、不决策**。
-- `GraphCommands`（root 注入给 pipeline，避免循环依赖）：`reset`/`openSearch`/`applySearchQuery`/`focusNextSearchResult`/`closeSearch`/`selectCommunity`/`toggleTypeFilter`/`togglePanel` 等命令回调，内部指向 controller。
+文档里的类型名沿用现有代码；实现时可把局部别名落到 `render-context.ts` 或相邻模块，但边界不变。
+
+```ts
+interface GraphController {
+  onGestureIntents(intents: GraphGestureIntent[], event: PointerEvent | null): void;
+  syncRuntimeGestureState(): void;
+  handleDocumentKeydown(event: KeyboardEvent): void;
+  isGraphKeyboardFocusActive(): boolean;
+
+  openSearch(): void;
+  applySearchQuery(query: string): void;
+  focusNextSearchResult(): void;
+  closeSearch(): void;
+
+  selectCommunity(id: CommunityId): void;
+  focusCommunity(id: CommunityId): void;
+  resetViewState(): void;
+  retreatFocusedView(): void;
+  clearInteractionState(): void;
+  clearTransientInteractionForDataRefresh(): void;
+  hasInteractionState(): boolean;
+
+  handleNodeClick(id: NodeId, additive: boolean): void;
+  handleNodeDragStart(id: NodeId, screenPoint: GraphScreenPoint): void;
+  handleNodeDragMove(id: NodeId, pointerId: number, screenPoint: GraphScreenPoint): void;
+  handleNodeDragEnd(id: NodeId, pointerId: number, screenPoint: GraphScreenPoint): void;
+  handleNodeDragCancel(id: NodeId, pointerId: number): void;
+  handleBlankClick(): void;
+
+  destroy(): void;
+}
+```
+
+`GraphController` 读 context，写 `runtimeState`/`pinState`/`simulation`，可在已存在的 DOM 元素上切 `is-dragging`/focus 附着；**不调用 `paint`/`mount*`，不创建画图元素，不计算 render model**。
+
+```ts
+interface GraphRenderPipeline {
+  rebuildAndPaint(next?: GraphRenderNextOptions): void;
+  paint(graph: RenderableGraph, options: PaintOptions): PaintedGraphDom;
+
+  mountSearchControl(commands: GraphCommands): void;
+  mountGraphToolbar(commands: GraphCommands): void;
+  mountCommunityLegend(commands: GraphCommands): void;
+
+  commitViewport(nextViewport: RendererViewport, options?: ViewportFrameCommitOptions): void;
+  bindResizeObserver(): void;
+  resetRootScroll(): void;
+  updateEffectiveDensity(): void;
+  renderMotionOverlays(): void;
+  updateMinimapViewport(): void;
+  setViewportAnimating(enabled: boolean): void;
+
+  restartSimulation(): void;
+  applyMotionFrame(positions: RenderPositionMap): void;
+  markPinnedNodes(pinnedNodeIds: NodeId[]): void;
+
+  animateDiff(diff: GraphDiff, options?: GraphDiffAnimationOptions): Promise<void>;
+  markDiffElements(diff: GraphDiff): void;
+  settleDiffElements(): void;
+  semanticAnchorForNode(id: NodeId): GraphWorldPoint | null;
+
+  destroy(): void;
+}
+```
+
+`GraphRenderPipeline` 写 `context.graph`/`context.dom`/pipeline-owned lifecycle fields；可读 `runtimeState.snapshot()` 生成视图；**不做手势分类，不写 selection/focus/hover/pin 语义状态**。`mount*` 只拿 `GraphCommands`，不 import controller。
+
+```ts
+interface GraphOverlaysPresenter {
+  scheduleHoverPreview(id: NodeId): void;
+  showEdgeHoverPreview(id: string): void;
+  clearHoverPreview(): void;
+  setGraphHover(hover: GraphRuntimeStateSnapshot["hover"]): GraphRuntimeStateSnapshot;
+
+  renderHoverPreview(): void;
+  positionHoverPreview(preview: HTMLElement, node: RenderableNode): void;
+  positionEdgeHoverPreview(preview: HTMLElement, edge: RenderableGraph["edges"][number]): void;
+
+  renderReader(): void;
+  renderSelectionPanel(): void;
+
+  destroy(): void;
+}
+```
+
+`GraphOverlaysPresenter` 读 context + viewport + runtime snapshot，管理 hover preview 定时器和 overlay 贴位；**不画主图、不创建 graph node/edge/community/minimap 元素、不做语义决策**。
+
+```ts
+interface GraphCommands {
+  render(next?: GraphRenderNextOptions): void;
+  resetView(): void;
+  resetLayout(): void;
+  clearInteraction(): void;
+
+  openSearch(): void;
+  applySearchQuery(query: string): void;
+  focusNextSearchResult(): void;
+  closeSearch(): void;
+
+  selectCommunity(id: CommunityId): void;
+  focusCommunity(id: CommunityId): void;
+  toggleTypeFilter(type: string, enabled: boolean): void;
+  toggleToolbarPanel(panel: Exclude<GraphToolbarPanelState, "closed">): void;
+  closeToolbarPanel(): void;
+
+  openNode(id: NodeId): void;
+  submitSelection(selection: SelectionInput): void;
+  clearSelectionRequest(): void;
+  pinsChanged(pins: PinMap): void;
+  dragActiveChanged(active: boolean): void;
+}
+```
+
+`GraphCommands` 由 root 打包并注入 pipeline/presenter 需要接线的地方；内部委派到 controller、root state-apply 或 host callback，保持 controller ↔ pipeline 无循环依赖。
 
 ## 阶段计划
 
