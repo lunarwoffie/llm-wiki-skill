@@ -175,7 +175,9 @@ async function openWorkbenchGraphPage(browser, viewport, theme) {
   }
   const graphButton = page.getByRole("button", { name: /图谱/ });
   if (await graphButton.count() && await graphButton.first().isVisible()) {
-    await graphButton.first().click();
+    if (await graphButton.first().isEnabled()) {
+      await graphButton.first().click();
+    }
   }
   await page.waitForSelector("[data-llm-wiki-graph-root='true']");
   await page.waitForSelector("[data-viewport-layer='true']");
