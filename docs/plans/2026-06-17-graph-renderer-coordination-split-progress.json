@@ -32,8 +32,13 @@
     { "decision": "implementation branch feat/graph-renderer-coordination-split from spark branch", "reason": "carry spec+plan into impl branch; repo rule: code changes on feat/ branch", "source": "plan" },
     { "decision": "add controller layer id to architecture.ts owner map", "reason": "controller is a distinct owner per spec core principle", "source": "plan" },
     { "decision": "split render() into applyOptionChanges + rebuildAndPaint before extraction", "reason": "state-apply belongs to command side, rebuild/paint to pipeline", "source": "plan" },
-    { "decision": "explicit GraphRenderContext held by root; pipeline writes graph/dom/pinState, others read-only", "reason": "multi-file split needs shared connective state without parallel state islands", "source": "spec self-review" },
-    { "decision": "controller may toggle is-dragging/focus affordances on painted elements; forbidden to build/paint graph DOM", "reason": "matches real code; hard ban would over-indirect", "source": "spec self-review" }
+    { "decision": "explicit GraphRenderContext held by root: graph/dom pipeline-written (others read); pinState/simulation written by BOTH controller and pipeline; runtimeState owns semantic state [corrected by eng-review C1]", "reason": "codex proved controller writes pinState on drag-end and drives simulation, so the earlier pipeline-only-write rule was wrong", "source": "eng-review-codex" },
+    { "decision": "controller may toggle is-dragging/focus affordances on painted elements; forbidden to build/paint graph DOM", "reason": "matches real code; hard ban would over-indirect", "source": "spec self-review" },
+    { "decision": "[A1] root injects a GraphCommands interface into render-pipeline mount* (no controller<->pipeline cycle)", "reason": "mount* callbacks call controller commands while controller depends on pipeline; interface injection keeps deps acyclic", "source": "eng-review" },
+    { "decision": "[A2+CQ3] single root.render(opts) = applyOptionChanges(state) + pipeline.rebuildAndPaint (pure); all ~18 call sites use it", "reason": "pipeline must not write selection/focus/pin; apply logic must not duplicate across 18 sites", "source": "eng-review" },
+    { "decision": "[C1] Phase 1.0 designs full context + 4 interfaces before moving code", "reason": "codex: otherwise Phase1 builds ad-hoc callback bags and Phase2 rewrites them = interface redesign hidden in a move", "source": "eng-review-codex" },
+    { "decision": "[C2] explicit render-epoch + teardown contract + lifecycle tests", "reason": "render re-entry, animateDiff async race, and destroy ordering are silent-failure seams in a pure move", "source": "eng-review-codex" },
+    { "decision": "[C3] CSS block (ensureStaticRendererStyles) goes to render-pipeline; accept clean rename (no external consumer of createStaticGraphRenderer though it is in the export* surface); soften acceptance wording; runtime boundary probes mandatory; community-wash regression runs in Phase 2", "reason": "batch of low-cost hardenings from codex outside voice", "source": "eng-review-codex" }
   ],
   "phases": [
     {
@@ -62,9 +67,10 @@
       ],
       "status": "pending",
       "tasks": [
-        { "id": "1.1", "title": "Define GraphRenderContext; switch static-renderer internals from closure vars to the context object (behavior-preserving)", "status": "pending", "verification": [], "commit": null },
-        { "id": "1.2", "title": "Extract controller.ts: gesture intent dispatch, handleNode*/handleBlankClick, node-drag helpers, bindViewportHandlers wiring", "status": "pending", "verification": [], "commit": null },
-        { "id": "1.3", "title": "Move semantic commands + keyboard routing into controller", "status": "pending", "verification": [], "commit": null }
+        { "id": "1.0", "title": "Design full GraphRenderContext field set + 4 interface signatures (GraphController/GraphRenderPipeline/GraphOverlaysPresenter/GraphCommands) before moving code [eng-review C1]", "status": "pending", "verification": [], "commit": null },
+        { "id": "1.1", "title": "Land GraphRenderContext (root owns). Write-ownership [eng-review C1 corrected]: graph/dom = pipeline-written render outputs (others read); pinState/simulation = shared coordination written by BOTH controller and pipeline; runtimeState is the semantic-state authority. Switch internals from closure vars to the context object", "status": "pending", "verification": [], "commit": null },
+        { "id": "1.2", "title": "Extract controller.ts: gesture intent dispatch, handleNode*/handleBlankClick, node-drag helpers, bindViewportHandlers wiring; writes pinState/drives simulation/toggles is-dragging+focus; no paint/mount, no render-model computation", "status": "pending", "verification": [], "commit": null },
+        { "id": "1.3", "title": "Move semantic commands + keyboard routing into controller; search-state fields move into context", "status": "pending", "verification": [], "commit": null }
       ]
     },
     {
@@ -128,7 +134,7 @@
       ],
       "status": "pending",
       "tasks": [
-        { "id": "5.1", "title": "Extend renderer-boundary.test.ts: prove controller doesn't draw (allows affordance), pipeline/presenter don't decide; include a runtime probe", "status": "pending", "verification": [], "commit": null },
+        { "id": "5.1", "title": "Extend renderer-boundary.test.ts: (1) controller doesn't draw (allows is-dragging/focus affordance + pinState/simulation writes); (2) pipeline/presenter don't write selection/focus/pin; (3) runtime probe MANDATORY for mutation-ownership + teardown [eng-review C3]; (4) command-injection wiring unit test with fake GraphCommands [eng-review Test4]; (5) lifecycle tests: repeated mount/destroy, applyDiff-vs-setData race, destroy-while-hover-timer-pending [eng-review C2]", "status": "pending", "verification": [], "commit": null },
         { "id": "5.2", "title": "Run full acceptance + fps capture, record evidence and residual risk, mark complete", "status": "pending", "verification": [], "commit": null }
       ]
     }
