@@ -4,8 +4,8 @@
   "status": {
     "overall": "in_progress",
     "phase": "phase-5",
-    "task": "5.1",
-    "next_allowed_action": "Extend renderer-boundary.test.ts with ownership, command-injection, and lifecycle/runtime probes."
+    "task": "5.2",
+    "next_allowed_action": "Run full acceptance command set, capture fps evidence, record residual risk, and mark final status."
   },
   "execution_rules": {
     "branch": "feat/graph-renderer-coordination-split",
@@ -554,9 +554,45 @@
         "new boundary test passes",
         "progress overall status = completed with residual risk recorded"
       ],
-      "status": "pending",
+      "status": "in_progress",
       "tasks": [
-        { "id": "5.1", "title": "Extend renderer-boundary.test.ts: (1) controller doesn't draw (allows is-dragging/focus affordance + pinState/simulation writes); (2) pipeline/presenter don't write selection/focus/pin; (3) runtime probe MANDATORY for mutation-ownership + teardown [eng-review C3]; (4) command-injection wiring unit test with fake GraphCommands [eng-review Test4]; (5) lifecycle tests: repeated mount/destroy, applyDiff-vs-setData race, destroy-while-hover-timer-pending [eng-review C2]", "status": "pending", "verification": [] },
+        {
+          "id": "5.1",
+          "title": "Extend renderer-boundary.test.ts: (1) controller doesn't draw (allows is-dragging/focus affordance + pinState/simulation writes); (2) pipeline/presenter don't write selection/focus/pin; (3) runtime probe MANDATORY for mutation-ownership + teardown [eng-review C3]; (4) command-injection wiring unit test with fake GraphCommands [eng-review Test4]; (5) lifecycle tests: repeated mount/destroy, applyDiff-vs-setData race, destroy-while-hover-timer-pending [eng-review C2]",
+          "status": "completed",
+          "verification": [
+            {
+              "command": "git log --oneline -15",
+              "exit": 0,
+              "evidence": "task 4.2 commit present: bf37087 docs: update graph architecture owners [task 4.2]"
+            },
+            {
+              "command": "npm run test --workspace=@llm-wiki/graph-engine",
+              "exit": 0,
+              "evidence": "271 tests passed, 0 failed after extending renderer-boundary.test.ts"
+            },
+            {
+              "command": "npm run typecheck --workspace=@llm-wiki/graph-engine",
+              "exit": 0,
+              "evidence": "tsc --noEmit completed after boundary test expansion"
+            },
+            {
+              "command": "git diff --check",
+              "exit": 0,
+              "evidence": "no whitespace errors"
+            },
+            {
+              "command": "bash -lc '! rg -n \"\\\\bpaint\\\\b|mount[A-Z]|createGraphNodeElement|createGraphEdgeElement|createCommunityWashElement|buildRenderableGraph|createGraphMinimap\" packages/graph-engine/src/render/controller.ts'",
+              "exit": 0,
+              "evidence": "controller.ts still has no paint/mount calls, drawing-piece creation, or render-model build call matches"
+            },
+            {
+              "command": "bash -lc '! rg -n \"classifyGraphKeyboardIntent|isTextEditingElement|from \\\\\\\"\\\\./controller\\\\\\\"|from '\\''\\\\./controller'\\''|setSelection|setFocus|setPins\\\\(\" packages/graph-engine/src/render/render-pipeline.ts packages/graph-engine/src/render/overlays-presenter.ts'",
+              "exit": 0,
+              "evidence": "pipeline and presenter have no controller import, gesture classification, or semantic selection/focus/pin writes"
+            }
+          ]
+        },
         { "id": "5.2", "title": "Run full acceptance + fps capture, record evidence and residual risk, mark complete", "status": "pending", "verification": [] }
       ]
     }
@@ -617,6 +653,11 @@
       "task": "4.2",
       "status": "completed",
       "notes": "Updated the graph architecture owner map and architecture test for the new controller layer plus graph-renderer-root/render-pipeline/overlays-presenter renderer entrypoints; Phase 4 acceptance passed."
+    },
+    {
+      "task": "5.1",
+      "status": "completed",
+      "notes": "Expanded renderer-boundary.test.ts with controller/pipeline/presenter ownership checks, fake-event command wiring coverage, injected-command wiring guards, and lifecycle/async teardown probes; boundary test count rose to 271 pass."
     }
   ]
 }

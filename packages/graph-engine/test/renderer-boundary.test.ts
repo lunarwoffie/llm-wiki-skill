@@ -4,6 +4,7 @@ import { readFile, readdir } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createCommunityWashElement } from "../src/render/community-washes";
+import { createCommunityLegend, createGraphToolbar, createSearchControl } from "../src/render/controls";
 import { createGraphEdgeElement } from "../src/render/edges";
 import { createGraphMinimap } from "../src/render/minimap";
 import { createGraphNodeElement } from "../src/render/nodes";
@@ -48,6 +49,20 @@ const FORBIDDEN_RENDERER_EVENT_TYPES = new Set([
   "pointercancel",
   "lostpointercapture"
 ]);
+const CONTROLLER_FORBIDDEN_PATTERNS = [
+  /\bcreateGraphNodeElement\b/,
+  /\bcreateGraphEdgeElement\b/,
+  /\bcreateCommunityWashElement\b/,
+  /\bcreateGraphMinimap\b/,
+  /\bbuildRenderableGraph\b/,
+  /\bpaint\s*\(/,
+  /\bmount(?:SearchControl|GraphToolbar|CommunityLegend)\s*\(/
+];
+const RENDER_ONLY_STATE_MUTATION_PATTERNS = [
+  /\bsetSelection\s*\(/,
+  /\bsetFocus\s*\(/,
+  /\bsetPins\s*\(/
+];
 
 describe("renderer and facade boundary contract", () => {
   it("keeps host callback names out of layout and renderer modules", async () => {
@@ -147,6 +162,131 @@ describe("renderer and facade boundary contract", () => {
 
     assert.deepEqual(ownerDocument.forbiddenListeners, []);
   });
+
+  it("keeps controller out of drawing and render-model ownership", async () => {
+    const controllerText = await readFile(join(SRC, "render/controller.ts"), "utf8");
+    const violations = CONTROLLER_FORBIDDEN_PATTERNS
+      .filter((pattern) => pattern.test(controllerText))
+      .map(String);
+
+    assert.deepEqual(violations, []);
+  });
+
+  it("keeps pipeline and presenter out of semantic selection/focus/pin ownership", async () => {
+    const files = ["render/render-pipeline.ts", "render/overlays-presenter.ts"];
+    const violations: string[] = [];
+
+    for (const rel of files) {
+      const text = await readFile(join(SRC, rel), "utf8");
+      for (const pattern of RENDER_ONLY_STATE_MUTATION_PATTERNS) {
+        if (pattern.test(text)) violations.push(`${rel}: ${pattern}`);
+      }
+    }
+
+    assert.deepEqual(violations, []);
+  });
+
+  it("routes mounted control callbacks through injected graph commands", () => {
+    const ownerDocument = new FakeDocument();
+    const calls: string[] = [];
+
+    const search = createSearchControl(ownerDocument as unknown as Document, {
+      open: false,
+      query: "",
+      onOpen: () => calls.push("openSearch"),
+      onQuery: (query) => calls.push(`query:${query}`),
+      onNext: () => calls.push("nextSearch"),
+      onClose: () => calls.push("closeSearch")
+    });
+    search.input.value = "atlas";
+    (search.input as unknown as FakeElement).dispatch("focus");
+    (search.input as unknown as FakeElement).dispatch("input");
+    (search.input as unknown as FakeElement).dispatch("keydown", { key: "Enter" });
+    (search.input as unknown as FakeElement).dispatch("keydown", { key: "Escape" });
+
+    const toolbar = createGraphToolbar(ownerDocument as unknown as Document, {
+      panelState: "closed",
+      typeFilters: { topic: true },
+      onPanelToggle: (panel) => calls.push(`panel:${panel}`),
+      onTypeFilterToggle: (type, enabled) => calls.push(`filter:${type}:${enabled}`),
+      onReset: () => calls.push("resetView")
+    });
+    const toolbarButtons = findByClass(toolbar.element as unknown as FakeElement, "graph-toolbar-button");
+    toolbarButtons[0]?.dispatch("click");
+    toolbarButtons[2]?.dispatch("click");
+    const filterInput = findByTag(toolbar.element as unknown as FakeElement, "input")[0];
+    if (filterInput) {
+      filterInput.checked = false;
+      filterInput.dispatch("change");
+    }
+
+    const legend = createCommunityLegend(ownerDocument as unknown as Document, {
+      rows: [{ id: "community-a", label: "Community A", color: "#c66", pageCount: 2, nodeIds: ["node-a"] }],
+      collapsed: false,
+      onToggle: () => calls.push("toggleLegend"),
+      onHover: (id) => calls.push(`hover:${id ?? "none"}`),
+      onSelect: (id) => calls.push(`selectCommunity:${id}`)
+    });
+    const legendToggle = findByClass(legend.element as unknown as FakeElement, "community-legend-toggle")[0];
+    legendToggle?.dispatch("click");
+    const legendRow = legend.rows.get("community-a") as unknown as FakeElement | undefined;
+    legendRow?.dispatch("pointerenter");
+    legendRow?.dispatch("pointerleave");
+    legendRow?.dispatch("click");
+
+    assert.deepEqual(calls, [
+      "openSearch",
+      "query:atlas",
+      "nextSearch",
+      "closeSearch",
+      "panel:filters",
+      "resetView",
+      "filter:topic:false",
+      "toggleLegend",
+      "hover:community-a",
+      "hover:none",
+      "selectCommunity:community-a"
+    ]);
+  });
+
+  it("keeps mounted control wiring on injected graph commands", async () => {
+    const pipelineText = await readFile(join(SRC, "render/render-pipeline.ts"), "utf8");
+
+    assert.doesNotMatch(pipelineText, /from\s+["']\.\/controller["']/);
+    assert.match(pipelineText, /onOpen:\s*\(\) => options\.commands\.openSearch\(\)/);
+    assert.match(pipelineText, /onQuery:\s*\(query\) => options\.commands\.applySearchQuery\(query\)/);
+    assert.match(pipelineText, /onNext:\s*\(\) => options\.commands\.focusNextSearchResult\(\)/);
+    assert.match(pipelineText, /onClose:\s*\(\) => options\.commands\.closeSearch\(\)/);
+    assert.match(pipelineText, /onSelect:\s*\(id\) => options\.commands\.selectCommunity\(id\)/);
+    assert.match(pipelineText, /options\.commands\.render\(\{ typeFilters: \{ \.\.\.context\.availableTypeFilters, \[type\]: enabled \} \}\)/);
+    assert.match(pipelineText, /options\.commands\.resetViewState\(\)/);
+  });
+
+  it("keeps lifecycle teardown ownership explicit in the renderer root", async () => {
+    const rootText = await readFile(join(SRC, "render/graph-renderer-root.ts"), "utf8");
+    const pipelineText = await readFile(join(SRC, "render/render-pipeline.ts"), "utf8");
+    const presenterText = await readFile(join(SRC, "render/overlays-presenter.ts"), "utf8");
+
+    assert.match(rootText, /if \(context\.destroyed\) return;/);
+    assert.match(rootText, /pipeline\.destroy\(\);/);
+    assert.match(rootText, /presenter\.destroy\(\);/);
+    assert.match(rootText, /removeEventListener\("scroll", pipeline\.resetRootScroll\)/);
+    assert.match(rootText, /removeEventListener\("keydown", controller\.handleDocumentKeydown\)/);
+    assert.match(rootText, /context\.gestureController\?\.destroy\(\);/);
+    assert.match(rootText, /context\.pathCache\.clear\(\);/);
+    assert.match(pipelineText, /context\.simulation\?\.destroy\(\);/);
+    assert.match(pipelineText, /context\.resizeObserver\?\.disconnect\(\);/);
+    assert.match(pipelineText, /clearTimeout\(context\.viewportAnimationTimer\)/);
+    assert.match(presenterText, /clearTimeout\(context\.previewTimer\)/);
+    assert.match(presenterText, /context\.previewTimer = null;/);
+  });
+
+  it("keeps async diff settlement guarded after destroy", async () => {
+    const pipelineText = await readFile(join(SRC, "render/render-pipeline.ts"), "utf8");
+
+    assert.match(pipelineText, /if \(context\.destroyed\) return;/);
+    assert.match(pipelineText, /if \(!context\.destroyed\) settleDiffElements\(\);/);
+  });
 });
 
 async function sourceFiles(dir: string): Promise<string[]> {
@@ -236,6 +376,7 @@ class FakeDocument {
 
 class FakeElement {
   readonly children: FakeElement[] = [];
+  private readonly listeners = new Map<string, Array<(event: FakeEvent) => void>>();
   readonly dataset: Record<string, string | undefined> = {};
   readonly style: Record<string, string> = {};
   readonly classList = {
@@ -256,6 +397,8 @@ class FakeElement {
   title = "";
   href = "";
   innerHTML = "";
+  checked = false;
+  value = "";
 
   constructor(readonly tagName: string, private readonly ownerDocument: FakeDocument) {}
 
@@ -280,9 +423,58 @@ class FakeElement {
     else (this as unknown as Record<string, string>)[name] = value;
   }
 
-  addEventListener(type: string, _listener: unknown): void {
+  addEventListener(type: string, listener: unknown): void {
     if (FORBIDDEN_RENDERER_EVENT_TYPES.has(type)) {
       this.ownerDocument.forbiddenListeners.push(`${this.tagName}:${type}`);
     }
+    const listeners = this.listeners.get(type) || [];
+    listeners.push(listener as (event: FakeEvent) => void);
+    this.listeners.set(type, listeners);
   }
+
+  dispatch(type: string, init: Record<string, unknown> = {}): void {
+    const event = new FakeEvent(type, init);
+    for (const listener of this.listeners.get(type) || []) {
+      listener(event);
+    }
+  }
+}
+
+class FakeEvent {
+  readonly type: string;
+  readonly key?: string;
+  defaultPrevented = false;
+  propagationStopped = false;
+
+  constructor(type: string, init: Record<string, unknown>) {
+    this.type = type;
+    if (typeof init.key === "string") this.key = init.key;
+  }
+
+  preventDefault(): void {
+    this.defaultPrevented = true;
+  }
+
+  stopPropagation(): void {
+    this.propagationStopped = true;
+  }
+}
+
+function findByClass(root: FakeElement, className: string): FakeElement[] {
+  const matches: FakeElement[] = [];
+  const classes = new Set(root.className.split(/\s+/).filter(Boolean));
+  if (classes.has(className)) matches.push(root);
+  for (const child of root.children) {
+    matches.push(...findByClass(child, className));
+  }
+  return matches;
+}
+
+function findByTag(root: FakeElement, tagName: string): FakeElement[] {
+  const matches: FakeElement[] = [];
+  if (root.tagName === tagName) matches.push(root);
+  for (const child of root.children) {
+    matches.push(...findByTag(child, tagName));
+  }
+  return matches;
 }
