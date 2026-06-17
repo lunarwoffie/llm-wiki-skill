@@ -3,9 +3,9 @@
   "spec": "docs/spark/2026-06-17-static-renderer-coordination-split-design.md",
   "status": {
     "overall": "in_progress",
-    "phase": "phase-2",
-    "task": "2.2",
-    "next_allowed_action": "Extract render-pipeline.ts: rebuildAndPaint/paint/mount*/viewport commit/diff animation/sim frame, writing context graph/dom/pinState."
+    "phase": "phase-3",
+    "task": "3.1",
+    "next_allowed_action": "Extract overlays-presenter.ts: hover/edge preview + reader + selection panel via viewport anchors, read-only state."
   },
   "execution_rules": {
     "branch": "feat/graph-renderer-coordination-split",
@@ -276,7 +276,7 @@
         "stage-4.5 offline exits 0 and captured fps >= 45 (recorded)",
         "render-pipeline.ts does not call gesture classification or write semantic state"
       ],
-      "status": "in_progress",
+      "status": "completed",
       "tasks": [
         {
           "id": "2.1",
@@ -315,7 +315,58 @@
             }
           ]
         },
-        { "id": "2.2", "title": "Extract render-pipeline.ts: rebuildAndPaint/paint/mount*/viewport commit/diff animation/sim frame, writing context graph/dom/pinState", "status": "pending", "verification": [] }
+        {
+          "id": "2.2",
+          "title": "Extract render-pipeline.ts: rebuildAndPaint/paint/mount*/viewport commit/diff animation/sim frame, writing context graph/dom/pinState",
+          "status": "completed",
+          "verification": [
+            {
+              "command": "git log --oneline -15",
+              "exit": 0,
+              "evidence": "task 2.1 commit present: fb0b585 refactor: split graph render orchestration [task 2.1]"
+            },
+            {
+              "command": "npm run test --workspace=@llm-wiki/graph-engine",
+              "exit": 0,
+              "evidence": "265 tests passed, 0 failed before starting 2.2 and after render-pipeline extraction"
+            },
+            {
+              "command": "npm run typecheck --workspace=@llm-wiki/graph-engine",
+              "exit": 0,
+              "evidence": "tsc --noEmit completed after render-pipeline extraction"
+            },
+            {
+              "command": "git diff --check",
+              "exit": 0,
+              "evidence": "no whitespace errors"
+            },
+            {
+              "command": "bash -lc '! rg -n \"classifyGraphKeyboardIntent|isTextEditingElement|from \\\\\\\"\\\\./controller\\\\\\\"|setSelection|setFocus|setPins\\\\(\" packages/graph-engine/src/render/render-pipeline.ts'",
+              "exit": 0,
+              "evidence": "render-pipeline.ts has no gesture classification, controller import, or semantic selection/focus/pin writes"
+            },
+            {
+              "command": "bash tests/graph-workbench-interactions.regression-1.sh",
+              "exit": 0,
+              "evidence": "PASS: graph workbench interaction regression"
+            },
+            {
+              "command": "bash tests/graph-offline-phase-6.regression-1.sh",
+              "exit": 0,
+              "evidence": "PASS: phase 6 offline graph regression"
+            },
+            {
+              "command": "bash tests/graph-community-wash-interactions.regression-1.sh",
+              "exit": 0,
+              "evidence": "PASS: graph community wash interaction regression"
+            },
+            {
+              "command": "GRAPH_STAGE_4_5_CHROME_EXECUTABLE=/Users/kangjiaqi/Library/Caches/ms-playwright/chromium_headless_shell-1223/chrome-headless-shell-mac-arm64/chrome-headless-shell bash tests/graph-browser-stage-4-5.regression-1.sh --target offline",
+              "exit": 0,
+              "evidence": "PASS: stage 4.5 browser regression (offline); dense wheel fps 60.1 using the same browser check with retained artifact JSON"
+            }
+          ]
+        }
       ]
     },
     {
@@ -328,7 +379,7 @@
         "bash tests/graph-offline-phase-6.regression-1.sh exits 0",
         "overlays-presenter.ts does not call gesture classification or write semantic state"
       ],
-      "status": "pending",
+      "status": "in_progress",
       "tasks": [
         { "id": "3.1", "title": "Extract overlays-presenter.ts: hover/edge preview + reader + selection panel via viewport anchors, read-only state", "status": "pending", "verification": [] }
       ]
@@ -403,6 +454,11 @@
       "task": "2.1",
       "status": "completed",
       "notes": "Split root render() into applyOptionChanges() plus rebuildAndPaint(), and routed root-level pins/selection updates through render(next) without behavior changes."
+    },
+    {
+      "task": "2.2",
+      "status": "completed",
+      "notes": "Extracted render-pipeline.ts and render-styles.ts for rebuild/paint, mount controls, viewport commits, simulation frames, pin marking, diff animation, semantic anchors, and CSS injection; Phase 2 acceptance passed with dense-wheel fps 60.1."
     }
   ]
 }
