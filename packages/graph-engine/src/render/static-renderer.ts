@@ -82,10 +82,15 @@ interface StaticRendererOptions {
   live?: boolean;
 }
 
+type RenderNextOptions = Partial<StaticRendererOptions> & {
+  selectedNodeId?: string | null;
+  selection?: SelectionInput | null;
+};
+
 export interface StaticGraphRenderer {
   root: HTMLElement;
   graph: RenderableGraph;
-  render(next?: Partial<StaticRendererOptions> & { selectedNodeId?: string | null; selection?: SelectionInput | null }): void;
+  render(next?: RenderNextOptions): void;
   applyDiff(diff: GraphDiff, options?: { reducedMotion?: boolean; durationMs?: number }): Promise<void>;
   isDragging(): boolean;
   setData(data: GraphData, pins?: PinMap): void;
@@ -192,8 +197,13 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
   context.gestureController = controller.bindViewportHandlers();
   bindResizeObserver();
 
-  function render(next: Partial<StaticRendererOptions> & { selectedNodeId?: string | null; selection?: SelectionInput | null } = {}): void {
+  function render(next: RenderNextOptions = {}): void {
     assertActive();
+    applyOptionChanges(next);
+    rebuildAndPaint();
+  }
+
+  function applyOptionChanges(next: RenderNextOptions): void {
     context.data = next.data || context.data;
     context.theme = next.theme || context.theme;
     if (Object.hasOwn(next, "typeFilters")) context.typeFilters = next.typeFilters || {};
@@ -206,6 +216,9 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
     if (Object.hasOwn(next, "selection")) {
       context.runtimeState.setSelection(next.selection || null, next.selection ? "selection-panel" : null);
     }
+  }
+
+  function rebuildAndPaint(): void {
     const runtimeSnapshot = context.runtimeState.snapshot();
     const renderSelection = rendererSelectionFromRuntimeState(runtimeSnapshot);
     context.graph = buildRenderableGraph(context.data, {
@@ -279,8 +292,7 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
       render({ theme: nextTheme });
     },
     setPins(nextPins: PinMap): void {
-      context.runtimeState.setPins(nextPins);
-      render();
+      render({ pins: nextPins });
     },
     focusNode(pathOrId: WikiPath): void {
       const node = context.graph.nodes.find((item) => item.id === pathOrId || item.sourcePath === pathOrId);
@@ -297,8 +309,7 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
       controller.resetViewState();
     },
     select(nextSelection: SelectionInput): void {
-      context.runtimeState.setSelection(nextSelection, "selection-panel");
-      render();
+      render({ selection: nextSelection });
     },
     clearSelection(): void {
       controller.retreatFocusedView();
@@ -308,8 +319,7 @@ export function createStaticGraphRenderer(container: HTMLElement, options: Stati
     },
     resetLayout(): void {
       const nextState = context.pinState.reset();
-      context.runtimeState.setPins(nextState.pins);
-      render();
+      render({ pins: nextState.pins });
       context.callbacks.onPinsChanged?.(nextState.pins);
     },
     destroy(): void {

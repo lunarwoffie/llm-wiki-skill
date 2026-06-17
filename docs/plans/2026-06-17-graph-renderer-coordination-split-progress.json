@@ -4,8 +4,8 @@
   "status": {
     "overall": "in_progress",
     "phase": "phase-2",
-    "task": "2.1",
-    "next_allowed_action": "Split render() into applyOptionChanges (state) + rebuildAndPaint (draw), behavior-preserving."
+    "task": "2.2",
+    "next_allowed_action": "Extract render-pipeline.ts: rebuildAndPaint/paint/mount*/viewport commit/diff animation/sim frame, writing context graph/dom/pinState."
   },
   "execution_rules": {
     "branch": "feat/graph-renderer-coordination-split",
@@ -278,7 +278,43 @@
       ],
       "status": "in_progress",
       "tasks": [
-        { "id": "2.1", "title": "Split render() into applyOptionChanges (state) + rebuildAndPaint (draw), behavior-preserving", "status": "pending", "verification": [] },
+        {
+          "id": "2.1",
+          "title": "Split render() into applyOptionChanges (state) + rebuildAndPaint (draw), behavior-preserving",
+          "status": "completed",
+          "verification": [
+            {
+              "command": "git log --oneline -15",
+              "exit": 0,
+              "evidence": "task 1.3 commit present: 94b29c6 refactor: move graph commands into controller [task 1.3]"
+            },
+            {
+              "command": "npm run test --workspace=@llm-wiki/graph-engine",
+              "exit": 0,
+              "evidence": "265 tests passed, 0 failed before starting 2.1 and after render split"
+            },
+            {
+              "command": "npm run typecheck --workspace=@llm-wiki/graph-engine",
+              "exit": 0,
+              "evidence": "tsc --noEmit completed after render split"
+            },
+            {
+              "command": "git diff --check",
+              "exit": 0,
+              "evidence": "no whitespace errors"
+            },
+            {
+              "command": "bash tests/graph-workbench-interactions.regression-1.sh",
+              "exit": 0,
+              "evidence": "PASS: graph workbench interaction regression"
+            },
+            {
+              "command": "bash tests/graph-offline-phase-6.regression-1.sh",
+              "exit": 0,
+              "evidence": "PASS: phase 6 offline graph regression"
+            }
+          ]
+        },
         { "id": "2.2", "title": "Extract render-pipeline.ts: rebuildAndPaint/paint/mount*/viewport commit/diff animation/sim frame, writing context graph/dom/pinState", "status": "pending", "verification": [] }
       ]
     },
@@ -362,6 +398,11 @@
       "task": "1.3",
       "status": "completed",
       "notes": "Moved semantic commands, search commands, toolbar close, interaction clearing, community focus/select, reset/retreat, and document key routing into controller.ts; Phase 1 acceptance passed."
+    },
+    {
+      "task": "2.1",
+      "status": "completed",
+      "notes": "Split root render() into applyOptionChanges() plus rebuildAndPaint(), and routed root-level pins/selection updates through render(next) without behavior changes."
     }
   ]
 }
