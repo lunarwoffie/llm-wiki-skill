@@ -3,9 +3,9 @@
   "spec": "docs/spark/2026-06-17-static-renderer-coordination-split-design.md",
   "status": {
     "overall": "in_progress",
-    "phase": "phase-0",
-    "task": "0.2",
-    "next_allowed_action": "Run full acceptance command set and stage-4.5 offline fps capture, then record baseline numbers."
+    "phase": "phase-1",
+    "task": "1.0",
+    "next_allowed_action": "Design the full GraphRenderContext field set and four interface signatures before moving code."
   },
   "execution_rules": {
     "branch": "feat/graph-renderer-coordination-split",
@@ -24,10 +24,21 @@
     "progress_update_in_same_commit": true
   },
   "baseline": {
-    "recorded": false,
-    "unit_tests": "265 pass expected (confirm in 0.2)",
-    "dense_wheel_fps": null,
-    "commands": "fill in task 0.2"
+    "recorded": true,
+    "unit_tests": "265 pass, 0 failed",
+    "dense_wheel_fps": 50.2,
+    "commands": [
+      { "command": "npm run test --workspace=@llm-wiki/graph-engine", "exit": 0, "evidence": "265 tests passed, 0 failed" },
+      { "command": "npm run typecheck --workspace=@llm-wiki/graph-engine", "exit": 0, "evidence": "tsc --noEmit completed" },
+      { "command": "npm run build --workspace=@llm-wiki/graph-engine", "exit": 0, "evidence": "vite build and declarations completed" },
+      { "command": "npm run test --workspace=@llm-wiki-agent/web", "exit": 0, "evidence": "29 tests passed, 0 failed after graph-engine build completed" },
+      { "command": "npm run typecheck --workspace=@llm-wiki-agent/web", "exit": 0, "evidence": "tsc -b --noEmit completed" },
+      { "command": "npm run build --workspace=@llm-wiki-agent/web", "exit": 0, "evidence": "vite production build completed" },
+      { "command": "bash tests/graph-workbench-interactions.regression-1.sh", "exit": 0, "evidence": "PASS: graph workbench interaction regression" },
+      { "command": "bash tests/graph-offline-phase-6.regression-1.sh", "exit": 0, "evidence": "PASS: phase 6 offline graph regression" },
+      { "command": "bash tests/graph-community-wash-interactions.regression-1.sh", "exit": 0, "evidence": "PASS: graph community wash interaction regression" },
+      { "command": "bash tests/graph-browser-stage-4-5.regression-1.sh --target offline", "exit": 0, "evidence": "PASS: stage 4.5 browser regression (offline); dense wheel fps 50.2" }
+    ]
   },
   "decision_log": [
     { "decision": "implementation branch feat/graph-renderer-coordination-split from spark branch", "reason": "carry spec+plan into impl branch; repo rule: code changes on feat/ branch", "source": "plan" },
@@ -50,7 +61,7 @@
         "npm run test --workspace=@llm-wiki/graph-engine exits 0 (265 pass)",
         "progress records baseline fps; verification proves completion; git log by task id shows which commit completed the item"
       ],
-      "status": "pending",
+      "status": "completed",
       "tasks": [
         {
           "id": "0.1",
@@ -74,7 +85,17 @@
             }
           ]
         },
-        { "id": "0.2", "title": "Run full acceptance set + fps capture, record baseline numbers", "status": "pending", "verification": [] }
+        {
+          "id": "0.2",
+          "title": "Run full acceptance set + fps capture, record baseline numbers",
+          "status": "completed",
+          "verification": [
+            { "command": "git log --oneline -15", "exit": 0, "evidence": "task 0.1 commit present: 873e2ba docs: record renderer split baseline start [task 0.1]" },
+            { "command": "npm run test --workspace=@llm-wiki/graph-engine", "exit": 0, "evidence": "265 tests passed, 0 failed" },
+            { "command": "full acceptance command set", "exit": 0, "evidence": "graph-engine test/typecheck/build, web test/typecheck/build, workbench/offline/community browser regressions all exited 0" },
+            { "command": "bash tests/graph-browser-stage-4-5.regression-1.sh --target offline", "exit": 0, "evidence": "dense wheel fps 50.2, above fps floor 45" }
+          ]
+        }
       ]
     },
     {
@@ -167,6 +188,11 @@
       "task": "0.1",
       "status": "completed",
       "notes": "Created feat/graph-renderer-coordination-split and recorded green graph-engine smoke baseline; no feature code changed."
+    },
+    {
+      "task": "0.2",
+      "status": "completed",
+      "notes": "Recorded full green baseline and dense-wheel fps 50.2; Phase 0 acceptance passed."
     }
   ]
 }
