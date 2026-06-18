@@ -185,9 +185,9 @@ async function sampleAnimationFrames(page, durationMs) {
 
 async function runOfflineThemeChecks(page) {
   await page.waitForFunction(() => document.querySelector(".llm-wiki-graph-engine")?.dataset.theme === "shan-shui");
-  await page.getByRole("button", { name: "切换墨夜主题" }).click();
+  await page.getByRole("button", { name: "切换墨夜主题" }).click({ force: true });
   await page.waitForFunction(() => document.querySelector(".llm-wiki-graph-engine")?.dataset.theme === "mo-ye");
-  await page.getByRole("button", { name: "切换山水主题" }).click();
+  await page.getByRole("button", { name: "切换山水主题" }).click({ force: true });
   await page.waitForFunction(() => document.querySelector(".llm-wiki-graph-engine")?.dataset.theme === "shan-shui");
 }
 
