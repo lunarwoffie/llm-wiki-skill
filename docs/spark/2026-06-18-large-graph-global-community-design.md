@@ -3,6 +3,7 @@
 日期：2026-06-18
 状态：待用户复核
 当前分支：`codex/graph-performance-optimization`
+视觉稿：[`docs/spark/mockups/2026-06-18-large-graph-global-community-flow.html`](mockups/2026-06-18-large-graph-global-community-flow.html)
 
 ## 目的
 
