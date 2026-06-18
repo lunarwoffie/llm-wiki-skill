@@ -364,6 +364,15 @@ function App() {
 		setDrawer((current) => drawerForGraphSelection(graphData, selection, current, { pins: graphPins }));
 	}, [graphData, graphPins, drawer]);
 
+	const handleGraphViewReset = useCallback(() => {
+		setGraphFocusPath(null);
+		setDrawer((current) => (
+			current.mode === "graph-reader"
+				? drawerForGraphSummaryNode(graphData, current.payload.node.id, current, { pins: graphPins })
+				: current
+		));
+	}, [graphData, graphPins]);
+
 	const handleGraphSelectionTextChange = useCallback((value: string) => {
 		setDrawer((current) => (
 			current.mode === "graph-selection"
@@ -740,7 +749,7 @@ function App() {
 							onGraphDataChange={setGraphData}
 							onGraphPinsChange={setGraphPins}
 							onSelectionChange={handleGraphSelectionChange}
-							onViewReset={() => setGraphFocusPath(null)}
+							onViewReset={handleGraphViewReset}
 							selectionCommand={selectionCommand}
 							focusPath={graphFocusPath}
 							pendingDiff={pendingGraphDiff}

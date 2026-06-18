@@ -61,6 +61,7 @@ const data = JSON.parse(fs.readFileSync(file, "utf8"));
 for (const node of data.nodes) {
   node.source_path = `wiki/entities/${node.id}.md`;
   node.content = `# ${node.label}\n\n这是${node.label}的内容。\n`;
+  if (node.id === "C") node.type = "source";
 }
 fs.writeFileSync(file, `${JSON.stringify(data, null, 2)}\n`);
 NODE

@@ -42,6 +42,7 @@ async function runDesktopChecks(browser) {
     drawer: {},
     communitySummary: {},
     blankAndDoubleClick: {},
+    returnGlobalState: {},
     communityDrag: {},
     dragRefreshRace: {},
     rootScroll: {},
@@ -99,6 +100,9 @@ async function runDesktopChecks(browser) {
   await closeDrawerIfOpen(page);
   await resetGraphView(page, ["A", "B", "C"]);
   evidence.blankAndDoubleClick = await runBlankAndDoubleClickCheck(page);
+  await closeDrawerIfOpen(page);
+  await resetGraphView(page, ["A", "B", "C"]);
+  evidence.returnGlobalState = await runReturnGlobalStatePreservationCheck(page);
   await closeDrawerIfOpen(page);
   await resetGraphView(page, ["A", "B", "C"]);
   evidence.communityDrag = await runCommunityDragCheck(page);
@@ -429,6 +433,92 @@ async function runBlankAndDoubleClickCheck(page) {
   };
 }
 
+async function runReturnGlobalStatePreservationCheck(page) {
+  const nodeFlow = await runNodeReturnGlobalStateCheck(page);
+  const resetLayout = await runResetLayoutDistinctFromReturnGlobalCheck(page);
+  const communityFlow = await runCommunityReturnGlobalStateCheck(page);
+  return { nodeFlow, resetLayout, communityFlow };
+}
+
+async function runNodeReturnGlobalStateCheck(page) {
+  await resetGraphLayout(page);
+  await closeDrawerIfOpen(page);
+  await resetGraphView(page, ["A", "B", "C"]);
+
+  await openSearch(page);
+  await page.locator(".graph-search-input").fill("节点A");
+  await page.waitForSelector(".node[data-id='A'][data-search-state='match']");
+  await openToolbarFilters(page);
+  await setTypeFilter(page, "entity", true);
+  await setTypeFilter(page, "source", false);
+  await waitForVisibleNodeIds(page, ["A", "B"], "source filter should hide C before return global");
+
+  await clickNodeForSummary(page, "A", "return global node setup");
+  await page.locator('[data-testid="graph-node-summary"] button', { hasText: "固定位置" }).click();
+  await page.waitForSelector(".node[data-id='A'][data-pinned='true']");
+  await page.locator('[data-testid="graph-node-summary"] button', { hasText: "打开详情" }).click();
+  await page.waitForSelector(".graph-reader-drawer");
+  await waitForCommunityFocus(page, "t1", "node detail return-global setup should enter community");
+  await waitForVisibleNodeIds(page, ["A", "B"]);
+  await page.waitForSelector(".node[data-id='A'][aria-pressed='true']");
+  const focused = await returnGlobalStateSnapshot(page);
+
+  await resetGraphView(page, ["A", "B"]);
+  await waitForNoGraphFocus(page, "return global should leave community focus");
+  await page.waitForSelector('[data-testid="graph-node-summary"]');
+  await page.waitForSelector(".node[data-id='A'][aria-pressed='true'][data-pinned='true']");
+  await page.waitForSelector(".node[data-id='A'][data-search-state='match']");
+  const returned = await returnGlobalStateSnapshot(page);
+
+  assert.equal(returned.drawerTestId, "graph-node-summary", "selected node should still show the lightweight node summary after return global");
+  assert.equal(returned.searchQuery, "节点A", "search query should remain visible after return global");
+  assert.equal(returned.sourceFilterChecked, false, "type filter should remain active after return global");
+  assert.equal(returned.nodeA.pinned, "true", "fixed position should remain after return global");
+  assert.equal(returned.nodeA.pressed, "true", "selected node should remain selected after return global");
+  assert.deepEqual(returned.visibleNodes, ["A", "B"], "active source filter should still shape the returned global view");
+
+  await setTypeFilter(page, "source", true);
+  await waitForVisibleNodeIds(page, ["A", "B", "C"]);
+  return { focused, returned };
+}
+
+async function runResetLayoutDistinctFromReturnGlobalCheck(page) {
+  await page.locator('[data-testid="graph-node-summary"] button', { hasText: "打开详情" }).click();
+  await page.waitForSelector(".graph-reader-drawer");
+  await waitForCommunityFocus(page, "t1", "reset-layout distinction setup should enter community");
+  await page.waitForSelector(".node[data-id='A'][data-pinned='true']");
+  await resetGraphLayout(page);
+  await waitForCommunityFocus(page, "t1", "reset layout should not return global");
+  await waitForVisibleNodeIds(page, ["A", "B"]);
+  await page.waitForSelector(".graph-reader-drawer");
+  const afterResetLayout = await returnGlobalStateSnapshot(page);
+
+  assert.equal(afterResetLayout.readerOpen, true, "reset layout should keep the current reader open");
+  assert.equal(afterResetLayout.nodeA.pinned, "false", "reset layout should clear fixed position");
+  assert.equal(afterResetLayout.nodeA.pressed, "true", "reset layout should not clear selection");
+  assert.deepEqual(afterResetLayout.visibleNodes, ["A", "B"], "reset layout should preserve community focus");
+  return afterResetLayout;
+}
+
+async function runCommunityReturnGlobalStateCheck(page) {
+  await closeDrawerIfOpen(page);
+  await resetGraphView(page, ["A", "B", "C"]);
+  await openCommunitySummaryFromWash(page, "t1");
+  await page.locator('[data-testid="graph-community-summary"] button', { hasText: "进入社区" }).click();
+  await waitForCommunityFocus(page, "t1", "community return-global setup should enter community");
+  await waitForVisibleNodeIds(page, ["A", "B"]);
+  const focused = await returnGlobalStateSnapshot(page);
+
+  await resetGraphView(page, ["A", "B", "C"]);
+  await waitForNoGraphFocus(page, "community return global should leave community focus");
+  await page.waitForSelector('[data-testid="graph-community-summary"]');
+  const returned = await returnGlobalStateSnapshot(page);
+
+  assert.equal(returned.drawerTestId, "graph-community-summary", "selected community should still show community summary after return global");
+  assert.deepEqual(returned.visibleNodes, ["A", "B", "C"], "community return global should restore the global node set");
+  return { focused, returned };
+}
+
 async function openCommunitySummaryFromWash(page, communityId) {
   await closeDrawerIfOpen(page);
   await resetGraphView(page, ["A", "B", "C"]);
@@ -609,6 +699,32 @@ async function resetGraphLayout(page) {
   await page.waitForFunction(() => {
     return [...document.querySelectorAll(".node")].every((node) => node.getAttribute("data-pinned") !== "true");
   }, undefined, { timeout: 3000 });
+}
+
+async function returnGlobalStateSnapshot(page) {
+  return roundObject(await page.evaluate(() => {
+    const nodeSnapshot = (id) => {
+      const node = document.querySelector(`.node[data-id="${CSS.escape(id)}"]`);
+      return {
+        present: Boolean(node),
+        pressed: node?.getAttribute("aria-pressed") || "",
+        pinned: node?.getAttribute("data-pinned") || "",
+        searchState: node?.getAttribute("data-search-state") || ""
+      };
+    };
+    const sourceFilter = document.querySelector('.graph-type-filter-option input[data-type="source"]');
+    return {
+      focus: document.querySelector(".graph-host")?.dataset.llmWikiGraphFocus || "",
+      visibleNodes: [...document.querySelectorAll(".node")].map((item) => item.dataset.id).sort(),
+      drawerTestId: document.querySelector(".drawer-panel-open [data-testid]")?.getAttribute("data-testid") || "",
+      readerOpen: Boolean(document.querySelector(".graph-reader-drawer")),
+      searchQuery: document.querySelector(".graph-search-input")?.value || "",
+      sourceFilterChecked: sourceFilter instanceof HTMLInputElement ? sourceFilter.checked : null,
+      nodeA: nodeSnapshot("A"),
+      nodeB: nodeSnapshot("B"),
+      nodeC: nodeSnapshot("C")
+    };
+  }));
 }
 
 async function closeDrawerIfOpen(page) {
@@ -1131,6 +1247,20 @@ async function openToolbarFilters(page) {
   }
   await waitForToolbarPanel(page, "filters");
   await page.waitForSelector('.graph-toolbar-panel[data-state="filters"] .community-legend-row');
+}
+
+async function setTypeFilter(page, type, enabled) {
+  await openToolbarFilters(page);
+  const input = page.locator(`.graph-type-filter-option input[data-type="${cssString(type)}"]`);
+  await input.waitFor();
+  const checked = await input.isChecked();
+  if (checked !== enabled) {
+    await input.click();
+    await page.waitForFunction(({ type, enabled }) => {
+      const input = document.querySelector(`.graph-type-filter-option input[data-type="${CSS.escape(type)}"]`);
+      return input instanceof HTMLInputElement && input.checked === enabled;
+    }, { type, enabled });
+  }
 }
 
 async function openSearch(page) {

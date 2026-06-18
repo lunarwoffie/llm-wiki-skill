@@ -434,10 +434,10 @@ export function createGraphController(context: GraphRenderContext, delegates: Gr
   }
 
   function resetViewState(): void {
-    context.searchFocusedNodeId = null;
-    context.runtimeState.clearInteraction();
+    delegates.setGraphHover(null);
+    context.runtimeState.setFocus(null);
+    context.runtimeState.setActiveGesture(null);
     delete context.root.dataset.focus;
-    context.callbacks.onSelectionClearRequested?.();
     context.callbacks.onViewReset?.();
     delegates.render();
     delegates.setViewportAnimating(true);

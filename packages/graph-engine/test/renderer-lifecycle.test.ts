@@ -128,6 +128,104 @@ describe("graph renderer lifecycle", () => {
     renderer.destroy();
   });
 
+  it("returns global while preserving selection, search, filters, and fixed positions", async () => {
+    const ownerDocument = new FakeDocument();
+    const container = ownerDocument.createElement("div");
+    const clearRequests: number[] = [];
+    const viewResets: number[] = [];
+    const renderer = createGraphRenderer(container as unknown as HTMLElement, {
+      data: graphDataForReturnGlobal(),
+      pins: { "wiki/a.md": { x: 120, y: 140, coordinateSpace: "world" } },
+      theme: "shan-shui",
+      live: false,
+      focus: { kind: "community", id: "community-a" },
+      typeFilters: { entity: true, source: true },
+      onSelectionClearRequested: () => clearRequests.push(1),
+      onViewReset: () => viewResets.push(1)
+    });
+
+    renderer.setTypeFilters({ entity: true, source: false });
+    renderer.select({ kind: "node", id: "a" });
+    const searchInput = findByClass(renderer.root as unknown as FakeElement, "graph-search-input")[0];
+    searchInput.value = "Node a";
+    searchInput.dispatch("input");
+
+    assert.deepEqual(visibleNodeIds(renderer), ["a"]);
+
+    renderer.resetView();
+    await waitForViewportCommit();
+
+    assert.deepEqual(viewResets, [1]);
+    assert.deepEqual(clearRequests, []);
+    assert.deepEqual(visibleNodeIds(renderer), ["a", "c"]);
+    assert.equal(nodeElement(renderer, "a")?.getAttribute("aria-pressed"), "true");
+    assert.equal(nodeElement(renderer, "c")?.getAttribute("aria-pressed"), "false");
+    assert.equal(nodeElement(renderer, "a")?.dataset.pinned, "true");
+    assert.equal(nodeElement(renderer, "b"), undefined);
+    assert.equal(findByClass(renderer.root as unknown as FakeElement, "graph-search-input")[0]?.value, "Node a");
+    assert.equal(nodeElement(renderer, "a")?.dataset.searchState, "match");
+    assert.equal(nodeElement(renderer, "c")?.dataset.searchState, "faded");
+
+    renderer.destroy();
+  });
+
+  it("keeps reset layout separate from return global", async () => {
+    const ownerDocument = new FakeDocument();
+    const container = ownerDocument.createElement("div");
+    const viewResets: number[] = [];
+    const pinsChanged: unknown[] = [];
+    const renderer = createGraphRenderer(container as unknown as HTMLElement, {
+      data: graphDataForReturnGlobal(),
+      pins: { "wiki/a.md": { x: 120, y: 140, coordinateSpace: "world" } },
+      theme: "shan-shui",
+      live: false,
+      focus: { kind: "community", id: "community-a" },
+      typeFilters: { entity: true, source: true },
+      onViewReset: () => viewResets.push(1),
+      onPinsChanged: (pins) => pinsChanged.push(pins)
+    });
+
+    renderer.select({ kind: "node", id: "a" });
+    const searchInput = findByClass(renderer.root as unknown as FakeElement, "graph-search-input")[0];
+    searchInput.value = "Node a";
+    searchInput.dispatch("input");
+
+    renderer.resetLayout();
+    await waitForViewportCommit();
+
+    assert.deepEqual(viewResets, []);
+    assert.deepEqual(pinsChanged.at(-1), {});
+    assert.deepEqual(visibleNodeIds(renderer), ["a", "b"]);
+    assert.equal(nodeElement(renderer, "a")?.getAttribute("aria-pressed"), "true");
+    assert.equal(nodeElement(renderer, "a")?.dataset.pinned, "false");
+    assert.equal(findByClass(renderer.root as unknown as FakeElement, "graph-search-input")[0]?.value, "Node a");
+    assert.equal(nodeElement(renderer, "c"), undefined);
+
+    renderer.destroy();
+  });
+
+  it("returns global with a selected community still selected", async () => {
+    const ownerDocument = new FakeDocument();
+    const container = ownerDocument.createElement("div");
+    const renderer = createGraphRenderer(container as unknown as HTMLElement, {
+      data: graphDataForReturnGlobal(),
+      theme: "shan-shui",
+      live: false,
+      focus: { kind: "community", id: "community-a" }
+    });
+
+    renderer.select({ kind: "community", id: "community-a" });
+    renderer.resetView();
+    await waitForViewportCommit();
+
+    assert.deepEqual(visibleNodeIds(renderer), ["a", "b", "c"]);
+    assert.equal(nodeElement(renderer, "a")?.getAttribute("aria-pressed"), "true");
+    assert.equal(nodeElement(renderer, "b")?.getAttribute("aria-pressed"), "true");
+    assert.equal(nodeElement(renderer, "c")?.getAttribute("aria-pressed"), "false");
+
+    renderer.destroy();
+  });
+
   it("updates toolbar panel state without repainting the graph", () => {
     const ownerDocument = new FakeDocument();
     const container = ownerDocument.createElement("div");
@@ -213,6 +311,40 @@ function graphDataWithCommunities(entries: Array<[string, string]>): GraphData {
   };
 }
 
+function graphDataForReturnGlobal(): GraphData {
+  return {
+    meta: {
+      build_date: "2026-06-17",
+      wiki_title: "Return global graph",
+      total_nodes: 3,
+      total_edges: 1
+    },
+    nodes: [
+      { id: "a", label: "Node a", type: "entity", community: "community-a", source_path: "wiki/a.md", content: "Node a detail" },
+      { id: "b", label: "Node b", type: "source", community: "community-a", source_path: "wiki/b.md", content: "Node b detail" },
+      { id: "c", label: "Node c", type: "entity", community: "community-b", source_path: "wiki/c.md", content: "Node c detail" }
+    ],
+    edges: [
+      { id: "a-b", from: "a", to: "b", type: "EXTRACTED" }
+    ]
+  };
+}
+
+function visibleNodeIds(renderer: { root: HTMLElement }): string[] {
+  return collectNodes(renderer.root as unknown as FakeElement).map((node) => node.dataset.id || "").sort();
+}
+
+function collectNodes(root: FakeElement): FakeElement[] {
+  const matches: FakeElement[] = [];
+  if (root.classList.contains("node")) matches.push(root);
+  for (const child of root.children) matches.push(...collectNodes(child));
+  return matches;
+}
+
+async function waitForViewportCommit(): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, 24));
+}
+
 function diff(overrides: Partial<GraphDiff> & { nodeCount: number }): GraphDiff {
   return {
     addedNodes: overrides.addedNodes || [],
@@ -246,7 +378,8 @@ class FakeDocument {
   readonly head = new FakeElement("head", this);
   readonly defaultView = {
     localStorage: null,
-    matchMedia: () => ({ matches: false })
+    matchMedia: () => ({ matches: false }),
+    requestAnimationFrame: (callback: () => void) => setTimeout(callback, 0) as unknown as number
   };
 
   createElement(tagName: string): FakeElement {

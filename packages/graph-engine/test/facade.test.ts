@@ -115,6 +115,32 @@ describe("GraphFacade", () => {
     assert.deepEqual(renderer.calls.at(-1), ["select", { kind: "node", id: "a" }]);
   });
 
+  it("keeps return global and reset layout as separate facade commands", () => {
+    const container = { dataset: {} as Record<string, string | undefined> };
+    const renderer = createFakeRenderer();
+    const viewResets: number[] = [];
+    const engine = createGraphFacadeFromRenderer(container, renderer, {
+      data: DATA,
+      theme: "shan-shui",
+      capabilities: {
+        onViewReset: () => viewResets.push(1)
+      }
+    });
+
+    engine.focusCommunity("c1");
+    assert.equal(container.dataset.llmWikiGraphFocus, "community:c1");
+
+    engine.resetLayout();
+    assert.equal(container.dataset.llmWikiGraphFocus, "community:c1");
+    assert.deepEqual(renderer.calls.at(-1), ["resetLayout"]);
+    assert.deepEqual(viewResets, []);
+
+    engine.resetView();
+    assert.equal(container.dataset.llmWikiGraphFocus, undefined);
+    assert.deepEqual(renderer.calls.at(-1), ["resetView"]);
+    assert.deepEqual(viewResets, [1]);
+  });
+
   it("exposes shared summary payloads from current facade data and pins", () => {
     const container = { dataset: {} as Record<string, string | undefined> };
     const renderer = createFakeRenderer();
