@@ -3,9 +3,9 @@
   "spec": "docs/spark/2026-06-18-large-graph-global-community-design.md",
   "status": {
     "overall": "in_progress",
-    "phase": "phase-2",
-    "task": "2.4",
-    "next_allowed_action": "Prepare early global-renderer trial matrix."
+    "phase": "phase-3",
+    "task": "3.1",
+    "next_allowed_action": "Change global node click to lightweight summary selection."
   },
   "execution_rules": {
     "branch": "codex/large-graph-performance-experience",
@@ -1884,6 +1884,24 @@
       "reason": "The first stage keeps edges passive while retaining strong relationship summaries in node/community drawers.",
       "source": "latest user-confirmed design decisions",
       "status": "recorded"
+    },
+    {
+      "decision": "Compare Sigma/Graphology WebGL, vis-network Canvas, and no-new-dependency aggregation fallback with one production global route only",
+      "reason": "The plan must test the main rendering candidates without splitting the product into multiple permanent global experiences.",
+      "source": "task 2.4",
+      "status": "recorded"
+    },
+    {
+      "decision": "Allow aggregation-first only as a staged route if it wins, not as a parallel permanent product",
+      "reason": "Aggregation may be the chosen global route, but it must not sit beside a second global renderer in production.",
+      "source": "task 2.4",
+      "status": "recorded"
+    },
+    {
+      "decision": "Record explicit dependency approval before trial packages are installed",
+      "reason": "Candidate renderer packages need a written approval boundary before package changes land.",
+      "source": "task 2.4",
+      "status": "recorded"
     }
   ],
   "phases": [
@@ -2074,7 +2092,7 @@
     {
       "id": "phase-2",
       "goal": "Define graph semantic contracts, lightweight drawer states, shared renderer adapter, and trial matrix before click semantics change.",
-      "status": "in_progress",
+      "status": "completed",
       "acceptance": [
         {
           "check": "Graph summary payloads and action commands preserve object ids, community ids, search hits, Pin hints, and selection state.",
@@ -2108,8 +2126,12 @@
         },
         {
           "check": "Renderer trial matrix records Sigma/Graphology, vis-network, and aggregation fallback with one-production-route rule.",
-          "status": "pending",
-          "evidence": []
+          "status": "completed",
+          "evidence": [
+            "docs/graph/performance/2026-06-18-phase-2-4-global-renderer-trial-matrix.md records Sigma/Graphology WebGL, vis-network Canvas, and no-new-dependency aggregation fallback as the comparison set.",
+            "The trial matrix defines shared graph shapes, required metrics, rejection reasons, dependency approval boundary, desktop-app compatibility checks, and the one-production-global-route rule.",
+            "The progress decision log records that aggregation-first may be a staged selected route but must not become a permanent parallel global graph product."
+          ]
         }
       ],
       "tasks": [
@@ -2157,8 +2179,15 @@
         {
           "id": "2.4",
           "title": "Prepare early global-renderer trial matrix",
-          "status": "pending",
-          "verification": []
+          "status": "completed",
+          "verification": [
+            "`git status --short --branch` inspected before work; unrelated docs/plans, docs/spark, and .superpowers/ changes were left out of task scope.",
+            "`git log --oneline -15` inspected before work; latest commit was 78e2cd6 feat: add graph renderer adapter contract [task 2.3].",
+            "`npm run test --workspace=@llm-wiki/graph-engine` passed before work: 286 tests, 61 suites, 0 failures.",
+            "Created docs/graph/performance/2026-06-18-phase-2-4-global-renderer-trial-matrix.md.",
+            "The matrix records WebGL, Canvas, and aggregation fallback candidates, expected metrics, acceptance table, rejection reasons, desktop-app compatibility checks, dependency approval requirements, and the one-production-route rule.",
+            "`npm run test --workspace=@llm-wiki/graph-engine` passed after work: 286 tests, 61 suites, 0 failures."
+          ]
         }
       ]
     },
@@ -2491,6 +2520,10 @@
     {
       "timestamp": "2026-06-18",
       "entry": "Task 2.3 added a shared renderer adapter and behavior contract so DOM/SVG, candidate global renderers, and aggregation fallback use the same object ids, selection/search/Pin state, aggregation metadata, drawer targets, and enter-community semantics before any candidate renderer is wired into production."
+    },
+    {
+      "timestamp": "2026-06-18",
+      "entry": "Task 2.4 added the global renderer trial matrix, defining the WebGL, Canvas, and aggregation fallback comparison set, required metrics, rejection reasons, dependency approval boundary, desktop compatibility checks, and one-production-global-route rule."
     }
   ],
   "execution_log": [
@@ -2625,6 +2658,19 @@
         "graph-engine typecheck passed"
       ],
       "measured_at": "2026-06-18T09:16:00Z"
+    },
+    {
+      "task": "2.4",
+      "status": "completed",
+      "summary": "Prepared the early global renderer trial matrix and completed Phase 2.",
+      "evidence": [
+        "docs/graph/performance/2026-06-18-phase-2-4-global-renderer-trial-matrix.md",
+        "Matrix covers Sigma/Graphology WebGL, vis-network Canvas, and no-new-dependency aggregation fallback",
+        "Matrix records required graph shapes, metrics, acceptance table, rejection reasons, desktop-app checks, dependency approval requirements, and one-production-route rule",
+        "Decision log records aggregation-first as a staged route only if selected, not a permanent parallel product",
+        "graph-engine test passed: 286 tests, 61 suites, 0 failures"
+      ],
+      "measured_at": "2026-06-18T09:30:00Z"
     }
   ]
 }
