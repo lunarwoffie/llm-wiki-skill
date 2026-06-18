@@ -1,4 +1,4 @@
-import type { GraphData, GraphDiff, GraphTypeFilters, NodeId, PinMap, SelectionInput, ThemeId } from "../types";
+import type { GraphData, GraphDiff, GraphSummaryObjectRef, GraphTypeFilters, GraphVisibilityState, NodeId, PinMap, SelectionInput, ThemeId } from "../types";
 import type { LiveGraphSimulation, PinState } from "../sim";
 import type { GraphHitTargetResolver } from "./hit-testing";
 import type { GraphGestureController, GraphGestureStateMachine } from "./gestures";
@@ -36,6 +36,7 @@ export interface GraphRendererCallbacks {
   onViewReset?: () => void;
   onPinsChanged?: (pins: PinMap) => void;
   onDragActiveChange?: (dragging: boolean) => void;
+  onVisibilityStateChange?: (state: GraphVisibilityState) => void;
 }
 
 export interface GraphRenderContext {
@@ -51,6 +52,7 @@ export interface GraphRenderContext {
   typeFilters: GraphTypeFilters;
   baseTypeFilters: GraphTypeFilters;
   availableTypeFilters: GraphTypeFilters;
+  temporaryObject: GraphSummaryObjectRef | null;
   searchIndex: ReturnType<typeof resolveGraphSearchState>["searchIndex"] | undefined;
   previewTimer: ReturnType<typeof setTimeout> | null;
   pathCache: RenderPathCache;

@@ -340,6 +340,45 @@ describe("graph renderer lifecycle", () => {
     renderer.destroy();
   });
 
+  it("temporarily reveals a filtered selected node with one-hop context without clearing filters", () => {
+    const ownerDocument = new FakeDocument();
+    const container = ownerDocument.createElement("div");
+    const visibilityStates: unknown[] = [];
+    const renderer = createGraphRenderer(container as unknown as HTMLElement, {
+      data: graphDataForReturnGlobal(),
+      theme: "shan-shui",
+      live: false,
+      typeFilters: { entity: true, source: true },
+      onVisibilityStateChange: (state) => visibilityStates.push(state)
+    });
+
+    renderer.setTypeFilters({ entity: true, source: false });
+
+    assert.equal(nodeElement(renderer, "b")?.dataset.filterState, "hidden");
+    assert.equal(edgeElement(renderer, "a-b")?.dataset.filterState, "hidden");
+
+    renderer.showTemporaryObject({ kind: "node", nodeId: "b" });
+
+    assert.equal(nodeElement(renderer, "b")?.dataset.filterState, "visible");
+    assert.equal(nodeElement(renderer, "a")?.dataset.filterState, "visible");
+    assert.equal(edgeElement(renderer, "a-b")?.dataset.filterState, "visible");
+    assert.equal(renderer.root.dataset.typeFiltersActive, "true");
+    const temporaryState = visibilityStates.find((state) =>
+      JSON.stringify((state as { temporaryObject: unknown }).temporaryObject) === JSON.stringify({ kind: "node", nodeId: "b" })
+    ) as { temporaryObject: unknown; typeFilters: Record<string, boolean> } | undefined;
+    assert.ok(temporaryState);
+    assert.equal(temporaryState.typeFilters.source, false);
+
+    renderer.clearTemporaryObjectDisplay();
+
+    assert.equal(nodeElement(renderer, "b")?.dataset.filterState, "hidden");
+    assert.equal(edgeElement(renderer, "a-b")?.dataset.filterState, "hidden");
+    assert.equal(renderer.root.dataset.typeFiltersActive, "true");
+    assert.equal((visibilityStates.at(-1) as { temporaryObject: unknown } | undefined)?.temporaryObject, null);
+
+    renderer.destroy();
+  });
+
   it("degrades interaction detail during lightweight viewport changes and restores after settle", async () => {
     const ownerDocument = new FakeDocument();
     const container = ownerDocument.createElement("div");

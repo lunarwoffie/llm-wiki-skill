@@ -7,12 +7,14 @@ import { RightDrawer } from "../src/components/RightDrawer";
 import {
 	graphCommunitySummaryDrawer,
 	graphEmptyDrawer,
+	graphExcludedObjectDrawer,
 	graphNodeSummaryDrawer,
 	graphUnavailableObjectDrawer,
 	type DrawerState,
 } from "../src/lib/drawer-state";
 import type {
 	GraphCommunitySummaryPayload,
+	GraphExcludedObjectPayload,
 	GraphNodeSummaryPayload,
 	GraphSummaryCommand,
 	GraphUnavailableObjectPayload,
@@ -46,12 +48,18 @@ describe("RightDrawer graph lightweight summaries", () => {
 		assert.doesNotMatch(html, /graph-reader-drawer/);
 	});
 
-	it("renders graph empty and unavailable states", () => {
+	it("renders graph empty, excluded, and unavailable states", () => {
 		const empty = renderDrawer(graphEmptyDrawer("没有搜索结果", "no-search-results", "暂无搜索结果"));
+		const excluded = renderDrawer(graphExcludedObjectDrawer(excludedFixture()));
 		const unavailable = renderDrawer(graphUnavailableObjectDrawer(unavailableFixture()));
 
 		assert.match(empty, /没有搜索结果/);
 		assert.match(empty, /暂无搜索结果/);
+		assert.match(excluded, /data-testid="graph-excluded-object"/);
+		assert.match(excluded, /暂不可见/);
+		assert.match(excluded, /当前筛选暂时隐藏了这个对象/);
+		assert.match(excluded, /显示这个对象/);
+		assert.match(excluded, /清除临时显示/);
 		assert.match(unavailable, /data-testid="graph-unavailable-object"/);
 		assert.match(unavailable, /missing-node/);
 		assert.match(unavailable, /这个节点当前不可用/);
@@ -163,6 +171,28 @@ function unavailableFixture(): GraphUnavailableObjectPayload {
 		pinHints: [],
 		aggregationMarkers: [],
 		commands: [],
+	};
+}
+
+function excludedFixture(): GraphExcludedObjectPayload {
+	return {
+		kind: "excluded-object",
+		object: { kind: "node", nodeId: "filtered-node" },
+		reason: "filter",
+		selection: {
+			input: { kind: "node", id: "filtered-node" },
+			selectionId: "node:filtered-node",
+			selectedNodeIds: ["filtered-node"],
+			selectedCommunityIds: ["alpha"],
+			containsCurrentObject: true,
+		},
+		searchResultIds: [],
+		pinHints: [],
+		aggregationMarkers: [],
+		commands: [
+			{ kind: "show-this-object", object: { kind: "node", nodeId: "filtered-node" }, label: "显示这个对象" },
+			{ kind: "clear-temporary-object-display", label: "清除临时显示" },
+		],
 	};
 }
 

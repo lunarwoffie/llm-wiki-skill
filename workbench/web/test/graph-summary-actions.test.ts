@@ -2,9 +2,12 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
 import {
+	drawerForExcludedGraphObject,
 	drawerForGraphSelection,
 	drawerForGraphSummaryNode,
+	drawerForUnavailableGraphObject,
 	graphOpenPagePayloadForCommand,
+	graphObjectVisibilityReason,
 	graphSelectionCommandForOpenDetail,
 } from "../src/lib/graph-summary-actions";
 import { closedDrawer } from "../src/lib/drawer-state";
@@ -84,6 +87,39 @@ describe("graph summary actions", () => {
 			nodeId: "a",
 			type: "enter-community-node",
 		});
+	});
+
+	it("classifies selected objects excluded by filters or search without clearing state", () => {
+		const data = graphFixture();
+		const object = { kind: "node" as const, nodeId: "b" };
+		const filteredState = {
+			searchQuery: "",
+			searchResultIds: [],
+			typeFilters: { topic: true, entity: false, source: true },
+			temporaryObject: null,
+		};
+		const searchedState = {
+			searchQuery: "Alpha",
+			searchResultIds: ["a"],
+			typeFilters: { topic: true, entity: true, source: true },
+			temporaryObject: null,
+		};
+
+		assert.equal(graphObjectVisibilityReason(data, filteredState, object), "filter");
+		assert.equal(graphObjectVisibilityReason(data, searchedState, object), "search");
+
+		const excluded = drawerForExcludedGraphObject(data, object, "filter", closedDrawer(), {
+			selection: { kind: "node", id: "b" },
+			searchResultIds: ["a"],
+		});
+		assert.equal(excluded.mode, "graph-excluded-object");
+		assert.deepEqual(
+			excluded.mode === "graph-excluded-object" ? excluded.payload.commands.map((command) => command.kind) : [],
+			["show-this-object", "clear-temporary-object-display"],
+		);
+
+		const unavailable = drawerForUnavailableGraphObject({ ...data, nodes: data.nodes.filter((node) => node.id !== "b") }, object, "missing-node", closedDrawer());
+		assert.equal(unavailable.mode, "graph-unavailable-object");
 	});
 });
 

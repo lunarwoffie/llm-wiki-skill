@@ -379,6 +379,12 @@ export function createGraphController(context: GraphRenderContext, delegates: Gr
           : `${state.matchIds.length} 个结果`
         : "输入关键词";
     }
+    context.callbacks.onVisibilityStateChange?.({
+      searchQuery: state.query,
+      searchResultIds: state.matchIds,
+      typeFilters: context.typeFilters,
+      temporaryObject: context.temporaryObject
+    });
   }
 
   function focusNextSearchResult(): void {

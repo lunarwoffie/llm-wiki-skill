@@ -2,18 +2,24 @@ import {
 	graphNodeTypeLabel,
 	summarizeGraphCommunity,
 	summarizeGraphNode,
+	summarizeExcludedGraphObject,
+	summarizeUnavailableGraphObject,
 	wikiPathForGraphNode,
 	type GraphData,
 	type GraphOpenPagePayload,
 	type GraphSummaryCommand,
+	type GraphSummaryObjectRef,
 	type GraphSummaryOptions,
+	type GraphVisibilityState,
 	type Selection,
 } from "@llm-wiki/graph-engine";
 
 import {
 	graphCommunitySummaryDrawer,
+	graphExcludedObjectDrawer,
 	graphNodeSummaryDrawer,
 	graphSelectionDrawer,
+	graphUnavailableObjectDrawer,
 	type DrawerState,
 } from "./drawer-state";
 import { selectionTitle } from "./graph-selection";
@@ -22,7 +28,9 @@ export type GraphSelectionCommand =
 	| { id: string; type: "clear" | "clear-selection" | "neighbors" | "enter-community" }
 	| { id: string; commandId?: string; nodeId: string; type: "enter-community-node" }
 	| { id: string; nodeId: string | null; type: "preview-node" }
-	| { id: string; nodeId: string; mode: "fix" | "unfix"; type: "set-fixed-position" };
+	| { id: string; nodeId: string; mode: "fix" | "unfix"; type: "set-fixed-position" }
+	| { id: string; object: GraphSummaryObjectRef; type: "show-temporary-object" }
+	| { id: string; type: "clear-temporary-object-display" };
 
 export function drawerForGraphSelection(
 	data: GraphData | null,
@@ -100,6 +108,42 @@ export function drawerForGraphSummaryNode(
 	});
 	if (summary.kind !== "node-summary") return current;
 	return graphNodeSummaryDrawer(summary);
+}
+
+export function drawerForExcludedGraphObject(
+	data: GraphData | null,
+	object: GraphSummaryObjectRef,
+	reason: "filter" | "aggregation" | "search" | "community-scope",
+	current: DrawerState,
+	options: GraphSummaryOptions = {},
+): DrawerState {
+	if (!data) return current;
+	const summary = summarizeExcludedGraphObject(data, object, reason, options);
+	return graphExcludedObjectDrawer(summary);
+}
+
+export function drawerForUnavailableGraphObject(
+	data: GraphData | null,
+	object: GraphSummaryObjectRef,
+	reason: "missing-node" | "missing-community" | "missing-aggregation",
+	current: DrawerState,
+	options: GraphSummaryOptions = {},
+): DrawerState {
+	if (!data) return current;
+	const summary = summarizeUnavailableGraphObject(data, object, reason, options);
+	return graphUnavailableObjectDrawer(summary);
+}
+
+export function graphObjectVisibilityReason(
+	data: GraphData | null,
+	state: GraphVisibilityState | null,
+	object: GraphSummaryObjectRef,
+): "filter" | "search" | "community-scope" | null {
+	if (!data || !state) return null;
+	const node = object.kind === "node" ? data.nodes.find((item) => item.id === object.nodeId) ?? null : null;
+	if (object.kind === "node" && node && state.typeFilters[node.type] === false) return "filter";
+	if (object.kind === "node" && state.searchQuery && !state.searchResultIds.includes(object.nodeId)) return "search";
+	return null;
 }
 
 function fallbackPayloadForOpenDetail(command: Extract<GraphSummaryCommand, { kind: "open-detail-read" }>): GraphOpenPagePayload {

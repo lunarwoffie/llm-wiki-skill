@@ -339,6 +339,7 @@ export interface GraphSummaryOptions {
   searchResultIds?: NodeId[];
   pins?: PinMap;
   aggregationMarkers?: GraphAggregationMarker[];
+  temporaryObject?: GraphSummaryObjectRef | null;
 }
 
 export interface GraphNodeSummaryPayload {
@@ -431,6 +432,13 @@ export type GraphSummaryPayload =
   | GraphExcludedObjectPayload
   | GraphUnavailableObjectPayload;
 
+export interface GraphVisibilityState {
+  searchQuery: string;
+  searchResultIds: NodeId[];
+  typeFilters: GraphTypeFilters;
+  temporaryObject: GraphSummaryObjectRef | null;
+}
+
 export type GraphFocusInput =
   | { kind: "community"; id: CommunityId }
   | null;
@@ -462,6 +470,7 @@ export interface GraphEngineCapabilities {
   onSelectionClear?: () => void;
   onViewReset?: () => void;
   onDragStateChange?: (dragging: boolean) => void;
+  onVisibilityStateChange?: (state: GraphVisibilityState) => void;
 }
 
 export interface GraphEngineOptions {
@@ -481,6 +490,8 @@ export interface GraphEngine {
   focusNode(path: WikiPath): void;
   focusCommunity(id: CommunityId): Selection;
   setTypeFilters(filters: GraphTypeFilters): void;
+  showTemporaryObject(object: GraphSummaryObjectRef): void;
+  clearTemporaryObjectDisplay(): void;
   resetView(): void;
   select(selector: SelectionInput): Selection;
   previewNode(id: NodeId | null): void;

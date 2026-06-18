@@ -1,6 +1,7 @@
 import type {
   CommunityId,
   GraphFocusInput,
+  GraphSummaryObjectRef,
   GraphTypeFilters,
   GraphData,
   GraphDiff,
@@ -27,7 +28,7 @@ import {
   GraphGestureStateMachine
 } from "./gestures";
 import { readToolbarPanelState } from "./toolbar";
-import type { GraphRenderContext } from "./render-context";
+import type { GraphRenderContext, GraphRendererCallbacks } from "./render-context";
 import { createGraphController, type GraphController } from "./controller";
 import {
   createGraphRenderPipeline,
@@ -54,6 +55,7 @@ export interface GraphRendererOptions {
   onViewReset?: () => void;
   onPinsChanged?: (pins: PinMap) => void;
   onDragActiveChange?: (dragging: boolean) => void;
+  onVisibilityStateChange?: GraphRendererCallbacks["onVisibilityStateChange"];
   toolbarContainer?: HTMLElement | null;
   focus?: GraphFocusInput;
   typeFilters?: GraphTypeFilters;
@@ -77,6 +79,8 @@ export interface GraphRenderer {
   focusNode(pathOrId: WikiPath): void;
   focusCommunity(id: CommunityId): void;
   setTypeFilters(filters: GraphTypeFilters): void;
+  showTemporaryObject(object: GraphSummaryObjectRef): void;
+  clearTemporaryObjectDisplay(): void;
   resetView(): void;
   select(selection: SelectionInput): void;
   previewNode(id: NodeId | null): void;
@@ -134,6 +138,7 @@ export function createGraphRenderer(container: HTMLElement, options: GraphRender
     typeFilters: options.typeFilters || {},
     baseTypeFilters: {},
     availableTypeFilters: {},
+    temporaryObject: null,
     searchIndex: undefined,
     previewTimer: null,
     pathCache,
@@ -164,7 +169,8 @@ export function createGraphRenderer(container: HTMLElement, options: GraphRender
       onSelectionClearRequested: options.onSelectionClearRequested,
       onViewReset: options.onViewReset,
       onPinsChanged: options.onPinsChanged,
-      onDragActiveChange: options.onDragActiveChange
+      onDragActiveChange: options.onDragActiveChange,
+      onVisibilityStateChange: options.onVisibilityStateChange
     }
   };
   presenter = createGraphOverlaysPresenter(context, {
@@ -275,6 +281,12 @@ export function createGraphRenderer(container: HTMLElement, options: GraphRender
     },
     setTypeFilters(filters: GraphTypeFilters): void {
       pipeline.applyTypeFilters(filters);
+    },
+    showTemporaryObject(object: GraphSummaryObjectRef): void {
+      pipeline.showTemporaryObject(object);
+    },
+    clearTemporaryObjectDisplay(): void {
+      pipeline.clearTemporaryObjectDisplay();
     },
     resetView(): void {
       controller.resetViewState();

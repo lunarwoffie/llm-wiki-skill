@@ -1,4 +1,4 @@
-import type { GraphDiff, NodeId, SelectionInput, ThemeId } from "../types";
+import type { GraphDiff, GraphSummaryObjectRef, NodeId, SelectionInput, ThemeId } from "../types";
 import { createLiveGraphSimulation, PinState, pinsToPositions } from "../sim";
 import { getThemeTokens, themeTokensToCssVars } from "../themes";
 import { buildCommunityLegend } from "./legend";
@@ -31,6 +31,7 @@ import {
 import { defaultGraphViewportSize, sideExitWorldAnchor, worldPointDeltaToLayerDelta } from "./geometry";
 import { createCommunityLegend, createGraphToolbar, createSearchControl } from "./controls";
 import { nextToolbarPanelState, writeToolbarPanelState } from "./toolbar";
+import { resolveGraphSearchState } from "./search";
 import type { GraphRuntimeStateSnapshot } from "./state";
 import type { GraphRenderContext, PaintedGraphDom } from "./render-context";
 import { ensureGraphRendererStyles } from "./render-styles";
@@ -77,6 +78,8 @@ export interface GraphRenderPipeline {
   mountGraphToolbar(): void;
   mountCommunityLegend(): void;
   applyTypeFilters(filters: Record<string, boolean>): void;
+  showTemporaryObject(object: GraphSummaryObjectRef): void;
+  clearTemporaryObjectDisplay(): void;
   applyCommunityHover(): void;
   bindResizeObserver(): void;
   commitViewport(nextViewport: RendererViewport, options?: ViewportFrameCommitOptions): void;
@@ -128,6 +131,7 @@ export function createGraphRenderPipeline(
     context.availableTypeFilters = context.typeFilters;
     context.graph.typeFilters = context.typeFilters;
     context.searchIndex = undefined;
+    syncVisibilityState();
     context.pinState = new PinState(context.graph, context.runtimeState.snapshot().pins);
     context.hitTargetResolver.refresh();
     applyTheme(context.root, context.theme);
@@ -318,29 +322,62 @@ export function createGraphRenderPipeline(
   function applyTypeFilters(filters: Record<string, boolean>): void {
     context.typeFilters = normalizeAvailableTypeFilters(filters, context.baseTypeFilters);
     context.graph.typeFilters = context.typeFilters;
+    const revealNodeIds = temporaryObjectNodeIds(context.temporaryObject, context.graph);
     const hiddenNodeIds = new Set<string>();
     for (const [id, element] of context.dom.nodeElements) {
-      const hidden = context.typeFilters[element.dataset.type || ""] === false;
+      const hidden = context.typeFilters[element.dataset.type || ""] === false && !revealNodeIds.has(id);
       element.dataset.filterState = hidden ? "hidden" : "visible";
       element.setAttribute("aria-hidden", hidden ? "true" : "false");
       if (hidden) hiddenNodeIds.add(id);
     }
     for (const [id, element] of context.dom.edgeElements) {
       const edge = context.graph.edges.find((item) => item.id === id);
-      const hidden = !edge || hiddenNodeIds.has(edge.source) || hiddenNodeIds.has(edge.target);
+      const hidden = !edge || (!revealNodeIds.has(edge.source) && !revealNodeIds.has(edge.target) && (hiddenNodeIds.has(edge.source) || hiddenNodeIds.has(edge.target)));
       element.dataset.filterState = hidden ? "hidden" : "visible";
       element.setAttribute("aria-hidden", hidden ? "true" : "false");
     }
     for (const [id, element] of context.dom.communityWashElements) {
-      const hasVisibleNode = context.graph.nodes.some((node) => node.community === id && !hiddenNodeIds.has(node.id));
+      const hasVisibleNode = context.graph.nodes.some((node) => node.community === id && (!hiddenNodeIds.has(node.id) || revealNodeIds.has(node.id)));
       element.dataset.filterState = hasVisibleNode ? "visible" : "hidden";
       element.setAttribute("aria-hidden", hasVisibleNode ? "false" : "true");
     }
     syncTypeFilterInputs();
+    syncVisibilityState();
     context.root.dataset.filteredNodeCount = String(hiddenNodeIds.size);
     context.root.dataset.typeFiltersActive = Object.values(context.typeFilters).some((enabled) => enabled === false) ? "true" : "false";
     applyCommunityHover();
     updateMinimapViewport();
+  }
+
+  function showTemporaryObject(object: GraphSummaryObjectRef): void {
+    context.temporaryObject = object;
+    applyTypeFilters(context.typeFilters);
+  }
+
+  function clearTemporaryObjectDisplay(): void {
+    context.temporaryObject = null;
+    applyTypeFilters(context.typeFilters);
+  }
+
+  function syncVisibilityState(): void {
+    const searchState = resolveGraphSearchState(context.data.nodes, context.searchQuery, context.searchIndex);
+    context.searchIndex = searchState.searchIndex;
+    context.callbacks.onVisibilityStateChange?.({
+      searchQuery: searchState.query,
+      searchResultIds: searchState.matchIds,
+      typeFilters: context.typeFilters,
+      temporaryObject: context.temporaryObject
+    });
+  }
+
+  function temporaryObjectNodeIds(object: GraphSummaryObjectRef | null, graph: RenderableGraph): Set<string> {
+    if (!object || object.kind !== "node") return new Set();
+    const ids = new Set([object.nodeId]);
+    for (const edge of graph.edges) {
+      if (edge.source === object.nodeId) ids.add(edge.target);
+      if (edge.target === object.nodeId) ids.add(edge.source);
+    }
+    return ids;
   }
 
   function syncTypeFilterInputs(): void {
@@ -695,6 +732,8 @@ export function createGraphRenderPipeline(
     mountGraphToolbar,
     mountCommunityLegend,
     applyTypeFilters,
+    showTemporaryObject,
+    clearTemporaryObjectDisplay,
     applyCommunityHover,
     bindResizeObserver,
     commitViewport,

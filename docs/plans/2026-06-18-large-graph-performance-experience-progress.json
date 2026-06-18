@@ -4,8 +4,8 @@
   "status": {
     "overall": "in_progress",
     "phase": "phase-5",
-    "task": "5.2",
-    "next_allowed_action": "Define filtered-out selected object behavior."
+    "task": "5.3",
+    "next_allowed_action": "Add community aggregation container rules."
   },
   "execution_rules": {
     "branch": "codex/large-graph-performance-experience",
@@ -2515,8 +2515,18 @@
         },
         {
           "check": "Filtered-out selected objects remain inspectable, can be temporarily shown, and can clear temporary display without clearing filters.",
-          "status": "pending",
-          "evidence": []
+          "status": "passed",
+          "evidence": [
+            "Shared graph visibility state now carries search query, search result ids, type filters, and temporary object identity from renderer to host.",
+            "Filtered selected nodes route to graph-excluded-object drawers while preserving search/filter state and offering show-this-object / clear-temporary-object-display commands.",
+            "show-this-object temporarily reveals the selected filtered node plus one-hop context through the shared renderer without clearing active filters.",
+            "clear-temporary-object-display removes the temporary reveal and returns the drawer to excluded-object state while keeping the selected object inspectable.",
+            "Unavailable object drawers are shown when a previously selected node no longer exists after data refresh.",
+            "`npm run test --workspace=@llm-wiki/graph-engine` passed: 310 tests, 61 suites, 0 failures.",
+            "`npm run test --workspace=@llm-wiki-agent/web` passed: 40 tests, 14 suites, 0 failures.",
+            "`bash tests/graph-workbench-interactions.regression-1.sh` passed and emitted excludedObjectFlow evidence for excluded, shown, and cleared states.",
+            "`bash tests/graph-browser-stage-4-5.regression-1.sh --target offline` passed."
+          ]
         },
         {
           "check": "Aggregation containers expose selected/search/Pin markers, open summary first, and drawer lists internal hits/Pins.",
@@ -2558,8 +2568,26 @@
         {
           "id": "5.2",
           "title": "Define filtered-out selected object behavior",
-          "status": "pending",
-          "verification": []
+          "status": "completed",
+          "verification": [
+            "`git status --short --branch` inspected before work; unrelated docs/plans, docs/spark, and .superpowers/ changes were left out of task scope.",
+            "`git log --oneline -15` inspected before task work; latest commit was ace08ee feat: preserve graph layout during search and filters [task 5.1].",
+            "Baseline `npm run test --workspace=@llm-wiki/graph-engine` passed before task work: 310 tests, 61 suites, 0 failures.",
+            "packages/graph-engine/src/types.ts, facade.ts, render/graph-renderer-root.ts, render/render-pipeline.ts, and render/render-context.ts expose shared visibility state and temporary object display commands.",
+            "packages/graph-engine/test/renderer-lifecycle.test.ts proves filtered selected objects remain selected, can be temporarily revealed with one-hop context, and can clear temporary display without clearing filters.",
+            "packages/graph-engine/test/facade.test.ts proves temporary object commands flow through the public facade.",
+            "workbench/web/src/App.tsx, GraphPanel.tsx, and graph-summary-actions.ts keep excluded selected objects inspectable, route missing objects to unavailable state, and avoid duplicate drawer replacement during temporary reveal.",
+            "workbench/web/test/graph-summary-actions.test.ts and right-drawer-graph-summary.test.tsx cover excluded-object drawers, unavailable-object drawers, and temporary display actions.",
+            "tests/browser/graph-workbench-interactions.mjs covers show-this-object preserving search/filter, showing temporary one-hop context, and clearing temporary display.",
+            "`node --import tsx --test workbench/web/test/graph-summary-actions.test.ts workbench/web/test/right-drawer-graph-summary.test.tsx` passed.",
+            "`npm run typecheck --workspace=@llm-wiki/graph-engine` passed.",
+            "`npm run test --workspace=@llm-wiki/graph-engine` passed after implementation: 310 tests, 61 suites, 0 failures.",
+            "`npm run test --workspace=@llm-wiki-agent/web` passed after implementation: 40 tests, 14 suites, 0 failures.",
+            "`npm run typecheck --workspace=@llm-wiki-agent/web` passed.",
+            "`node --check tests/browser/graph-workbench-interactions.mjs` passed.",
+            "`bash tests/graph-workbench-interactions.regression-1.sh` passed and emitted returnGlobalState.nodeFlow.excludedObjectFlow evidence for excluded, shown, and cleared states.",
+            "`bash tests/graph-browser-stage-4-5.regression-1.sh --target offline` passed."
+          ]
         },
         {
           "id": "5.3",
@@ -3090,6 +3118,23 @@
         "/tmp/llm-wiki-graph-large-perf-task-4-4/large-graph-performance-results.json: 47 records, 0 interaction over-budget records, 5 graph shapes measured."
       ],
       "measured_at": "2026-06-18T14:32:29Z"
+    },
+    {
+      "task": "5.2",
+      "status": "completed",
+      "summary": "Filtered-out selected graph objects now stay inspectable. Users can temporarily reveal the object with one-hop context without clearing filters, clear that temporary reveal, and see unavailable state after data refresh removes the selected object.",
+      "evidence": [
+        "Shared visibility state and temporary object commands are wired through graph-engine and the workbench host.",
+        "Excluded-object and unavailable-object drawer paths preserve object identity and actions.",
+        "Workbench browser regression records excludedObjectFlow for excluded, shown, and cleared states while search/filter state remains active.",
+        "graph-engine test passed: 310 tests, 61 suites, 0 failures",
+        "web test passed: 40 tests, 14 suites, 0 failures",
+        "graph-engine typecheck passed",
+        "web typecheck passed",
+        "workbench interaction browser regression passed",
+        "stage 4.5 offline browser regression passed"
+      ],
+      "measured_at": "2026-06-18T16:14:54Z"
     }
   ]
 }

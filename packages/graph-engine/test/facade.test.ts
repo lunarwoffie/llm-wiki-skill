@@ -214,6 +214,7 @@ describe("GraphFacade", () => {
       "onSelectionChange",
       "onSelectionClear",
       "onViewReset",
+      "onVisibilityStateChange",
       "persistPins"
     ]);
 

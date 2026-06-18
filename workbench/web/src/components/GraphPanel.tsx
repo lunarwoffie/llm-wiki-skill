@@ -8,6 +8,7 @@ import {
 	type GraphDiff,
 	type GraphEngine,
 	type GraphOpenPagePayload,
+	type GraphVisibilityState,
 	type PinMap,
 	type Selection,
 	type ThemeId,
@@ -30,6 +31,7 @@ interface Props {
 	onOpenPage?: (payload: GraphOpenPagePayload) => void;
 	onGraphDataChange?: (data: GraphData | null) => void;
 	onGraphPinsChange?: (pins: PinMap) => void;
+	onGraphVisibilityChange?: (state: GraphVisibilityState | null) => void;
 	onSelectionChange?: (selection: Selection | null) => void;
 	onViewReset?: () => void;
 	selectionCommand?: GraphSelectionCommand;
@@ -59,6 +61,7 @@ export function GraphPanel({
 	onOpenPage,
 	onGraphDataChange,
 	onGraphPinsChange,
+	onGraphVisibilityChange,
 	onSelectionChange,
 	onViewReset,
 	selectionCommand,
@@ -79,6 +82,7 @@ export function GraphPanel({
 	const onOpenPageRef = useRef(onOpenPage);
 	const onGraphDataChangeRef = useRef(onGraphDataChange);
 	const onGraphPinsChangeRef = useRef(onGraphPinsChange);
+	const onGraphVisibilityChangeRef = useRef(onGraphVisibilityChange);
 	const onSelectionChangeRef = useRef(onSelectionChange);
 	const onViewResetRef = useRef(onViewReset);
 	const diffQueueRef = useRef(new GraphDiffQueue({ visible: true }));
@@ -123,6 +127,10 @@ export function GraphPanel({
 	}, [onGraphPinsChange]);
 
 	useLayoutEffect(() => {
+		onGraphVisibilityChangeRef.current = onGraphVisibilityChange;
+	}, [onGraphVisibilityChange]);
+
+	useLayoutEffect(() => {
 		onSelectionChangeRef.current = onSelectionChange;
 	}, [onSelectionChange]);
 
@@ -158,6 +166,7 @@ export function GraphPanel({
 			setData(null);
 			setDataKnowledgeBasePath(null);
 			onGraphDataChangeRef.current?.(null);
+			onGraphVisibilityChangeRef.current?.(null);
 			applyLayoutPins({});
 			onSelectionChangeRef.current?.(null);
 			setStatus("idle");
@@ -175,6 +184,7 @@ export function GraphPanel({
 				setData(null);
 				setDataKnowledgeBasePath(kbPath);
 				onGraphDataChangeRef.current?.(null);
+				onGraphVisibilityChangeRef.current?.(null);
 				onSelectionChangeRef.current?.(null);
 				setStatus("building");
 				const nextBuildState = await rebuildGraph(kbPath);
@@ -194,6 +204,7 @@ export function GraphPanel({
 			setData(null);
 			setDataKnowledgeBasePath(kbPath);
 			onGraphDataChangeRef.current?.(null);
+			onGraphVisibilityChangeRef.current?.(null);
 			applyLayoutPins({});
 			onSelectionChangeRef.current?.(null);
 			setStatus("error");
@@ -343,6 +354,7 @@ export function GraphPanel({
 						void playDiff(decision.diff);
 					}
 				},
+				onVisibilityStateChange: (state) => onGraphVisibilityChangeRef.current?.(state),
 			}).capabilities,
 		});
 		engineRef.current = engine;
@@ -381,6 +393,12 @@ export function GraphPanel({
 		}
 		if (selectionCommand.type === "set-fixed-position") {
 			engineRef.current?.setNodeFixed(selectionCommand.nodeId, selectionCommand.mode);
+		}
+		if (selectionCommand.type === "show-temporary-object") {
+			engineRef.current?.showTemporaryObject(selectionCommand.object);
+		}
+		if (selectionCommand.type === "clear-temporary-object-display") {
+			engineRef.current?.clearTemporaryObjectDisplay();
 		}
 	}, [selectionCommand, status]);
 

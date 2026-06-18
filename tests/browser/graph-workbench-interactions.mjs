@@ -29,7 +29,14 @@ try {
   }
   console.log(JSON.stringify(evidence, null, 2));
 } finally {
-  await browser.close();
+  await closeBrowserForRegression(browser);
+}
+
+async function closeBrowserForRegression(browser) {
+  await Promise.race([
+    browser.close(),
+    new Promise((resolve) => setTimeout(resolve, 5000))
+  ]);
 }
 
 async function runDesktopChecks(browser) {
@@ -451,6 +458,8 @@ async function runNodeReturnGlobalStateCheck(page) {
   await resetGraphLayout(page);
   await closeDrawerIfOpen(page);
   await resetGraphView(page, ["A", "B", "C"]);
+  await clickNodeForSummary(page, "C", "filtered selected object setup");
+  await page.waitForSelector('[data-testid="graph-node-summary"]');
 
   await openSearch(page);
   const beforeSearchTransform = await layerTransform(page);
@@ -466,6 +475,7 @@ async function runNodeReturnGlobalStateCheck(page) {
   await waitForVisibleNodeIds(page, ["A", "B"], `${filteredNodeType} filter should hide node C before return global`);
   const afterFilterTransform = await layerTransform(page);
   assert.equal(afterFilterTransform, beforeFilterTransform, "type filter changes should not move or rebuild the graph layout");
+  const excludedObjectFlow = await runFilteredSelectedObjectCheck(page, filteredNodeType);
 
   await clickNodeForSummary(page, "A", "return global node setup");
   await page.locator('[data-testid="graph-node-summary"] button', { hasText: "固定位置" }).click();
@@ -499,8 +509,35 @@ async function runNodeReturnGlobalStateCheck(page) {
     returned,
     searchLayoutStable: beforeSearchTransform === afterSearchTransform,
     filterLayoutStable: beforeFilterTransform === afterFilterTransform,
-    filteredNodeType
+    filteredNodeType,
+    excludedObjectFlow
   };
+}
+
+async function runFilteredSelectedObjectCheck(page, filteredNodeType) {
+  await page.waitForSelector('[data-testid="graph-excluded-object"]');
+  await page.waitForSelector('[data-testid="graph-excluded-object"] button:has-text("显示这个对象")');
+  const excluded = await returnGlobalStateSnapshot(page);
+  assert.equal(excluded.drawerTestId, "graph-excluded-object", "filtered selected node should keep drawer as an excluded object");
+  assert.ok(excluded.disabledTypes.includes(filteredNodeType), "excluded object drawer should preserve the active type filter");
+  assert.deepEqual(excluded.visibleNodes, ["A", "B"], "filtered object should remain hidden before explicit show");
+
+  await page.locator('[data-testid="graph-excluded-object"] button', { hasText: "显示这个对象" }).click();
+  await page.waitForSelector('[data-testid="graph-node-summary"]');
+  await waitForVisibleNodeIds(page, ["A", "B", "C"], "show this object should temporarily reveal filtered node with context");
+  const shown = await returnGlobalStateSnapshot(page);
+  assert.equal(shown.drawerTestId, "graph-node-summary", "show this object should return to a node summary");
+  assert.ok(shown.disabledTypes.includes(filteredNodeType), "show this object should not clear the active filter");
+  assert.equal(shown.nodeC.pressed, "true", "shown object should remain selected");
+
+  await page.locator('[data-testid="graph-node-summary"] button', { hasText: "清除临时显示" }).click();
+  await page.waitForSelector('[data-testid="graph-excluded-object"]');
+  await waitForVisibleNodeIds(page, ["A", "B"], "clearing temporary object should restore active filter visibility");
+  const cleared = await returnGlobalStateSnapshot(page);
+  assert.equal(cleared.drawerTestId, "graph-excluded-object", "cleared temporary display should return to excluded drawer");
+  assert.ok(cleared.disabledTypes.includes(filteredNodeType), "clearing temporary display should keep the filter active");
+
+  return { excluded, shown, cleared };
 }
 
 async function runResetLayoutDistinctFromReturnGlobalCheck(page) {
@@ -754,8 +791,11 @@ async function returnGlobalStateSnapshot(page) {
 async function closeDrawerIfOpen(page) {
   const button = page.locator(".drawer-header button[aria-label='关闭']");
   if (await button.count()) {
-    await button.first().click();
-    await page.waitForSelector(".drawer-panel-open", { state: "detached" });
+    await button.first().click({ force: true });
+    await page.waitForSelector(".drawer-panel-open", { state: "detached", timeout: 3000 }).catch(async () => {
+      await page.keyboard.press("Escape");
+      await page.waitForSelector(".drawer-panel-open", { state: "detached" });
+    });
   }
 }
 

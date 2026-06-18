@@ -42,7 +42,8 @@ export function createGraphWorkbenchCapabilities(
       onViewReset: capabilities.onViewReset,
       onAsk: capabilities.onAsk,
       persistPins: capabilities.persistPins,
-      onDragStateChange: capabilities.onDragStateChange
+      onDragStateChange: capabilities.onDragStateChange,
+      onVisibilityStateChange: capabilities.onVisibilityStateChange
     }
   };
 }
@@ -72,6 +73,8 @@ export interface GraphFacadeRenderer {
   focusNode(path: string): void;
   focusCommunity(id: string): void;
   setTypeFilters(filters: NonNullable<GraphEngineOptions["typeFilters"]>): void;
+  showTemporaryObject(object: GraphSummaryObjectRef): void;
+  clearTemporaryObjectDisplay(): void;
   resetView(): void;
   select(selection: SelectionInput): void;
   previewNode(id: string | null): void;
@@ -125,7 +128,8 @@ export function createGraphFacade(container: HTMLElement, options: GraphEngineOp
       delete container.dataset.llmWikiGraphFocus;
       capabilities?.onViewReset?.();
     },
-    onDragActiveChange: capabilities?.onDragStateChange
+    onDragActiveChange: capabilities?.onDragStateChange,
+    onVisibilityStateChange: capabilities?.onVisibilityStateChange
   });
 
   return createGraphFacadeFromRenderer(container, renderer, options, facadeState);
@@ -181,6 +185,16 @@ export function createGraphFacadeFromRenderer(
     setTypeFilters(filters): void {
       assertActive();
       renderer.setTypeFilters(filters);
+    },
+
+    showTemporaryObject(object): void {
+      assertActive();
+      renderer.showTemporaryObject(object);
+    },
+
+    clearTemporaryObjectDisplay(): void {
+      assertActive();
+      renderer.clearTemporaryObjectDisplay();
     },
 
     resetView(): void {

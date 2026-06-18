@@ -45,6 +45,10 @@ export function summarizeGraphNode(
   const pinHint = pinHintForNode(node, options.pins);
   const selection = selectionStateForObject(data, { kind: "node", nodeId }, options.selection);
   const relations = relationSummariesForNode(data, index, nodeId);
+  const commands = nodeSummaryCommands(node, pinHint);
+  if (isTemporaryObject(options.temporaryObject, { kind: "node", nodeId })) {
+    commands.push({ kind: "clear-temporary-object-display", label: "清除临时显示" });
+  }
   return {
     kind: "node-summary",
     object: { kind: "node", nodeId },
@@ -61,7 +65,7 @@ export function summarizeGraphNode(
     strongestRelations: topRelations(relations, DEFAULT_LIMIT),
     bridgeRelations: topRelations(relations.filter((relation) => relation.bridge), DEFAULT_LIMIT),
     aggregationMarkers: markersContainingNode(options.aggregationMarkers, nodeId),
-    commands: nodeSummaryCommands(node, pinHint)
+    commands
   };
 }
 
@@ -383,6 +387,14 @@ function markersContainingAnyNode(markers: GraphAggregationMarker[] | undefined,
 
 function searchSet(options: GraphSummaryOptions): Set<NodeId> {
   return new Set(options.searchResultIds ?? []);
+}
+
+function isTemporaryObject(left: GraphSummaryObjectRef | null | undefined, right: GraphSummaryObjectRef): boolean {
+  if (!left || left.kind !== right.kind) return false;
+  if (left.kind === "node" && right.kind === "node") return left.nodeId === right.nodeId;
+  if (left.kind === "community" && right.kind === "community") return left.communityId === right.communityId;
+  if (left.kind === "aggregation" && right.kind === "aggregation") return left.aggregationId === right.aggregationId;
+  return false;
 }
 
 function numericWeight(value: unknown): number {

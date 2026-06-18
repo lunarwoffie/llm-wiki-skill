@@ -5,6 +5,8 @@ import {
 	type GraphDiff,
 	type GraphOpenPagePayload,
 	type GraphSummaryCommand,
+	type GraphSummaryObjectRef,
+	type GraphVisibilityState,
 	type PinMap,
 	type Selection,
 } from "@llm-wiki/graph-engine";
@@ -49,8 +51,11 @@ import type { GraphReaderActionId } from "@/lib/graph-reader";
 import { buildSelectionPromptPayload } from "@/lib/graph-selection";
 import {
 	drawerForGraphSelection,
+	drawerForExcludedGraphObject,
 	drawerForGraphSummaryNode,
+	drawerForUnavailableGraphObject,
 	graphOpenPagePayloadForCommand,
+	graphObjectVisibilityReason,
 	graphSelectionCommandForOpenDetail,
 	type GraphSelectionCommand,
 } from "@/lib/graph-summary-actions";
@@ -70,6 +75,65 @@ const COMPACT_SIDEBAR_WIDTH = 230;
 const COLLAPSED_SIDEBAR_WIDTH = 52;
 const MOBILE_BREAKPOINT = 768;
 const COMPACT_BREAKPOINT = 1024;
+
+function drawerForGraphNodeVisibility(
+	data: GraphData | null,
+	nodeId: string,
+	current: DrawerState,
+	options: {
+		pins: PinMap;
+		visibility: GraphVisibilityState | null;
+		selection?: { kind: "node"; id: string };
+	} ,
+): DrawerState {
+	const object = { kind: "node" as const, nodeId };
+	const summaryOptions = {
+		pins: options.pins,
+		selection: options.selection ?? { kind: "node" as const, id: nodeId },
+		searchResultIds: options.visibility?.searchResultIds ?? [],
+		temporaryObject: options.visibility?.temporaryObject ?? null,
+	};
+	if (!data?.nodes.some((node) => node.id === nodeId)) {
+		return drawerForUnavailableGraphObject(data, object, "missing-node", current, summaryOptions);
+	}
+	const reason = graphObjectVisibilityReason(data, options.visibility, object);
+	const temporaryObject = options.visibility?.temporaryObject ?? null;
+	const temporarilyShown = temporaryObject?.kind === "node" && temporaryObject.nodeId === nodeId;
+	if (reason && !temporarilyShown) {
+		return drawerForExcludedGraphObject(data, object, reason, current, summaryOptions);
+	}
+	return drawerForGraphSummaryNode(data, nodeId, current, summaryOptions);
+}
+
+function sameGraphDrawerTarget(left: DrawerState, right: DrawerState): boolean {
+	if (left.mode !== right.mode) return false;
+	if (left.mode === "graph-node-summary" && right.mode === "graph-node-summary") {
+		return left.payload.nodeId === right.payload.nodeId
+			&& left.payload.commands.map((command) => command.kind).join(",") === right.payload.commands.map((command) => command.kind).join(",");
+	}
+	if (left.mode === "graph-excluded-object" && right.mode === "graph-excluded-object") {
+		return JSON.stringify(left.payload.object) === JSON.stringify(right.payload.object)
+			&& left.payload.reason === right.payload.reason
+			&& left.payload.commands.map((command) => command.kind).join(",") === right.payload.commands.map((command) => command.kind).join(",");
+	}
+	if (left.mode === "graph-unavailable-object" && right.mode === "graph-unavailable-object") {
+		return JSON.stringify(left.payload.object) === JSON.stringify(right.payload.object) && left.payload.reason === right.payload.reason;
+	}
+	return false;
+}
+
+function visibilityWithTemporaryObject(
+	state: GraphVisibilityState | null,
+	temporaryObject: GraphSummaryObjectRef | null,
+): GraphVisibilityState | null {
+	if (!state && !temporaryObject) return null;
+	return {
+		searchQuery: state?.searchQuery ?? "",
+		searchResultIds: state?.searchResultIds ?? [],
+		typeFilters: state?.typeFilters ?? {},
+		temporaryObject,
+	};
+}
 
 function getSidebarLayoutWidth(collapsed: boolean): number {
 	if (typeof window === "undefined") return 0;
@@ -147,12 +211,15 @@ function App() {
 	const [graphHasPendingUpdate, setGraphHasPendingUpdate] = useState(false);
 	const [graphData, setGraphData] = useState<GraphData | null>(null);
 	const [graphPins, setGraphPins] = useState<PinMap>({});
+	const [graphVisibilityState, setGraphVisibilityState] = useState<GraphVisibilityState | null>(null);
+	const [graphTemporaryObject, setGraphTemporaryObject] = useState<GraphSummaryObjectRef | null>(null);
 	const [selectionCommand, setSelectionCommand] = useState<GraphSelectionCommand | undefined>();
 	const [mainView, setMainView] = useState<MainView>(() => {
 		if (typeof window === "undefined") return "chat";
 		return window.localStorage.getItem(MAIN_VIEW_STORAGE_KEY) === "graph" ? "graph" : "chat";
 	});
 	const mainViewRef = useRef(mainView);
+	const graphTemporaryObjectRef = useRef<GraphSummaryObjectRef | null>(null);
 	const activeConversationId = active?.conversation.id ?? null;
 
 	useEffect(() => {
@@ -193,6 +260,10 @@ function App() {
 	useEffect(() => {
 		if (mainView === "graph") setGraphHasPendingUpdate(false);
 	}, [mainView]);
+
+	useEffect(() => {
+		graphTemporaryObjectRef.current = graphTemporaryObject;
+	}, [graphTemporaryObject]);
 
 	useEffect(() => {
 		const handleWikiLinkSeenEvent = (event: Event) => {
@@ -364,6 +435,35 @@ function App() {
 		setDrawer((current) => drawerForGraphSelection(graphData, selection, current, { pins: graphPins }));
 	}, [graphData, graphPins, drawer]);
 
+	const handleGraphVisibilityChange = useCallback((state: GraphVisibilityState | null) => {
+		setGraphVisibilityState(state);
+		const effectiveState = visibilityWithTemporaryObject(state, graphTemporaryObjectRef.current ?? state?.temporaryObject ?? null);
+		setDrawer((current) => {
+			if (current.mode === "graph-node-summary") {
+				if (
+					effectiveState?.temporaryObject?.kind === "node"
+					&& effectiveState.temporaryObject.nodeId === current.payload.nodeId
+					&& current.payload.commands.some((command) => command.kind === "clear-temporary-object-display")
+				) {
+					return current;
+				}
+				const next = drawerForGraphNodeVisibility(graphData, current.payload.nodeId, current, {
+					pins: graphPins,
+					visibility: effectiveState,
+				});
+				return sameGraphDrawerTarget(current, next) ? current : next;
+			}
+			if (current.mode === "graph-excluded-object" && current.payload.object.kind === "node") {
+				const next = drawerForGraphNodeVisibility(graphData, current.payload.object.nodeId, current, {
+					pins: graphPins,
+					visibility: effectiveState,
+				});
+				return sameGraphDrawerTarget(current, next) ? current : next;
+			}
+			return current;
+		});
+	}, [graphData, graphPins]);
+
 	const handleGraphViewReset = useCallback(() => {
 		setGraphFocusPath(null);
 		setDrawer((current) => (
@@ -525,17 +625,63 @@ function App() {
 				mode: command.mode,
 				type: "set-fixed-position",
 			});
+			return;
 		}
-	}, [graphData, graphPins, active]);
+		if (command.kind === "show-this-object") {
+			graphTemporaryObjectRef.current = command.object;
+			setGraphTemporaryObject(command.object);
+			setSelectionCommand({
+				id: `show-${Math.random().toString(36).slice(2, 10)}`,
+				object: command.object,
+				type: "show-temporary-object",
+			});
+			if (command.object.kind === "node") {
+				const nodeId = command.object.nodeId;
+				const temporaryObject = command.object;
+				setDrawer((current) => {
+					const next = drawerForGraphNodeVisibility(graphData, nodeId, current, {
+					pins: graphPins,
+					visibility: {
+						searchQuery: graphVisibilityState?.searchQuery ?? "",
+						searchResultIds: graphVisibilityState?.searchResultIds ?? [],
+						typeFilters: graphVisibilityState?.typeFilters ?? {},
+						temporaryObject,
+					},
+					});
+					return sameGraphDrawerTarget(current, next) ? current : next;
+				});
+			}
+			return;
+		}
+		if (command.kind === "clear-temporary-object-display") {
+			graphTemporaryObjectRef.current = null;
+			setGraphTemporaryObject(null);
+			setSelectionCommand({
+				id: `clear-temporary-${Math.random().toString(36).slice(2, 10)}`,
+				type: "clear-temporary-object-display",
+			});
+			setDrawer((current) => {
+				if (current.mode !== "graph-node-summary") return current;
+				const next = drawerForGraphNodeVisibility(graphData, current.payload.nodeId, current, {
+					pins: graphPins,
+					visibility: graphVisibilityState ? { ...graphVisibilityState, temporaryObject: null } : null,
+				});
+				return sameGraphDrawerTarget(current, next) ? current : next;
+			});
+		}
+	}, [graphData, graphPins, graphVisibilityState, active]);
 
 	useEffect(() => {
 		if (drawer.mode !== "graph-node-summary") return;
 		setDrawer((current) => (
 			current.mode === "graph-node-summary"
-				? drawerForGraphSummaryNode(graphData, current.payload.nodeId, current, { pins: graphPins })
+				? drawerForGraphNodeVisibility(graphData, current.payload.nodeId, current, {
+					pins: graphPins,
+					visibility: visibilityWithTemporaryObject(graphVisibilityState, graphTemporaryObjectRef.current),
+				})
 				: current
 		));
-	}, [drawer.mode, graphData, graphPins]);
+	}, [drawer.mode, graphData, graphPins, graphVisibilityState]);
 
 	const handleGraphSummaryNodeSelect = useCallback((nodeId: string) => {
 		setDrawer((current) => drawerForGraphSummaryNode(graphData, nodeId, current, { pins: graphPins }));
@@ -748,6 +894,7 @@ function App() {
 							onOpenPage={handleOpenGraphPage}
 							onGraphDataChange={setGraphData}
 							onGraphPinsChange={setGraphPins}
+							onGraphVisibilityChange={handleGraphVisibilityChange}
 							onSelectionChange={handleGraphSelectionChange}
 							onViewReset={handleGraphViewReset}
 							selectionCommand={selectionCommand}
