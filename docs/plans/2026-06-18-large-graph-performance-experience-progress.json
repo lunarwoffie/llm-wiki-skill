@@ -3,9 +3,9 @@
   "spec": "docs/spark/2026-06-18-large-graph-global-community-design.md",
   "status": {
     "overall": "in_progress",
-    "phase": "phase-1",
-    "task": "1.4",
-    "next_allowed_action": "Run the disposable validation gate and record real-graph source/privacy policy, browser environment, edge caps, oversized-community semantics, desktop guardrails, and trial dependency path."
+    "phase": "phase-2",
+    "task": "2.1",
+    "next_allowed_action": "Add shared graph summary and command contracts before changing click behavior."
   },
   "execution_rules": {
     "branch": "codex/large-graph-performance-experience",
@@ -104,15 +104,82 @@
   },
   "disposable_validation_gate": {
     "required": true,
-    "status": "pending",
-    "real_graph_source_policy": null,
-    "privacy_handling": null,
-    "edge_count_caps": [],
-    "browser_environment": [],
-    "trial_dependency_records": [],
-    "oversized_community_semantics": null,
-    "desktop_compatibility_guardrails": [],
-    "artifact_paths": []
+    "status": "completed",
+    "real_graph_source_policy": "Use generated fixtures by default. Real graph snapshots may be exported only to ignored local paths such as /tmp/llm-wiki-real-graph-snapshot-<date>/graph-data.json, with owner/export command/counts/hash recorded. If private data cannot be anonymized, use real-snapshot-proxy instead.",
+    "privacy_handling": "Do not commit private real snapshots. Remove source paths, personal names, private project names, raw content, and local filesystem paths before sharing or committing any sanitized sample.",
+    "edge_count_caps": [
+      {
+        "shape": "nodes-1000-sparse",
+        "nodes": 1000,
+        "edges": 1400,
+        "role": "baseline navigation and interaction"
+      },
+      {
+        "shape": "nodes-1000-dense",
+        "nodes": 1000,
+        "edges": 12000,
+        "role": "dense relation pressure"
+      },
+      {
+        "shape": "nodes-5000-sparse",
+        "nodes": 5000,
+        "edges": 6500,
+        "role": "large global sparse map"
+      },
+      {
+        "shape": "nodes-5000-dense",
+        "nodes": 5000,
+        "edges": 60000,
+        "role": "stress candidate, not default smoke path"
+      },
+      {
+        "shape": "nodes-10000-aggregation",
+        "nodes": 10000,
+        "edges": 14000,
+        "role": "target global browsing shape"
+      },
+      {
+        "shape": "nodes-10000-high-edge",
+        "nodes": 10000,
+        "edges": 90000,
+        "role": "renderer-trial stress candidate"
+      },
+      {
+        "shape": "oversized-community",
+        "nodes": 3000,
+        "edges": 7000,
+        "role": "oversized community semantics"
+      }
+    ],
+    "browser_environment": [
+      "Measured browser environment available; performance phases are not blocked.",
+      "Runner: GRAPH_LARGE_PERF_ARTIFACT_DIR=/tmp/llm-wiki-graph-large-perf-task-1-3 bash tests/graph-browser-large-performance.regression-1.sh.",
+      "Playwright resolved via npx --yes -p playwright for the measurement harness.",
+      "Chromium executable: /Users/kangjiaqi/Library/Caches/ms-playwright/chromium-1228/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing.",
+      "Offline generated runner does not require local ports; later workbench checks may.",
+      "Browser plugin is a functional visual fallback only, not a replacement for performance artifacts."
+    ],
+    "trial_dependency_records": [
+      "No production dependency was added in Phase 1.",
+      "Playwright was used through temporary npx resolution and local browser cache for measurement.",
+      "Sigma/Graphology and vis-network may be installed only for isolated Phase 6 trials when the current task requires them.",
+      "Any package change must be recorded in the progress decision log before landing.",
+      "Production adoption waits for the Phase 6 route decision; at most one global production route may survive."
+    ],
+    "oversized_community_semantics": "Complete community presence means a bounded representation: container/outline, representative core nodes as cards, remaining members as points/count badges/internal drawer list, and explicit preservation of selected/search/pinned objects. It does not mean rendering every member as a full card at once.",
+    "desktop_compatibility_guardrails": [
+      "Do not store graph semantics only in DOM attributes; shared identity, selection, search, Pin, filter, and community rules belong in graph-engine data structures.",
+      "Do not make window, document, localStorage, URL routing, or CSS selectors the source of truth for graph behavior.",
+      "Keep filesystem paths and workspace paths behind host adapters; shared semantics use object ids, community ids, and wiki-relative ids.",
+      "Canvas/WebGL/browser APIs may be renderer implementation details, but semantic contracts must survive a desktop webview or native shell bridge.",
+      "Persisted Pin/layout state must stay serializable and portable rather than tied to one browser storage implementation."
+    ],
+    "artifact_paths": [
+      "docs/graph/performance/2026-06-18-phase-1-4-disposable-validation-gate.md",
+      "/tmp/llm-wiki-graph-large-perf-task-1-2/large-graph-performance-results.json",
+      "/tmp/llm-wiki-graph-large-perf-task-1-3/large-graph-performance-results.json",
+      "docs/graph/performance/2026-06-18-phase-1-3-dom-svg-large-baseline.md"
+    ]
   },
   "performance_schema": {
     "required_fields": [
@@ -1899,7 +1966,7 @@
     {
       "id": "phase-1",
       "goal": "Add reproducible large-graph fixtures, measurement runner, pass/fail table, and disposable validation gate.",
-      "status": "in_progress",
+      "status": "completed",
       "acceptance": [
         {
           "check": "Large graph fixture generation is deterministic and records graph-shape metadata for 1000, 5000, 10000, oversized-community, many-small-communities, many-search-hits, and many-Pin cases.",
@@ -1940,8 +2007,16 @@
         },
         {
           "check": "Disposable validation gate defines real-graph source, privacy handling, browser environment, trial dependency path, edge caps, oversized-community semantics, and desktop guardrails.",
-          "status": "pending",
-          "evidence": []
+          "status": "passed",
+          "evidence": [
+            "Validation note exists: docs/graph/performance/2026-06-18-phase-1-4-disposable-validation-gate.md",
+            "Real graph source policy and privacy handling are defined.",
+            "Edge-count caps are recorded for 1000, 5000, 10000, high-edge, and oversized-community shapes.",
+            "Browser environment evidence is recorded and Phase 1 is not blocked.",
+            "Trial dependency path records that no production dependency was added and Phase 6 owns candidate dependency adoption.",
+            "Oversized-community complete-presence semantics are defined for Phase 4 tests.",
+            "Desktop-app guardrails name browser-only APIs and storage assumptions to avoid."
+          ]
         }
       ],
       "tasks": [
@@ -1986,8 +2061,13 @@
         {
           "id": "1.4",
           "title": "Run disposable validation gate",
-          "status": "pending",
-          "verification": []
+          "status": "completed",
+          "verification": [
+            "`git log --oneline -15` inspected before task work; latest commit was ada510b docs: record graph performance baseline [task 1.3].",
+            "`npm run test --workspace=@llm-wiki/graph-engine` passed before validation note work: 277 tests, 59 suites, 0 failures.",
+            "docs/graph/performance/2026-06-18-phase-1-4-disposable-validation-gate.md written with source/privacy policy, browser environment, edge caps, trial dependency path, oversized-community semantics, desktop guardrails, and throwaway-code policy.",
+            "Progress disposable_validation_gate fields updated with the same evidence."
+          ]
         }
       ]
     },
@@ -2357,6 +2437,10 @@
     {
       "timestamp": "2026-06-18",
       "entry": "Task 1.3 ran the current DOM/SVG large-graph performance runner, wrote the baseline report, identified DOM/SVG update volume as the main bottleneck class, and recorded provisional thresholds."
+    },
+    {
+      "timestamp": "2026-06-18",
+      "entry": "Task 1.4 completed the disposable validation gate, recording real graph privacy policy, browser measurement environment, edge caps, trial dependency boundaries, oversized-community semantics, and desktop-app guardrails."
     }
   ],
   "execution_log": [
@@ -2427,6 +2511,21 @@
         "graph-engine test passed: 277 tests, 59 suites, 0 failures"
       ],
       "measured_at": "2026-06-18T07:55:00Z"
+    },
+    {
+      "task": "1.4",
+      "status": "completed",
+      "summary": "Completed the Phase 1 disposable validation gate and advanced the ledger to Phase 2 task 2.1.",
+      "evidence": [
+        "docs/graph/performance/2026-06-18-phase-1-4-disposable-validation-gate.md",
+        "real graph snapshots must remain ignored or sanitized before sharing/commit",
+        "browser environment available with Playwright Chromium; Phase 1 is not measurement-blocked",
+        "edge caps recorded for 1000/5000/10000/high-edge/oversized shapes",
+        "no production dependency added in Phase 1",
+        "desktop compatibility guardrails recorded",
+        "graph-engine test passed: 277 tests, 59 suites, 0 failures"
+      ],
+      "measured_at": "2026-06-18T08:05:00Z"
     }
   ]
 }
