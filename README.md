@@ -10,7 +10,7 @@
 
 把碎片化的信息变成持续积累、互相链接的知识库
 
-[![version](https://img.shields.io/badge/v3.6.6-动态工具状态-E8D5B5?style=flat-square&labelColor=3a3026&color=E8D5B5)](https://github.com/sdyckjq-lab/llm-wiki-skill/releases)
+[![version](https://img.shields.io/badge/v3.6.7-大图谱体验-E8D5B5?style=flat-square&labelColor=3a3026&color=E8D5B5)](https://github.com/sdyckjq-lab/llm-wiki-skill/releases)
 [![license](https://img.shields.io/badge/MIT-license-5a6e5c?style=flat-square&labelColor=3a3026)](LICENSE)
 [![platforms](https://img.shields.io/badge/Claude·Codex·OpenClaw·Hermes-多平台-7a96a6?style=flat-square&labelColor=3a3026)]
 
@@ -24,7 +24,7 @@
 <img src="assets/graph-demo.gif?v=20260428" width="100%" alt="知识图谱演示">
 </div>
 
-东方编辑部 × 数字山水风交互式知识图谱 — 双击 HTML 文件即可在浏览器中探索。搜索、社区图例、聚焦筛选、节点视觉分层、悬停预览、点击阅读、Shift 多选、画布缩放拖拽和小地图定位，全部离线运行，不依赖服务器。
+东方编辑部 × 数字山水风交互式知识图谱 — 双击 HTML 文件即可在浏览器中探索。搜索、社区图例、聚焦筛选、节点视觉分层、悬停预览、轻量摘要、明确进入阅读、Shift 多选、画布缩放拖拽和小地图定位，全部离线运行，不依赖服务器。
 
 ---
 
@@ -60,8 +60,8 @@ bash install.sh --platform hermes
 | | 功能 | 说明 |
 |---|---|---|
 | 🗺️ | **数字山水知识图谱** | 自包含 HTML，双击即可浏览；三栏国风布局、山水底图、可拖拽缩放画布、小地图定位和左右阅读区全部离线运行 |
-| ✨ | **图谱阅读体验打磨** | 节点按地名、索引签条、朱砂批注分层；默认画面更轻，悬停可预览，点击直接阅读 |
-| 🎓 | **本地阅读动线** | 社区图例、聚焦筛选、图谱搜索、右侧阅读抽屉和选区抽屉保持联动；搜索跟随当前可见范围，离线 HTML 也能查看选区事实 |
+| ✨ | **图谱阅读体验打磨** | 节点按地名、索引签条、朱砂批注分层；默认画面更轻，悬停可预览，点击先看摘要，再通过明确动作进入阅读 |
+| 🎓 | **本地阅读动线** | 社区图例、聚焦筛选、图谱搜索、右侧摘要/阅读抽屉和选区抽屉保持联动；社区先摘要再进入聚焦 |
 | 📦 | **零配置初始化** | 一句话创建完整知识库，自动生成目录结构、模板和研究方向页 |
 | 🔗 | **结构化 Wiki** | 自动生成实体页、主题页、素材摘要，用 `[[双向链接]]` 互相关联 |
 | 🏷️ | **置信度标注** | EXTRACTED / INFERRED / AMBIGUOUS / UNVERIFIED，一眼看出哪些需要核实 |
@@ -111,6 +111,7 @@ bash install.sh --platform claude --with-optional-adapters
 - **伴随升级命令** — Claude Code 安装后自带 `/llm-wiki-upgrade`
 - **素材删除** — 级联删除时自动清理关联页面、断链和缓存
 - **图谱运行时兜底更稳** — helper 同时支持浏览器全局与 CommonJS，旧运行时下的复杂 emoji 截断和离线 HTML 失败回滚都更可靠
+- **大图谱体验路线** — 全局视角以地图级浏览和轻量摘要为主，当前 DOM/SVG 保留给小图、离线细节和社区阅读；万级全局图后续走 Sigma/Graphology 主线
 - **查询结果持久化** — 有价值的综合回答可保存回知识库，越用越完整
 - **批量消化** — 给一个文件夹路径，批量处理所有文件
 - **工作台工具摘要** — `workbench/` 对话区采用 `omp` 风格动态工具状态，停止时显示取消状态，历史工具调用默认折叠为分组摘要
@@ -220,7 +221,7 @@ Hermes 会优先加载仓库根的 `HERMES.md` 作为项目上下文。这个文
 本仓库是 llm-wiki 的 monorepo，包含两种使用形态，读写同一份知识库格式、可自由切换：
 
 - **Skill 形态**（上文介绍，成熟稳定）：把仓库链接丢给 Claude Code / Codex / OpenClaw / Hermes 一键安装，在你的 AI CLI 里维护知识库。
-- **agent 工作台**（`workbench/`，开发中）：本地运行的知识库工作台，以对话为中心、内置交互式数字山水知识图谱。当前面向开发者（`npm run dev`），成熟后提供桌面应用。
+- **agent 工作台**（`workbench/`，开发中）：本地运行的知识库工作台，以对话为中心、内置交互式数字山水知识图谱。当前面向开发者（`npm run dev`），成熟后提供桌面应用；图谱语义会保持同一套，方便后续桌面形态复用。
 
 交互式图谱引擎（`packages/graph-engine/`）由两种形态共享——Skill 的离线 HTML 和工作台的图谱视图，是同一个引擎的两个出口。
 

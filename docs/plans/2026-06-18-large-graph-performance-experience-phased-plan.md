@@ -1010,16 +1010,38 @@ Synthesized from this review's findings. Each task derives from a specific findi
 ```text
 /goal Implement docs/plans/2026-06-18-large-graph-performance-experience-phased-plan.md by following its execution ledger.
 
+The progress JSON is the source of truth. Continue from its current phase/task; do not restart Phase 0 or redo completed tasks unless verification proves the recorded state is wrong.
+
+When the current task touches graph interaction, drawer behavior, global/community mode, loading states, or performance route decisions, read the matching section of docs/spark/2026-06-18-large-graph-global-community-design.md before editing. The plan is the execution ledger; the design doc is the product-behavior reference when UX intent is ambiguous.
+
+If the worktree already contains uncommitted edits for the current task, inspect them as in-progress work and continue from there. Do not overwrite, discard, or duplicate current-task changes; keep unrelated dirty files out of commits.
+
+If the progress file has advanced but the worktree still contains uncommitted files, first determine whether those files are completed evidence from the immediately previous task. If yes, verify and commit that previous task before starting the progress file's next task; do not strand a finished task as unrelated dirty work.
+
 Each turn:
 1. Read docs/plans/2026-06-18-large-graph-performance-experience-progress.json, then the current task in the plan.
-2. Run `git log --oneline -15` and `npm run test --workspace=@llm-wiki/graph-engine`; repair a broken state before starting new work.
-3. Work only on the current task.
+2. Run `git status --short --branch`, `git log --oneline -15`, and `npm run test --workspace=@llm-wiki/graph-engine`; repair a broken state before starting new work.
+3. Work only on the current task, and keep unrelated worktree changes out of task commits.
 4. After verification passes: update the progress file (status, evidence, measurement records, and log fields only) and commit the code change plus that update together, with the task id in the message. Never commit on failed verification. Never push, merge, or amend.
 5. When a phase's acceptance checks all pass, record it and continue to the next phase without asking for approval.
 
-Phase 0 must prove branch provenance and ledger inclusion before feature work: prefer branching from main with the reviewed design/plan ledger carried over; if branching from the current planning branch, record evidence that only reviewed docs/ledger changes were inherited. The plan and progress files live under ignored docs/plans, so intentionally track or force-add them before continuing.
+If docs/plans, docs/spark, or .superpowers already contain unrelated dirty changes, leave them untouched and unstaged unless they are explicitly part of the current task evidence. Do not bundle planning leftovers into a feature-task commit just because they are in the worktree.
 
-Phase 1 must complete the disposable validation gate before product implementation: define real-graph source/privacy policy, browser measurement environment, edge-count caps, oversized-community semantics, desktop-app guardrails, and trial dependency records. Necessary trial packages may be installed for isolated validation when the current task requires them, but production dependency adoption waits for the Phase 6 route decision.
+Use the progress file to decide which phase gates still apply. Do not re-run completed Phase 0/Phase 1 gates unless fresh verification proves their recorded evidence is wrong. If the current task depends on an earlier unfinished or contradicted gate, repair that gate first and record the reason in the progress file.
+
+If Phase 0 is not complete, prove branch provenance and ledger inclusion before feature work: prefer branching from main with the reviewed design/plan ledger carried over; if branching from the current planning branch, record evidence that only reviewed docs/ledger changes were inherited. The plan and progress files live under ignored docs/plans, so intentionally track or force-add them before continuing.
+
+If Phase 1 validation is not complete or a later task invalidates it, complete the disposable validation gate before product implementation: define real-graph source/privacy policy, measurable browser environment, edge-count caps, oversized-community semantics, desktop-app guardrails, and trial dependency records. Browser plugin checks may be used only as a functional visual fallback; performance phases require machine-readable measurement artifacts. Necessary trial packages are already approved for isolated validation when the current task requires them: install them without asking for repeat confirmation, record every package change in the progress decision log, verify the result, and keep production dependency adoption blocked until the Phase 6 route decision.
+
+Treat 5000 and 10000 graph-shape results as required evidence. Current DOM/SVG failure at those sizes is a valid recorded failure class, not a reason to skip measurement or mark the phase passed.
+
+Keep one production global graph route. Sigma/Graphology, vis-network, and aggregation fallback may be compared in isolated trials, but the final implementation must not leave multiple parallel global graph experiences.
+
+If Phase 6 is already complete, do not reopen renderer selection by default. Treat docs/graph/performance/2026-06-19-phase-6-4-global-renderer-route-decision.md as the chosen route record: Sigma/Graphology is the next single global large-graph renderer path, vis-network remains only a measured fallback if Sigma hits a hard blocker, and aggregation remains a degradation strategy rather than a second product.
+
+Preserve the product architecture: current DOM/SVG remains the rich small-graph and community-reading path; new renderer or aggregation work is for global large-graph browsing, while shared object ids, community ids, search, Pin, selection, and drawer semantics must stay reusable for the later desktop app.
+
+Do not downscope acceptance criteria to fit the current implementation. If a listed behavior needs shared graph support, implement that support inside the current task or mark the task blocked with evidence instead of quietly weakening the interaction.
 
 Done when every task is complete, every acceptance check is proven, performance records are present for the required graph shapes, and the progress file records final status and residual risk.
 
