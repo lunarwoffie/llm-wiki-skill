@@ -191,6 +191,9 @@ export function createGraphRenderPipeline(
     context.root.dataset.interactionUpdatedObjects = String(graph.interaction.updatedObjects);
     context.root.dataset.interactionHiddenObjects = String(graph.interaction.hiddenObjects);
     context.root.dataset.interactionPreservedNodes = String(graph.interaction.preservedNodeIds.length);
+    context.root.dataset.communityQuality = graph.communityQuality.level;
+    context.root.dataset.communityBoundaryCertainty = graph.communityQuality.boundaryCertainty;
+    context.root.dataset.communityAuxiliaryViews = graph.communityQuality.auxiliaryViews.map((view) => view.id).join(",");
     const painted = emptyPaintedDom();
     const contentLayer = context.ownerDocument.createElement("div");
     contentLayer.className = "graph-content-layer";
@@ -248,6 +251,9 @@ export function createGraphRenderPipeline(
     context.root.appendChild(preview);
     painted.previewElement = preview;
 
+    const qualityNotice = createCommunityQualityNotice(context.ownerDocument, graph);
+    if (qualityNotice) context.root.appendChild(qualityNotice);
+
     const minimap = createGraphMinimap(context.ownerDocument, graph.minimap);
     painted.miniViewportElement = minimap.viewportElement;
     painted.miniNodeElements = minimap.nodeElements;
@@ -266,6 +272,30 @@ export function createGraphRenderPipeline(
       painted.selectionElement = selectionPanel;
     }
     return painted;
+  }
+
+  function createCommunityQualityNotice(ownerDocument: Document, graph: RenderableGraph): HTMLElement | null {
+    if (!graph.communityQuality.warning) return null;
+    const notice = ownerDocument.createElement("aside");
+    notice.className = "graph-quality-notice";
+    notice.dataset.qualityLevel = graph.communityQuality.level;
+    notice.dataset.boundaryCertainty = graph.communityQuality.boundaryCertainty;
+    notice.setAttribute("aria-live", "polite");
+
+    const label = ownerDocument.createElement("span");
+    label.className = "graph-quality-notice-label";
+    label.textContent = graph.communityQuality.level === "poor" ? "社区划分可信度低" : "社区划分可信度偏弱";
+    notice.appendChild(label);
+
+    for (const view of graph.communityQuality.auxiliaryViews) {
+      const button = ownerDocument.createElement("button");
+      button.type = "button";
+      button.className = "graph-quality-notice-action";
+      button.dataset.auxiliaryViewId = view.id;
+      button.textContent = view.label;
+      notice.appendChild(button);
+    }
+    return notice;
   }
 
   function mountSearchControl(): void {

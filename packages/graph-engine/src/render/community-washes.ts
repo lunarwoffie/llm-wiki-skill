@@ -13,6 +13,7 @@ export function createCommunityWashElement(ownerDocument: Document, community: R
   ellipse.setAttribute("fill", community.color);
   ellipse.setAttribute("opacity", String(community.wash.opacity));
   ellipse.dataset.communityId = community.id;
+  ellipse.dataset.boundaryCertainty = community.boundaryCertainty;
   ellipse.style.cursor = "pointer";
   return ellipse;
 }

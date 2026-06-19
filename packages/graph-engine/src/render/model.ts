@@ -19,6 +19,14 @@ export type NodeVisualRole = "landmark" | "index-slip" | "cinnabar-note" | "map-
 export type GraphRenderBudgetView = "global" | "community";
 export type GraphCommunityFocusSizeBand = "small" | "medium" | "large" | "oversized";
 export type GraphCommunityFocusRepresentation = "cards-and-labels" | "points-with-cards" | "outline-with-caps" | "internal-map-entry";
+export type GraphCommunityQualityLevel = "good" | "moderate" | "poor";
+export type GraphCommunityBoundaryCertainty = "high" | "reduced" | "low";
+export type GraphCommunityQualitySignalId =
+  | "oversized-community"
+  | "many-tiny-communities"
+  | "mixed-cross-community-edges"
+  | "weak-community-labels"
+  | "abnormal-community-count";
 
 export interface GraphRenderBudgetLimits {
   maxVisibleNodes: number;
@@ -75,6 +83,26 @@ export interface GraphCommunityFocusScale {
   };
 }
 
+export interface GraphCommunityQualitySignal {
+  id: GraphCommunityQualitySignalId;
+  severity: "moderate" | "poor";
+  value: number;
+  threshold: number;
+}
+
+export interface GraphCommunityAuxiliaryView {
+  id: "core-structure-connectivity";
+  label: "核心结构 / 连通性";
+}
+
+export interface GraphCommunityQuality {
+  level: GraphCommunityQualityLevel;
+  boundaryCertainty: GraphCommunityBoundaryCertainty;
+  warning: "moderate-community-quality" | "poor-community-quality" | null;
+  signals: GraphCommunityQualitySignal[];
+  auxiliaryViews: GraphCommunityAuxiliaryView[];
+}
+
 export interface RenderableGraph {
   model: Record<string, unknown>;
   layout: Record<string, unknown>;
@@ -104,6 +132,7 @@ export interface RenderableGraph {
     temporaryBoostNodeIds: string[];
   };
   communityFocus: GraphCommunityFocusScale | null;
+  communityQuality: GraphCommunityQuality;
 }
 
 export interface RenderableNode {
@@ -153,6 +182,7 @@ export interface RenderableCommunity {
   label: string;
   color: string;
   nodeCount: number;
+  boundaryCertainty: GraphCommunityBoundaryCertainty;
   wash: {
     cx: number;
     cy: number;
@@ -334,6 +364,7 @@ export function buildRenderableGraph(data: GraphData, options: BuildRenderableGr
   const focus = normalizeGraphFocus(options.focus, model);
   const focusedCommunityNodeCount = focus?.kind === "community" ? model.nodes.filter((node) => node.community === focus.id).length : 0;
   const communityFocus = resolveCommunityFocusScale(focus, focusedCommunityNodeCount);
+  const communityQuality = evaluateCommunityQuality(data);
   const budgetLimits = resolveGraphRenderBudget(focus, focusedCommunityNodeCount);
   const budgetView: GraphRenderBudgetView = focus?.kind === "community" ? "community" : "global";
   const typeFilters = normalizeGraphTypeFilters(options.typeFilters, model.nodes);
@@ -565,12 +596,14 @@ export function buildRenderableGraph(data: GraphData, options: BuildRenderableGr
   const communities = model.communities.map((community, index) => {
     const communityNodes = nodes.filter((node) => node.community === community.id);
     const allCommunityNodes = allFilteredNodes.filter((node) => node.community === community.id);
+    const wash = computeCommunityWash(communityNodes);
     return {
       id: community.id,
       label: community.label || community.id,
       color: getCommunityColor(theme, Number(community.color_index ?? index)),
       nodeCount: Number(community.node_count ?? allCommunityNodes.length),
-      wash: computeCommunityWash(communityNodes)
+      boundaryCertainty: communityQuality.boundaryCertainty,
+      wash: wash ? { ...wash, opacity: communityWashOpacity(wash.opacity, communityQuality.boundaryCertainty) } : null
     };
   });
   const communityById = new Map(communities.map((community) => [community.id, community]));
@@ -689,8 +722,113 @@ export function buildRenderableGraph(data: GraphData, options: BuildRenderableGr
       stableSkeletonEdgeIds: filteredVisibleEdges.filter((edge) => stableSkeletonEdgeSet.has(edge.id)).map((edge) => edge.id),
       temporaryBoostNodeIds: filteredVisibleNodes.filter((node) => temporaryBoostNodeSet.has(node.id)).map((node) => node.id)
     },
-    communityFocus
+    communityFocus,
+    communityQuality
   };
+}
+
+export function evaluateCommunityQuality(data: GraphData): GraphCommunityQuality {
+  const nodeCount = data.nodes.length;
+  const communityCounts = new Map<string, number>();
+  const communityLabels = new Map<string, string>();
+  for (const node of data.nodes) {
+    const communityId = normalizeCommunityId(node.community);
+    if (!communityId) continue;
+    communityCounts.set(communityId, (communityCounts.get(communityId) || 0) + 1);
+  }
+  for (const community of data.learning?.communities || []) {
+    communityCounts.set(community.id, Math.max(communityCounts.get(community.id) || 0, Number(community.node_count) || 0));
+    communityLabels.set(community.id, community.label || "");
+  }
+  const communityCount = communityCounts.size;
+  const largestCommunity = Math.max(0, ...communityCounts.values());
+  const tinyCommunityCount = [...communityCounts.values()].filter((count) => count <= 2).length;
+  const weakLabelCount = [...communityCounts.keys()].filter((id) => isWeakCommunityLabel(communityLabels.get(id), id)).length;
+  const crossEdgeRatio = crossCommunityEdgeRatio(data);
+  const signals: GraphCommunityQualitySignal[] = [];
+
+  if (largestCommunity > GRAPH_COMMUNITY_FOCUS_THRESHOLDS.largeMax || (nodeCount >= 80 && largestCommunity / Math.max(1, nodeCount) >= 0.72)) {
+    signals.push({
+      id: "oversized-community",
+      severity: "poor",
+      value: largestCommunity,
+      threshold: GRAPH_COMMUNITY_FOCUS_THRESHOLDS.largeMax
+    });
+  }
+  if (communityCount >= 8 && tinyCommunityCount / communityCount >= 0.55) {
+    signals.push({
+      id: "many-tiny-communities",
+      severity: "moderate",
+      value: round(tinyCommunityCount / communityCount),
+      threshold: 0.55
+    });
+  }
+  if (data.edges.length >= 6 && crossEdgeRatio >= 0.42) {
+    signals.push({
+      id: "mixed-cross-community-edges",
+      severity: "poor",
+      value: round(crossEdgeRatio),
+      threshold: 0.42
+    });
+  }
+  if (communityCount > 0 && weakLabelCount / communityCount >= 0.35) {
+    signals.push({
+      id: "weak-community-labels",
+      severity: "moderate",
+      value: round(weakLabelCount / communityCount),
+      threshold: 0.35
+    });
+  }
+  if ((nodeCount >= 60 && communityCount <= 1) || communityCount > Math.max(48, Math.ceil(Math.sqrt(Math.max(1, nodeCount)) * 4))) {
+    signals.push({
+      id: "abnormal-community-count",
+      severity: "moderate",
+      value: communityCount,
+      threshold: nodeCount >= 60 && communityCount <= 1 ? 1 : Math.max(48, Math.ceil(Math.sqrt(Math.max(1, nodeCount)) * 4))
+    });
+  }
+
+  const score = signals.reduce((sum, signal) => sum + (signal.severity === "poor" ? 2 : 1), 0);
+  const level: GraphCommunityQualityLevel = score >= 3 ? "poor" : score >= 1 ? "moderate" : "good";
+  return {
+    level,
+    boundaryCertainty: level === "poor" ? "low" : level === "moderate" ? "reduced" : "high",
+    warning: level === "poor" ? "poor-community-quality" : level === "moderate" ? "moderate-community-quality" : null,
+    signals,
+    auxiliaryViews: level === "poor" ? [{ id: "core-structure-connectivity", label: "核心结构 / 连通性" }] : []
+  };
+}
+
+function communityWashOpacity(opacity: number, certainty: GraphCommunityBoundaryCertainty): number {
+  if (certainty === "low") return round(opacity * 0.48);
+  if (certainty === "reduced") return round(opacity * 0.72);
+  return opacity;
+}
+
+function normalizeCommunityId(value: unknown): string | null {
+  const id = String(value || "").trim();
+  return id ? id : null;
+}
+
+function isWeakCommunityLabel(label: unknown, id: string): boolean {
+  const normalized = String(label || "").trim().toLowerCase();
+  const normalizedId = id.trim().toLowerCase();
+  if (!normalized || normalized === normalizedId) return true;
+  return /^(community|cluster|group|社区|社群|群组)[\s:_-]*[a-z0-9._-]*$/i.test(normalized);
+}
+
+function crossCommunityEdgeRatio(data: GraphData): number {
+  const communityByNode = new Map(data.nodes.map((node) => [node.id, normalizeCommunityId(node.community)]));
+  let comparableEdges = 0;
+  let crossEdges = 0;
+  for (const edge of data.edges) {
+    const sourceCommunity = communityByNode.get(edge.from);
+    const targetCommunity = communityByNode.get(edge.to);
+    if (!sourceCommunity || !targetCommunity) continue;
+    comparableEdges += 1;
+    if (sourceCommunity !== targetCommunity) crossEdges += 1;
+  }
+  return comparableEdges ? crossEdges / comparableEdges : 0;
 }
 
 function pinHintForNode(node: AtlasNode | undefined, nodeId: NodeId, pins?: PinMap): GraphPinHint {

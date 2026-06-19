@@ -7,6 +7,7 @@ import {
   edgeStrokeWidth,
   edgeVisualOpacity,
   edgeVisualStrokeWidth,
+  evaluateCommunityQuality,
   GRAPH_COMMUNITY_FOCUS_BUDGETS,
   GRAPH_RENDER_BUDGETS,
   makeEdgePath,
@@ -128,6 +129,124 @@ function budgetGraph(nodeCount: number, edgeCount: number): GraphData {
       },
       communities: [
         { id: "c1", label: "Budget Community", node_count: nodes.length, color_index: 0, recommended_start_node_id: "n0" }
+      ]
+    }
+  };
+}
+
+function manyTinyCommunitiesGraph(): GraphData {
+  const nodes = Array.from({ length: 10 }, (_, index) => ({
+    id: `tiny-${index}`,
+    label: `Tiny node ${index}`,
+    type: "entity",
+    community: `tiny-${index}`,
+    source_path: `wiki/tiny/${index}.md`,
+    weight: 20 + index,
+    x: (index * 11) % 100,
+    y: (index * 17) % 100
+  }));
+  return {
+    meta: {
+      build_date: "2026-06-18T00:00:00.000Z",
+      wiki_title: "Many Tiny Communities",
+      total_nodes: nodes.length,
+      total_edges: 0
+    },
+    nodes,
+    edges: [],
+    learning: {
+      version: 1,
+      entry: { recommended_start_node_id: "tiny-0", recommended_start_reason: "fixture", default_mode: "global" },
+      views: {
+        path: { enabled: false, start_node_id: null, node_ids: [], degraded: true },
+        community: { enabled: false, community_id: null, label: null, node_ids: [], is_weak: false, degraded: true },
+        global: { enabled: true, node_ids: nodes.map((node) => node.id), degraded: false }
+      },
+      communities: nodes.map((node, index) => ({
+        id: String(node.community),
+        label: `Specific topic ${index}`,
+        node_count: 1,
+        color_index: index
+      }))
+    }
+  };
+}
+
+function oversizedWeakCommunityGraph(): GraphData {
+  const nodes = Array.from({ length: 120 }, (_, index) => ({
+    id: `blob-${index}`,
+    label: `Blob node ${index}`,
+    type: index % 9 === 0 ? "topic" : "entity",
+    community: "community",
+    source_path: `wiki/blob/${index}.md`,
+    weight: 60 - (index % 30),
+    x: (index * 19) % 100,
+    y: (index * 23) % 100
+  }));
+  return {
+    meta: {
+      build_date: "2026-06-18T00:00:00.000Z",
+      wiki_title: "Oversized Weak Community",
+      total_nodes: nodes.length,
+      total_edges: 0
+    },
+    nodes,
+    edges: [],
+    learning: {
+      version: 1,
+      entry: { recommended_start_node_id: "blob-0", recommended_start_reason: "fixture", default_mode: "global" },
+      views: {
+        path: { enabled: false, start_node_id: null, node_ids: [], degraded: true },
+        community: { enabled: false, community_id: null, label: null, node_ids: [], is_weak: true, degraded: true },
+        global: { enabled: true, node_ids: nodes.map((node) => node.id), degraded: false }
+      },
+      communities: [
+        { id: "community", label: "community", node_count: nodes.length, color_index: 0, is_weak: true }
+      ]
+    }
+  };
+}
+
+function mixedCrossCommunityGraph(): GraphData {
+  const nodes = Array.from({ length: 12 }, (_, index) => ({
+    id: `mixed-${index}`,
+    label: `Mixed node ${index}`,
+    type: "entity",
+    community: index < 6 ? "left" : "right",
+    source_path: `wiki/mixed/${index}.md`,
+    weight: 30,
+    x: (index * 13) % 100,
+    y: (index * 29) % 100
+  }));
+  const edges = Array.from({ length: 8 }, (_, index) => ({
+    id: `mixed-edge-${index}`,
+    from: `mixed-${index % 6}`,
+    to: `mixed-${6 + (index % 6)}`,
+    type: "INFERRED",
+    confidence: "INFERRED",
+    relation_type: "依赖",
+    weight: 0.5
+  }));
+  return {
+    meta: {
+      build_date: "2026-06-18T00:00:00.000Z",
+      wiki_title: "Mixed Cross Community",
+      total_nodes: nodes.length,
+      total_edges: edges.length
+    },
+    nodes,
+    edges,
+    learning: {
+      version: 1,
+      entry: { recommended_start_node_id: "mixed-0", recommended_start_reason: "fixture", default_mode: "global" },
+      views: {
+        path: { enabled: false, start_node_id: null, node_ids: [], degraded: true },
+        community: { enabled: false, community_id: null, label: null, node_ids: [], is_weak: true, degraded: true },
+        global: { enabled: true, node_ids: nodes.map((node) => node.id), degraded: false }
+      },
+      communities: [
+        { id: "left", label: "left", node_count: 6, color_index: 0, is_weak: true },
+        { id: "right", label: "right", node_count: 6, color_index: 1, is_weak: true }
       ]
     }
   };
@@ -476,6 +595,41 @@ describe("buildRenderableGraph", () => {
     assert.deepEqual(container.pinnedNodeIds, ["n3"]);
     assert.deepEqual(container.selectedNodeIds, ["n2"]);
     assert.deepEqual(container.pinHints.map((hint) => hint.nodeId), ["n3"]);
+  });
+
+  it("marks moderate community quality without auxiliary organization modes", () => {
+    const graph = buildRenderableGraph(manyTinyCommunitiesGraph(), { theme: "shan-shui" });
+
+    assert.equal(graph.communityQuality.level, "moderate");
+    assert.equal(graph.communityQuality.boundaryCertainty, "reduced");
+    assert.equal(graph.communityQuality.warning, "moderate-community-quality");
+    assert.deepEqual(graph.communityQuality.signals.map((signal) => signal.id), ["many-tiny-communities"]);
+    assert.deepEqual(graph.communityQuality.auxiliaryViews, []);
+  });
+
+  it("lowers boundary certainty and exposes only core connectivity for poor community quality", () => {
+    const graph = buildRenderableGraph(oversizedWeakCommunityGraph(), { theme: "shan-shui" });
+
+    assert.equal(graph.communityQuality.level, "poor");
+    assert.equal(graph.communityQuality.boundaryCertainty, "low");
+    assert.deepEqual(graph.communityQuality.auxiliaryViews, [
+      { id: "core-structure-connectivity", label: "核心结构 / 连通性" }
+    ]);
+    assert.deepEqual(
+      graph.communityQuality.signals.map((signal) => signal.id),
+      ["oversized-community", "weak-community-labels", "abnormal-community-count"]
+    );
+    assert.ok(graph.communities.every((community) => community.boundaryCertainty === "low"));
+    assert.deepEqual(graph.communityQuality.auxiliaryViews.map((view) => view.id), ["core-structure-connectivity"]);
+    assert.equal(graph.communityQuality.auxiliaryViews.some((view) => /type|source|time/i.test(view.id)), false);
+  });
+
+  it("detects mixed cross-community edges as an explicit quality signal", () => {
+    const quality = evaluateCommunityQuality(mixedCrossCommunityGraph());
+
+    assert.equal(quality.level, "poor");
+    assert.ok(quality.signals.some((signal) => signal.id === "mixed-cross-community-edges"));
+    assert.deepEqual(quality.auxiliaryViews.map((view) => view.id), ["core-structure-connectivity"]);
   });
 
   it("enters a community focus view by hiding nodes outside the selected community", () => {

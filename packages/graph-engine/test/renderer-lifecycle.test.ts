@@ -71,6 +71,30 @@ describe("graph renderer lifecycle", () => {
     renderer.destroy();
   });
 
+  it("renders poor community quality as a light warning with only core connectivity fallback", () => {
+    const ownerDocument = new FakeDocument();
+    const container = ownerDocument.createElement("div");
+    const renderer = createGraphRenderer(container as unknown as HTMLElement, {
+      data: poorCommunityQualityGraphData(),
+      theme: "shan-shui",
+      live: false
+    });
+    const notice = findByClass(renderer.root as unknown as FakeElement, "graph-quality-notice")[0];
+    const action = findByClass(renderer.root as unknown as FakeElement, "graph-quality-notice-action")[0];
+    const wash = findByClass(renderer.root as unknown as FakeElement, "community-wash")[0];
+
+    assert.equal(renderer.root.dataset.communityQuality, "poor");
+    assert.equal(renderer.root.dataset.communityBoundaryCertainty, "low");
+    assert.equal(renderer.root.dataset.communityAuxiliaryViews, "core-structure-connectivity");
+    assert.ok(notice);
+    assert.equal(notice.dataset.qualityLevel, "poor");
+    assert.equal(action?.dataset.auxiliaryViewId, "core-structure-connectivity");
+    assert.equal(/type|source|time/i.test(renderer.root.dataset.communityAuxiliaryViews || ""), false);
+    assert.equal(wash?.dataset.boundaryCertainty, "low");
+
+    renderer.destroy();
+  });
+
   it("routes a global node click to lightweight selection instead of opening the page", () => {
     const ownerDocument = new FakeDocument();
     const container = ownerDocument.createElement("div");
@@ -520,6 +544,39 @@ function graphDataWithCommunities(entries: Array<[string, string]>): GraphData {
       content: `Node ${id}`
     })),
     edges: []
+  };
+}
+
+function poorCommunityQualityGraphData(): GraphData {
+  const nodes = Array.from({ length: 90 }, (_, index) => ({
+    id: `poor-${index}`,
+    label: `Poor node ${index}`,
+    type: "entity",
+    community: "community",
+    source_path: `wiki/poor/${index}.md`,
+    content: `Poor node ${index}`
+  }));
+  return {
+    meta: {
+      build_date: "2026-06-17",
+      wiki_title: "Poor community quality",
+      total_nodes: nodes.length,
+      total_edges: 0
+    },
+    nodes,
+    edges: [],
+    learning: {
+      version: 1,
+      entry: { recommended_start_node_id: "poor-0", recommended_start_reason: "fixture", default_mode: "global" },
+      views: {
+        path: { enabled: false, start_node_id: null, node_ids: [], degraded: true },
+        community: { enabled: false, community_id: null, label: null, node_ids: [], is_weak: true, degraded: true },
+        global: { enabled: true, node_ids: nodes.map((node) => node.id), degraded: false }
+      },
+      communities: [
+        { id: "community", label: "community", node_count: nodes.length, is_weak: true }
+      ]
+    }
   };
 }
 
