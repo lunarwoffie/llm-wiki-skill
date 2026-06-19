@@ -3,9 +3,9 @@
   "spec": "docs/spark/2026-06-18-large-graph-global-community-design.md",
   "status": {
     "overall": "in_progress",
-    "phase": "phase-6",
-    "task": "6.4",
-    "next_allowed_action": "Choose or reject the global renderer path."
+    "phase": "phase-7",
+    "task": "7.1",
+    "next_allowed_action": "Run full verification set."
   },
   "execution_rules": {
     "branch": "codex/large-graph-performance-experience",
@@ -6996,7 +6996,7 @@
     ]
   },
   "renderer_trial_matrix": {
-    "status": "phase_6_in_progress",
+    "status": "route_decision_recorded",
     "production_rule": "Only one global large-graph renderer path may become production.",
     "candidates": [
       {
@@ -7004,13 +7004,14 @@
         "label": "Sigma/Graphology WebGL",
         "role": "first_candidate",
         "dependency_approval": "required_before_package_change",
-        "status": "measured",
-        "decision": "candidate_retained_for_phase_6_4_comparison",
+        "status": "selected",
+        "decision": "selected_for_future_production_integration_plan",
         "evidence": [
           "docs/graph/performance/2026-06-19-phase-6-1-sigma-graphology-trial.md compares Sigma/Graphology to the DOM/SVG baseline.",
           "/tmp/llm-wiki-graph-sigma-trial-task-6-1/sigma-graphology-trial-results.json contains 47 fixed-schema records across 5 graph shapes with 0 errors.",
           "Behavior contract test preserves object id, community id, search hit, Pin, selected object, and aggregation markers.",
-          "No production workbench renderer path was switched."
+          "No production workbench renderer path was switched.",
+          "Task 6.4 selected Sigma/Graphology as the single future global large-graph renderer route because it combines smooth 10000-node browsing with faster semantic updates than vis-network and richer direct exploration than aggregation-only."
         ]
       },
       {
@@ -7018,14 +7019,15 @@
         "label": "vis-network Canvas",
         "role": "strong_comparison",
         "dependency_approval": "required_before_package_change",
-        "status": "measured",
-        "decision": "candidate_retained_for_phase_6_4_comparison_with_integration_risks",
+        "status": "rejected_primary",
+        "decision": "rejected_for_primary_route_but_retained_as_measured_fallback_candidate",
         "evidence": [
           "docs/graph/performance/2026-06-19-phase-6-2-vis-network-trial.md compares vis-network to Sigma/Graphology and the DOM/SVG baseline.",
           "/tmp/llm-wiki-graph-vis-trial-task-6-2/vis-network-trial-results.json contains 47 fixed-schema records across 5 graph shapes with 0 errors.",
           "Behavior contract test preserves object id, community id, search hit, Pin, selected object, and aggregation markers.",
           "Integration risk recorded: vis-network owns built-in interaction/selection/layout behavior unless production integration keeps graph-engine as the semantic owner.",
-          "No production workbench renderer path was switched."
+          "No production workbench renderer path was switched.",
+          "Task 6.4 rejected vis-network as the primary route because search, point select, and container/community updates were materially slower than Sigma/Graphology and built-in interaction/layout ownership creates higher semantic drift risk."
         ]
       },
       {
@@ -7033,17 +7035,31 @@
         "label": "No-new-dependency aggregation fallback",
         "role": "fallback",
         "dependency_approval": "not_required",
-        "status": "measured",
-        "decision": "candidate_retained_for_phase_6_4_comparison_as_fast_structural_fallback",
+        "status": "retained_degradation_strategy",
+        "decision": "retained_as_degradation_strategy_not_standalone_global_product",
         "evidence": [
           "docs/graph/performance/2026-06-19-phase-6-3-aggregation-fallback-trial.md compares aggregation fallback to Sigma/Graphology, vis-network, and the DOM/SVG baseline.",
           "/tmp/llm-wiki-graph-aggregation-trial-task-6-3/aggregation-fallback-trial-results.json contains 47 fixed-schema records across 5 graph shapes with 0 errors.",
           "Behavior contract test proves container select and internal selected/search/Pin markers remain semantically correct.",
           "No new dependency was added for task 6.3.",
-          "No production workbench renderer path was switched."
+          "No production workbench renderer path was switched.",
+          "Task 6.4 retained aggregation as a global degradation strategy because it is fast for structural overview but hides thousands of objects at 5000/10000 sizes and is not a full rich exploration renderer."
         ]
       }
-    ]
+    ],
+    "selected_route": {
+      "id": "sigma-graphology",
+      "label": "Sigma/Graphology WebGL",
+      "role": "single_future_global_large_graph_renderer_route",
+      "decision": "selected_for_future_production_integration_plan",
+      "report": "docs/graph/performance/2026-06-19-phase-6-4-global-renderer-route-decision.md",
+      "evidence": [
+        "Sigma/Graphology measured all required shapes with 47 records and 0 errors.",
+        "10000-node shape: initial render 289.1 ms, wheel zoom 60.9 FPS, search 40.9 ms, point select 14.6 ms, container select 18.5 ms.",
+        "Behavior parity preserved object ids, community ids, search hits, Pin hints, selected objects, and aggregation markers.",
+        "No production workbench renderer path was switched by the route decision task."
+      ]
+    }
   },
   "decision_log": [
     {
@@ -7225,6 +7241,18 @@
       "reason": "The no-new-dependency trial passed required shapes with fast initial render and 60 FPS zoom, but it caps labels/cards/edges and hides thousands of interaction-time objects on 5000/10000 shapes, so it is best treated as a fallback or staged structural overview unless Phase 6.4 chooses it explicitly.",
       "source": "task 6.3 implementation",
       "status": "recorded"
+    },
+    {
+      "decision": "Select Sigma/Graphology as the single future global large-graph renderer route",
+      "reason": "Sigma/Graphology passed all required shapes, kept wheel zoom near 60 FPS through the 10000-node shape, had faster semantic search/selection/container updates than vis-network, and supports richer direct global exploration than aggregation-only while preserving shared graph semantics through the adapter contract.",
+      "rejected_alternatives": {
+        "vis-network": "Rejected as primary route because semantic update actions were slower and integration has higher risk of renderer-owned selection/layout behavior conflicting with graph-engine semantics.",
+        "aggregation-fallback": "Rejected as standalone route because it intentionally caps labels, cards, and edges and hides thousands of interaction-time objects at large sizes; retained as degradation strategy.",
+        "current-dom-svg": "Rejected as final global renderer because Phase 1 recorded 10000-node and oversized-community performance failures; retained for small graph and community reading."
+      },
+      "source": "task 6.4 implementation",
+      "status": "recorded",
+      "report": "docs/graph/performance/2026-06-19-phase-6-4-global-renderer-route-decision.md"
     }
   ],
   "phases": [
@@ -7944,7 +7972,7 @@
     {
       "id": "phase-6",
       "goal": "Evaluate Sigma/Graphology, vis-network, and aggregation fallback before choosing the single global large-graph path.",
-      "status": "in_progress",
+      "status": "completed",
       "acceptance": [
         {
           "check": "Sigma/Graphology trial is measured against the same graph shapes and semantic contract.",
@@ -7978,8 +8006,14 @@
         },
         {
           "check": "Decision log accepts or rejects each candidate with evidence and leaves at most one production global route.",
-          "status": "pending",
-          "evidence": []
+          "status": "passed",
+          "evidence": [
+            "docs/graph/performance/2026-06-19-phase-6-4-global-renderer-route-decision.md selects Sigma/Graphology as the future single global large-graph renderer integration route.",
+            "Decision report rejects vis-network as primary route with semantic-update and ownership-risk evidence.",
+            "Decision report rejects aggregation-only as standalone global route while retaining it as degradation strategy.",
+            "Decision report rejects current DOM/SVG as final 5000+/10000+ global renderer while retaining DOM/SVG for community reading.",
+            "No production workbench renderer path was added or switched."
+          ]
         }
       ],
       "tasks": [
@@ -8031,8 +8065,14 @@
         {
           "id": "6.4",
           "title": "Choose or reject the global renderer path",
-          "status": "pending",
-          "verification": []
+          "status": "completed",
+          "verification": [
+            "`git log --oneline -15` inspected before task work; latest commit was 49dd95e test: measure aggregation fallback renderer trial [task 6.3].",
+            "Baseline `npm run test --workspace=@llm-wiki/graph-engine` passed before task work: 324 tests, 64 suites, 0 failures.",
+            "docs/graph/performance/2026-06-19-phase-6-4-global-renderer-route-decision.md records the selected Sigma/Graphology route, rejected alternatives, integration boundary, and next plan direction.",
+            "`node -e \"JSON.parse(require('fs').readFileSync('docs/plans/2026-06-18-large-graph-performance-experience-progress.json','utf8'))\"` passed.",
+            "`npm run test --workspace=@llm-wiki/graph-engine` passed after the route decision update: 324 tests, 64 suites, 0 failures."
+          ]
         }
       ]
     },
@@ -8229,6 +8269,10 @@
     {
       "at": "2026-06-19T01:37:33.097Z",
       "entry": "Task 6.3 measured the no-new-dependency aggregation fallback across the required large graph shapes, recorded product limits, and advanced the ledger to task 6.4."
+    },
+    {
+      "at": "2026-06-19T01:44:19.477Z",
+      "entry": "Task 6.4 selected Sigma/Graphology as the future single global large-graph renderer route, rejected vis-network and aggregation-only as primary routes, retained aggregation as degradation strategy, completed Phase 6, and advanced the ledger to Phase 7 task 7.1."
     }
   ],
   "execution_log": [
@@ -8617,6 +8661,19 @@
         "No new dependency was added and no production workbench renderer path was switched."
       ],
       "measured_at": "2026-06-19T01:37:33.097Z"
+    },
+    {
+      "task": "6.4",
+      "status": "completed",
+      "summary": "Selected Sigma/Graphology as the single future global large-graph renderer route while keeping DOM/SVG for community reading and retaining aggregation as degradation strategy only.",
+      "evidence": [
+        "docs/graph/performance/2026-06-19-phase-6-4-global-renderer-route-decision.md",
+        "Sigma/Graphology selected because it had smooth required-shape measurements and stronger semantic update timings than vis-network.",
+        "vis-network rejected as primary route with semantic ownership and slower update evidence.",
+        "Aggregation-only rejected as standalone route because it hides thousands of objects at large graph sizes; retained as degradation strategy.",
+        "No production renderer path was added or switched."
+      ],
+      "measured_at": "2026-06-19T01:44:19.477Z"
     }
   ]
 }
