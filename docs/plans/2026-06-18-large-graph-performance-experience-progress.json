@@ -2,10 +2,10 @@
   "plan": "docs/plans/2026-06-18-large-graph-performance-experience-phased-plan.md",
   "spec": "docs/spark/2026-06-18-large-graph-global-community-design.md",
   "status": {
-    "overall": "in_progress",
+    "overall": "completed",
     "phase": "phase-7",
-    "task": "7.3",
-    "next_allowed_action": "Run final self-review."
+    "task": null,
+    "next_allowed_action": "Plan complete; do not push unless requested."
   },
   "execution_rules": {
     "branch": "codex/large-graph-performance-experience",
@@ -11853,7 +11853,7 @@
     {
       "id": "phase-7",
       "goal": "Run full regression, update documentation, and close residual risks.",
-      "status": "in_progress",
+      "status": "completed",
       "acceptance": [
         {
           "check": "Full verification set is run and recorded.",
@@ -11895,8 +11895,16 @@
         },
         {
           "check": "Every design requirement is implemented, verified, deferred with rationale, or assigned to a future plan.",
-          "status": "pending",
-          "evidence": []
+          "status": "passed",
+          "evidence": [
+            "Final audit confirmed implemented and verified paths for lightweight node/community summaries, explicit enter-community/open-detail actions, blank click/double-click separation, fixed-position explicit actions, return-global preservation, search/filter/Pin preservation, render budgets, community size bands, degradation, loading/error states, keyboard search activation, and browser regressions.",
+            "docs/spark/2026-06-18-large-graph-global-community-design.md assigns deferred items with rationale: Agent question entry, edge relationship inspection, alternate type/source/time organization modes, mobile/narrow-screen work, desktop-specific packaging plan, full keyboard roaming, and intelligent reading-path ranking.",
+            "docs/graph/performance/2026-06-19-phase-6-4-global-renderer-route-decision.md assigns the future large-graph renderer route to Sigma/Graphology only, keeps vis-network as measured fallback, and keeps aggregation as degradation strategy only.",
+            "`rg -n \"组织方式切换条|边关系摘要|直接打开完整阅读|10000\\+.*DOM/SVG.*硬撑\" docs packages workbench tests` returned only negative-rule/design-context matches plus the plan/progress self-review records; no stale instruction remains to use those old behaviors.",
+            "`rg -n \"from [\\'\\\"]sigma|from [\\'\\\"]graphology|from [\\'\\\"]vis-network|import\\([\\'\\\"]sigma|import\\([\\'\\\"]graphology|import\\([\\'\\\"]vis-network\" packages/graph-engine/src workbench/web/src packages/graph-engine/test tests/browser` found no production imports of the trial renderers; package entries remain devDependencies for isolated validation only.",
+            "workbench/PRODUCT.md was updated during final self-review to mark older WebGL, click-to-read, direct-community-entry, and double-click-unpin ADR language as superseded by the 2026-06-19 large-graph interaction/performance rules.",
+            "`git status --short --branch` before progress close showed only workbench/PRODUCT.md plus the expected untracked .superpowers/ directory; .superpowers/ remains unrelated and unstaged."
+          ]
         }
       ],
       "tasks": [
@@ -11939,8 +11947,16 @@
         {
           "id": "7.3",
           "title": "Final self-review",
-          "status": "pending",
-          "verification": []
+          "status": "completed",
+          "verification": [
+            "`git log --oneline -15` inspected before task work; latest commit was b5c67a8 docs: align large graph user-facing notes [task 7.2].",
+            "`npm run test --workspace=@llm-wiki/graph-engine` passed: 324 tests, 64 suites, 0 failures.",
+            "`rg -n \"组织方式切换条|边关系摘要|直接打开完整阅读|10000\\+.*DOM/SVG.*硬撑\" docs packages workbench tests` found only current negative-rule/design-context matches plus plan/progress records.",
+            "`rg -n \"from [\\'\\\"]sigma|from [\\'\\\"]graphology|from [\\'\\\"]vis-network|import\\([\\'\\\"]sigma|import\\([\\'\\\"]graphology|import\\([\\'\\\"]vis-network\" packages/graph-engine/src workbench/web/src packages/graph-engine/test tests/browser` found no trial renderer imports in production source.",
+            "Reviewed package manifests: sigma, graphology, and vis-network remain graph-engine devDependencies for isolated trial validation; no production renderer path was added.",
+            "Updated workbench/PRODUCT.md so current product strategy no longer conflicts with the large-graph design and route decision.",
+            "`node -e \"JSON.parse(require('fs').readFileSync('docs/plans/2026-06-18-large-graph-performance-experience-progress.json','utf8'))\"` passed after final progress update."
+          ]
         }
       ]
     }
@@ -11948,27 +11964,33 @@
   "residual_risk": [
     {
       "risk": "Exact performance budgets are provisional until Phase 1 measurement artifacts exist.",
-      "status": "open"
+      "status": "closed",
+      "evidence": "Phase 1 and Phase 7 performance artifacts exist; 7.2 design docs now record first-stage render budgets and DOM/SVG stress limits. Future Sigma budget tuning remains part of the next integration plan, not this plan."
     },
     {
       "risk": "Candidate renderer dependencies may require user approval before package changes.",
-      "status": "open"
+      "status": "closed",
+      "evidence": "User approved trial installation; sigma, graphology, and vis-network were installed only as graph-engine devDependencies for isolated validation and recorded in the progress log."
     },
     {
       "risk": "Functional browser regressions may be environment-blocked; blocked checks must be recorded rather than treated as passed.",
-      "status": "open"
+      "status": "closed",
+      "evidence": "Phase 7 full verification recorded workbench, offline, community wash, and stage 4/5 browser regression success; initial workbench timeout was rerun and passed."
     },
     {
       "risk": "Performance phases cannot pass without measurement artifacts; missing measurable environment blocks the phase.",
-      "status": "open"
+      "status": "closed",
+      "evidence": "Phase 7 large-graph performance runner wrote /tmp/llm-wiki-graph-large-perf-task-7-1-full/large-graph-performance-results.json with 102 records and 0 runner errors."
     },
     {
       "risk": "Desktop packaging is out of scope, but graph semantics must remain reusable for a future desktop app.",
-      "status": "open"
+      "status": "accepted",
+      "evidence": "Desktop packaging remains out of scope, but design docs and README now preserve the same graph semantics for future desktop reuse."
     },
     {
       "risk": "Current DOM/SVG still records low FPS on 10000 aggregation and oversized-community wheel zoom even after interaction-time detail budgets; Phase 6 renderer route decision remains required for the final 5000+/10000+ global browsing target.",
-      "status": "open"
+      "status": "accepted",
+      "evidence": "This is the intended residual risk and next-plan driver: current DOM/SVG remains for small/offline/community reading, while Sigma/Graphology is selected for the future 5000+/10000+ global route."
     }
   ],
   "turn_log": [
@@ -12102,6 +12124,10 @@
     {
       "at": "2026-06-19T03:02:44.681Z",
       "entry": "Task 7.2 updated design docs, README, CHANGELOG, and /goal Starter to reflect summary-first graph behavior, measured render budgets, DOM/SVG large-shape limits, the selected Sigma/Graphology next route, deferred parking lot boundaries, and stale-reference scan results. Advanced the ledger to task 7.3."
+    },
+    {
+      "at": "2026-06-19T03:09:19.285Z",
+      "entry": "Task 7.3 completed final self-review, closed Phase 7, marked design requirements as implemented/verified/deferred/future-assigned, updated PRODUCT.md to remove current-strategy conflicts, and recorded residual risks for the next Sigma/Graphology integration plan."
     }
   ],
   "execution_log": [
@@ -12530,6 +12556,19 @@
         "Stale-reference scan found no conflicting instructions for direct full reading, first-stage type/source/time organization modes, or direct community entry."
       ],
       "measured_at": "2026-06-19T03:02:44.681Z"
+    },
+    {
+      "task": "7.3",
+      "status": "completed",
+      "summary": "Completed final self-review and closed the large graph performance experience plan without pushing or adding a production renderer path.",
+      "evidence": [
+        "Graph-engine test passed: 324 tests, 64 suites, 0 failures.",
+        "Stale-reference scan found only negative-rule or historical-context matches.",
+        "No production imports of Sigma/Graphology or vis-network were found; trial packages remain devDependencies only.",
+        "workbench/PRODUCT.md now marks old WebGL/click-to-read/direct-community-entry/double-click-unpin language as superseded by the 2026-06-19 large-graph rules.",
+        "Progress status set to completed with residual risks recorded."
+      ],
+      "measured_at": "2026-06-19T03:09:19.285Z"
     }
   ]
 }
