@@ -4,7 +4,7 @@ import { readFile, readdir } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createCommunityWashElement } from "../src/render/community-washes";
-import { createCommunityLegend, createGraphToolbar, createSearchControl } from "../src/render/controls";
+import { createCommunityLegend, createGraphToolbar, createSearchControl, createSigmaZoomControls } from "../src/render/controls";
 import { createGraphEdgeElement } from "../src/render/edges";
 import { createGraphMinimap } from "../src/render/minimap";
 import { createGraphNodeElement } from "../src/render/nodes";
@@ -340,6 +340,32 @@ describe("renderer and facade boundary contract", () => {
     ]);
   });
 
+  it("wires Sigma zoom controls as a separate bottom-left control group", () => {
+    const ownerDocument = new FakeDocument();
+    const calls: string[] = [];
+
+    const zoom = createSigmaZoomControls(ownerDocument as unknown as Document, {
+      onZoomIn: () => calls.push("zoomIn"),
+      onZoomOut: () => calls.push("zoomOut")
+    });
+
+    assert.equal(zoom.element.className, "graph-zoom-controls");
+    assert.equal(zoom.element.dataset.control, "sigma-zoom");
+    assert.equal(zoom.element.getAttribute("aria-label"), "图谱缩放");
+    assert.equal(zoom.buttons.zoomIn.textContent, "+");
+    assert.equal(zoom.buttons.zoomIn.getAttribute("aria-label"), "放大图谱");
+    assert.equal(zoom.buttons.zoomOut.textContent, "-");
+    assert.equal(zoom.buttons.zoomOut.getAttribute("aria-label"), "缩小图谱");
+
+    const zoomInEvent = zoom.buttons.zoomIn.dispatch("click");
+    const zoomOutEvent = zoom.buttons.zoomOut.dispatch("click");
+
+    assert.deepEqual(calls, ["zoomIn", "zoomOut"]);
+    assert.equal(zoomInEvent.propagationStopped, true);
+    assert.equal(zoomOutEvent.propagationStopped, true);
+    assert.deepEqual(ownerDocument.forbiddenListeners, []);
+  });
+
   it("keeps mounted control wiring on injected graph commands", async () => {
     const pipelineText = await readFile(join(SRC, "render/render-pipeline.ts"), "utf8");
 
@@ -511,6 +537,7 @@ class FakeDocument {
 class FakeElement {
   readonly children: FakeElement[] = [];
   private readonly listeners = new Map<string, Array<(event: FakeEvent) => void>>();
+  private readonly attributes = new Map<string, string>();
   readonly dataset: Record<string, string | undefined> = {};
   readonly style: Record<string, string> & { setProperty(name: string, value: string): void } = {
     setProperty(name: string, value: string): void {
@@ -556,9 +583,14 @@ class FakeElement {
   }
 
   setAttribute(name: string, value: string): void {
+    this.attributes.set(name, value);
     if (name === "class") this.className = value;
     else if (name === "href") this.href = value;
     else (this as unknown as Record<string, string>)[name] = value;
+  }
+
+  getAttribute(name: string): string | null {
+    return this.attributes.get(name) ?? null;
   }
 
   addEventListener(type: string, listener: unknown): void {
@@ -570,11 +602,12 @@ class FakeElement {
     this.listeners.set(type, listeners);
   }
 
-  dispatch(type: string, init: Record<string, unknown> = {}): void {
+  dispatch(type: string, init: Record<string, unknown> = {}): FakeEvent {
     const event = new FakeEvent(type, init);
     for (const listener of this.listeners.get(type) || []) {
       listener(event);
     }
+    return event;
   }
 }
 

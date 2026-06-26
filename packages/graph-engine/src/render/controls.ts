@@ -24,6 +24,14 @@ export interface SearchControlDom {
   status: HTMLElement;
 }
 
+export interface SigmaZoomControlsDom {
+  element: HTMLElement;
+  buttons: {
+    zoomIn: HTMLButtonElement;
+    zoomOut: HTMLButtonElement;
+  };
+}
+
 export function createGraphToolbar(
   ownerDocument: Document,
   options: {
@@ -68,6 +76,35 @@ export function createGraphToolbar(
   panel.append(filtersPanel, legendPanel);
   element.append(actions, panel);
   return { element, panel, filtersPanel, buttons: { filters, legend } };
+}
+
+export function createSigmaZoomControls(
+  ownerDocument: Document,
+  options: {
+    onZoomIn: () => void;
+    onZoomOut: () => void;
+  }
+): SigmaZoomControlsDom {
+  const element = ownerDocument.createElement("nav");
+  element.className = "graph-zoom-controls";
+  element.dataset.control = "sigma-zoom";
+  element.setAttribute("aria-label", "图谱缩放");
+  element.addEventListener("click", (event) => event.stopPropagation());
+
+  const zoomIn = createZoomControlButton(ownerDocument, "+", "放大图谱");
+  zoomIn.addEventListener("click", (event) => {
+    event.stopPropagation();
+    options.onZoomIn();
+  });
+
+  const zoomOut = createZoomControlButton(ownerDocument, "-", "缩小图谱");
+  zoomOut.addEventListener("click", (event) => {
+    event.stopPropagation();
+    options.onZoomOut();
+  });
+
+  element.append(zoomIn, zoomOut);
+  return { element, buttons: { zoomIn, zoomOut } };
 }
 
 export function createCommunityLegend(
@@ -284,5 +321,14 @@ function createToolbarButton(ownerDocument: Document, label: string, active: boo
   button.className = "graph-toolbar-button";
   button.dataset.active = active ? "true" : "false";
   button.textContent = label;
+  return button;
+}
+
+function createZoomControlButton(ownerDocument: Document, label: string, ariaLabel: string): HTMLButtonElement {
+  const button = ownerDocument.createElement("button");
+  button.type = "button";
+  button.className = "graph-zoom-button";
+  button.textContent = label;
+  button.setAttribute("aria-label", ariaLabel);
   return button;
 }
