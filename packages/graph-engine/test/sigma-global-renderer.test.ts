@@ -1314,6 +1314,142 @@ describe("Sigma global renderer production boundary", () => {
 
     renderer.destroy();
   });
+
+  it("configures Sigma camera bounds and a conservative fallback wheel ratio", () => {
+    const runtime = fakeRuntime();
+    createSigmaGlobalRenderer({
+      container: fakeContainer(),
+      adapterData: adapterDataFixture(),
+      theme: "shan-shui",
+      runtime
+    });
+    const sigma = runtime.instances[0];
+
+    assert.equal(sigma.settings.minCameraRatio, 0.3);
+    assert.equal(sigma.settings.maxCameraRatio, 3);
+    assert.equal(sigma.settings.zoomingRatio, 1.18);
+    assert.equal(sigma.settings.zoomDuration, 120);
+  });
+
+  it("uses continuous wheel delta to zoom the Sigma camera without default Sigma jumping", () => {
+    const runtime = fakeRuntime();
+    createSigmaGlobalRenderer({
+      container: fakeContainer(),
+      adapterData: adapterDataFixture(),
+      theme: "shan-shui",
+      runtime
+    });
+    const sigma = runtime.instances[0];
+
+    const small = sigma.mouseCaptor.emitWheel({ x: 240, y: 160, deltaY: 4, deltaMode: 0 });
+    assert.equal(small.prevented, true);
+    assert.equal(sigma.camera.animateCalls.length, 0);
+    assert.deepEqual(sigma.zoomTargets.at(-1)?.point, { x: 240, y: 160 });
+    assertClose(sigma.zoomTargets.at(-1)?.ratio ?? 0, Math.exp(4 * 0.0016));
+    assertClose(sigma.camera.getState().ratio, Math.exp(4 * 0.0016));
+    assert.notEqual(sigma.camera.getState().x, 240, "camera x is not the raw pointer x");
+
+    const larger = sigma.mouseCaptor.emitWheel({ x: 240, y: 160, deltaY: 80, deltaMode: 0 });
+    assert.equal(larger.prevented, true);
+    assert.equal(sigma.camera.getState().ratio > Math.exp(4 * 0.0016), true);
+  });
+
+  it("zooms in for negative wheel deltas and respects camera bounds", () => {
+    const runtime = fakeRuntime();
+    createSigmaGlobalRenderer({
+      container: fakeContainer(),
+      adapterData: adapterDataFixture(),
+      theme: "shan-shui",
+      runtime
+    });
+    const sigma = runtime.instances[0];
+    sigma.camera.setState({ ratio: 0.31 });
+
+    const wheel = sigma.mouseCaptor.emitWheel({ x: 120, y: 90, deltaY: -1000, deltaMode: 0 });
+
+    assert.equal(wheel.prevented, true);
+    assert.equal(sigma.camera.getState().ratio, 0.3);
+  });
+
+  it("falls back to the viewport center when a wheel delta lacks pointer coordinates", () => {
+    const runtime = fakeRuntime();
+    createSigmaGlobalRenderer({
+      container: fakeContainer(),
+      adapterData: adapterDataFixture(),
+      theme: "shan-shui",
+      runtime
+    });
+    const sigma = runtime.instances[0];
+
+    const wheel = sigma.mouseCaptor.emitWheel({ deltaY: 80, deltaMode: 0 });
+
+    assert.equal(wheel.prevented, true);
+    assert.deepEqual(sigma.zoomTargets.at(-1)?.point, { x: 500, y: 340 });
+    assert.equal(sigma.camera.getState().ratio > 1, true);
+  });
+
+  it("prevents Sigma zoom when the wheel starts over the zoom controls", () => {
+    const runtime = fakeRuntime();
+    createSigmaGlobalRenderer({
+      container: fakeContainer(),
+      adapterData: adapterDataFixture(),
+      theme: "shan-shui",
+      runtime
+    });
+    const sigma = runtime.instances[0];
+
+    const wheel = sigma.mouseCaptor.emitWheel({
+      x: 120,
+      y: 90,
+      deltaY: 80,
+      deltaMode: 0,
+      target: fakeClosestTarget("[data-control=\"sigma-zoom\"]")
+    });
+
+    assert.equal(wheel.prevented, true);
+    assert.equal(sigma.camera.getState().ratio, 1);
+    assert.equal(sigma.zoomTargets.length, 0);
+
+    const textTargetWheel = sigma.mouseCaptor.emitWheel({
+      x: 120,
+      y: 90,
+      deltaY: 80,
+      deltaMode: 0,
+      target: fakeTextTargetInside("[data-control=\"sigma-zoom\"]")
+    });
+    assert.equal(textTargetWheel.prevented, true);
+    assert.equal(sigma.camera.getState().ratio, 1);
+    assert.equal(sigma.zoomTargets.length, 0);
+  });
+
+  it("exposes button zoom methods that use the viewport center, bounded ratio, and wheel takeover", () => {
+    const runtime = fakeRuntime();
+    const renderer = createSigmaGlobalRenderer({
+      container: fakeContainer(),
+      adapterData: adapterDataFixture(),
+      theme: "shan-shui",
+      runtime
+    });
+    const sigma = runtime.instances[0];
+
+    renderer.zoomIn();
+    assert.deepEqual(sigma.zoomTargets.at(-1)?.point, { x: 500, y: 340 });
+    assertClose(sigma.zoomTargets.at(-1)?.ratio ?? 0, 1 / 1.18);
+    assert.equal(sigma.camera.getState().x, 0);
+    assert.equal(sigma.camera.getState().y, 0);
+    assert.equal(sigma.camera.animateCalls.at(-1)?.options?.duration, 140);
+
+    renderer.zoomOut();
+    assertClose(sigma.zoomTargets.at(-1)?.ratio ?? 0, 1);
+
+    const takeoverWheel = sigma.mouseCaptor.emitWheel({ x: 240, y: 160, deltaY: 80, deltaMode: 0 });
+    assert.equal(takeoverWheel.prevented, true);
+    assert.equal(sigma.camera.animateCalls.at(-1)?.options?.duration, 1);
+  });
+
+  function assertClose(actual: number, expected: number, tolerance = 0.000001): void {
+    assert.ok(Math.abs(actual - expected) <= tolerance, `expected ${actual} to be within ${tolerance} of ${expected}`);
+  }
 });
 
 function adapterDataFixture(options: {
@@ -2104,6 +2240,59 @@ function sigmaEventPayload(node: string | null, x: number, y: number): {
   return payload;
 }
 
+function fakeClosestTarget(selector: string): { closest: (query: string) => unknown } {
+  return {
+    closest(query: string) {
+      return query === selector ? this : null;
+    }
+  };
+}
+
+function fakeTextTargetInside(selector: string): { parentElement: { closest: (query: string) => unknown } } {
+  return {
+    parentElement: fakeClosestTarget(selector)
+  };
+}
+
+class FakeMouseCaptor {
+  private readonly listeners = new Map<string, Set<(payload?: unknown) => void>>();
+
+  on(event: string, listener: (payload?: unknown) => void): void {
+    const listeners = this.listeners.get(event) ?? new Set();
+    listeners.add(listener);
+    this.listeners.set(event, listeners);
+  }
+
+  off(event: string, listener: (payload?: unknown) => void): void {
+    this.listeners.get(event)?.delete(listener);
+  }
+
+  emitWheel(input: {
+    x?: number;
+    y?: number;
+    deltaY: number;
+    deltaMode?: number;
+    target?: unknown;
+  }): { prevented: boolean } {
+    const payload = {
+      x: input.x,
+      y: input.y,
+      delta: -input.deltaY / 120,
+      original: {
+        deltaY: input.deltaY,
+        deltaMode: input.deltaMode ?? 0,
+        target: input.target
+      },
+      prevented: false,
+      preventSigmaDefault() {
+        payload.prevented = true;
+      }
+    };
+    for (const listener of this.listeners.get("wheel") ?? []) listener(payload);
+    return payload;
+  }
+}
+
 class FakeSigma implements SigmaGlobalSigmaLike {
   graph: SigmaGlobalGraphologyGraph;
   readonly container: HTMLElement;
@@ -2111,6 +2300,8 @@ class FakeSigma implements SigmaGlobalSigmaLike {
   readonly camera = new FakeCamera();
   readonly listeners = new Map<string, Set<(payload?: unknown) => void>>();
   readonly setGraphCalls: SigmaGlobalGraphologyGraph[] = [];
+  readonly mouseCaptor = new FakeMouseCaptor();
+  readonly zoomTargets: Array<{ point: { x: number; y: number }; ratio: number }> = [];
   killed = false;
 
   constructor(
@@ -2160,6 +2351,30 @@ class FakeSigma implements SigmaGlobalSigmaLike {
     return { x: point.x / scale, y: point.y / scale };
   }
 
+  getMouseCaptor(): FakeMouseCaptor {
+    return this.mouseCaptor;
+  }
+
+  getViewportZoomedState(point: { x: number; y: number }, newRatio: number): {
+    x: number;
+    y: number;
+    angle: number;
+    ratio: number;
+  } {
+    const current = this.camera.getState();
+    const ratioDiff = newRatio / current.ratio;
+    const center = { x: 500, y: 340 };
+    const graphMousePosition = this.viewportToFramedGraph(point);
+    const graphCenterPosition = this.viewportToFramedGraph(center);
+    this.zoomTargets.push({ point: { x: point.x, y: point.y }, ratio: newRatio });
+    return {
+      x: (graphMousePosition.x - graphCenterPosition.x) * (1 - ratioDiff) + current.x,
+      y: (graphMousePosition.y - graphCenterPosition.y) * (1 - ratioDiff) + current.y,
+      angle: current.angle,
+      ratio: newRatio
+    };
+  }
+
   on(event: string, listener: (payload?: unknown) => void): void {
     const listeners = this.listeners.get(event) ?? new Set();
     listeners.add(listener);
@@ -2188,6 +2403,7 @@ class FakeCamera {
     options?: { duration?: number; easing?: string };
   }> = [];
   activeAnimationTarget: Partial<{ x: number; y: number; angle: number; ratio: number }> | null = null;
+  animated = false;
 
   getState(): { x: number; y: number; angle: number; ratio: number } {
     return { ...this.state };
@@ -2198,10 +2414,15 @@ class FakeCamera {
     this.state = { ...this.state, ...state };
   }
 
+  isAnimated(): boolean {
+    return this.animated;
+  }
+
   animate(
     state: Partial<{ x: number; y: number; angle: number; ratio: number }>,
     options?: { duration?: number; easing?: string }
   ): Promise<void> {
+    this.animated = Boolean(options?.duration && options.duration > 1);
     this.animateCalls.push({ state: { ...state }, options: options ? { ...options } : undefined });
     this.activeAnimationTarget = { ...state };
     this.setState(state);
