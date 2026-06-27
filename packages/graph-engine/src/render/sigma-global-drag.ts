@@ -198,21 +198,3 @@ function sigmaAdapterNodeWithPoint(
     }
   };
 }
-
-export function sigmaCommunityLabels(adapterData: GraphRendererAdapterData, limit: number): GraphRendererAdapterData["renderable"]["communities"] {
-  const selectedCommunityIds = new Set(adapterData.communities.filter((community) => community.selected).map((community) => community.id));
-  return adapterData.renderable.communities
-    .filter((community) => community.wash)
-    .map((community, index) => ({
-      community,
-      index,
-      selected: selectedCommunityIds.has(community.id)
-    }))
-    .sort((left, right) => {
-      if (left.selected !== right.selected) return left.selected ? -1 : 1;
-      if (left.community.nodeCount !== right.community.nodeCount) return right.community.nodeCount - left.community.nodeCount;
-      return left.index - right.index;
-    })
-    .slice(0, limit)
-    .map((candidate) => candidate.community);
-}

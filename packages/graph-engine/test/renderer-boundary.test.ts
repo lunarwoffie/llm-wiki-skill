@@ -27,7 +27,8 @@ const HOST_CALLBACK_IDENTIFIERS = [
 const HOST_CALLBACK_ALLOWED_FILES = new Set(["facade.ts", "types.ts"]);
 const RAW_GRAPH_EVENT_ALLOWED_FILES = new Set([
   "render/gestures.ts",
-  "render/sigma-global-drag.ts"
+  "render/sigma-global-drag.ts",
+  "render/sigma-overlay-dom.ts"
 ]);
 const RAW_GRAPH_EVENT_PATTERNS = [
   /\baddEventListener\s*\(\s*["'](?:wheel|pointerdown|pointermove|pointerup|pointercancel|lostpointercapture)["']/,
@@ -37,10 +38,15 @@ const RAW_GRAPH_EVENT_PATTERNS = [
   /\bclassifyGraph(?:EventTarget|WheelTarget|WheelTargetFromGraphTarget|PointerDownTarget|PointerDownTargetFromGraphTarget)\s*\(/
 ];
 const SIGMA_RENDERER_FORBIDDEN_RAW_GRAPH_EVENT_PATTERNS = [
-  /\baddEventListener\s*\(\s*["'](?:wheel|pointermove|pointerup|pointercancel|lostpointercapture)["']/,
+  /\baddEventListener\s*\(\s*["'](?:wheel|pointerdown|pointermove|pointerup|pointercancel|lostpointercapture)["']/,
   /\bremoveEventListener\s*\(\s*["'](?:wheel|pointerdown|pointermove|pointerup|pointercancel|lostpointercapture)["']/,
   /\bsetPointerCapture(?:\?\.)?\s*\(/,
   /\breleasePointerCapture(?:\?\.)?\s*\(/
+];
+const SIGMA_OVERLAY_DOM_ALLOWED_RAW_GRAPH_EVENT_PATTERNS = [
+  /\baddEventListener\s*\(\s*["'](?:pointerdown)["']/,
+  /\baddEventListener\s*\(\s*["'](?:mousedown|click|dragstart)["']/,
+  /\bclassName = "sigma-global-node-hit-target"/
 ];
 const DRAWING_MODULES = [
   "render/nodes.ts",
@@ -147,20 +153,41 @@ describe("renderer and facade boundary contract", () => {
   it("keeps Sigma raw pointer exceptions limited to node overlay drag", async () => {
     const sigmaRendererText = await readFile(join(SRC, "render/sigma-global-renderer.ts"), "utf8");
     const sigmaDragText = await readFile(join(SRC, "render/sigma-global-drag.ts"), "utf8");
+    const sigmaOverlayDomText = await readFile(join(SRC, "render/sigma-overlay-dom.ts"), "utf8");
 
     assert.equal(/\baddEventListener\s*\(\s*["']wheel["']/.test(sigmaRendererText), false);
     assert.equal(/\baddEventListener\s*\(\s*["']wheel["']/.test(sigmaDragText), false);
-    assert.match(sigmaRendererText, /className = "sigma-global-node-hit-target"/);
-    assert.match(sigmaRendererText, /\baddEventListener\s*\(\s*"pointerdown"/);
+    assert.doesNotMatch(sigmaRendererText, /className = "sigma-global-node-hit-target"/);
+    assert.doesNotMatch(sigmaRendererText, /\baddEventListener\s*\(\s*"pointerdown"/);
     assert.equal(/\baddEventListener\s*\(\s*["'](?:pointermove|pointerup|pointercancel|lostpointercapture)["']/.test(sigmaRendererText), false);
     assert.equal(/\bremoveEventListener\s*\(\s*["'](?:pointermove|pointerup|pointercancel|lostpointercapture)["']/.test(sigmaRendererText), false);
     assert.equal(/\bsetPointerCapture(?:\?\.)?\s*\(/.test(sigmaRendererText), false);
     assert.equal(/\breleasePointerCapture(?:\?\.)?\s*\(/.test(sigmaRendererText), false);
+    assert.match(sigmaOverlayDomText, /className = "sigma-global-node-hit-target"/);
+    assert.match(sigmaOverlayDomText, /\baddEventListener\s*\(\s*"pointerdown"/);
+    assert.equal(/\baddEventListener\s*\(\s*["'](?:pointermove|pointerup|pointercancel|lostpointercapture)["']/.test(sigmaOverlayDomText), false);
+    assert.equal(/\bremoveEventListener\s*\(\s*["'](?:pointermove|pointerup|pointercancel|lostpointercapture)["']/.test(sigmaOverlayDomText), false);
+    for (const pattern of SIGMA_OVERLAY_DOM_ALLOWED_RAW_GRAPH_EVENT_PATTERNS) {
+      assert.match(sigmaOverlayDomText, pattern);
+    }
     assert.match(sigmaDragText, /\bbindSigmaGlobalOverlayPointerDrag\b/);
     assert.match(sigmaDragText, /\bsetPointerCapture(?:\?\.)?\s*\(/);
     assert.match(sigmaDragText, /\baddEventListener\s*\(\s*"pointermove"/);
     assert.match(sigmaDragText, /\bremoveEventListener\s*\(\s*"pointermove"/);
     assert.match(sigmaDragText, /\breleasePointerCapture(?:\?\.)?\s*\(/);
+  });
+
+  it("keeps Sigma overlay DOM out of host callbacks and graph selection ownership", async () => {
+    const sigmaOverlayDomText = await readFile(join(SRC, "render/sigma-overlay-dom.ts"), "utf8");
+
+    for (const identifier of HOST_CALLBACK_IDENTIFIERS) {
+      assert.doesNotMatch(sigmaOverlayDomText, new RegExp(`\\b${identifier}\\b`));
+    }
+    for (const pattern of RENDER_ONLY_STATE_MUTATION_PATTERNS) {
+      assert.doesNotMatch(sigmaOverlayDomText, pattern);
+    }
+    assert.doesNotMatch(sigmaOverlayDomText, /\boptions\.(?:onHitTarget|onPinsChanged|onDragActiveChange)\b/);
+    assert.doesNotMatch(sigmaOverlayDomText, /\bbuildGraphRendererAdapterData\b/);
   });
 
   it("keeps blank double-click ownership out of the graph renderer root", async () => {

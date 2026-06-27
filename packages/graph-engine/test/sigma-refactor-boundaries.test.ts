@@ -8,7 +8,8 @@ const helperFiles = [
   "sigma-graphology-model.ts",
   "sigma-hit-projector.ts",
   "sigma-global-camera.ts",
-  "sigma-wheel-zoom.ts"
+  "sigma-wheel-zoom.ts",
+  "sigma-overlay-dom.ts"
 ];
 
 const existingTypeOnlyFiles = [
