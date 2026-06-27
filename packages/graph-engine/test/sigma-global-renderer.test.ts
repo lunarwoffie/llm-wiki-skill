@@ -338,12 +338,16 @@ describe("Sigma global renderer production boundary", () => {
   });
 
   it("keeps the production Sigma boundary on GraphRendererAdapterData instead of raw GraphData", async () => {
-    const source = await readFile(new URL("../src/render/sigma-global-renderer.ts", import.meta.url), "utf8");
-    assert.match(source, /buildSigmaGlobalGraphologyGraph\(\s*adapterData: GraphRendererAdapterData/);
-    assert.doesNotMatch(source, /GraphData/);
-    assert.doesNotMatch(source, /buildGraphRendererAdapterData/);
-    assert.doesNotMatch(source, /\bdata\.nodes\b/);
-    assert.doesNotMatch(source, /\bdata\.edges\b/);
+    const modelSource = await readFile(new URL("../src/render/sigma-graphology-model.ts", import.meta.url), "utf8");
+    const rendererSource = await readFile(new URL("../src/render/sigma-global-renderer.ts", import.meta.url), "utf8");
+
+    assert.match(modelSource, /buildSigmaGlobalGraphologyGraph\(\s*adapterData: GraphRendererAdapterData/);
+    for (const source of [modelSource, rendererSource]) {
+      assert.doesNotMatch(source, /GraphData/);
+      assert.doesNotMatch(source, /buildGraphRendererAdapterData/);
+      assert.doesNotMatch(source, /\bdata\.nodes\b/);
+      assert.doesNotMatch(source, /\bdata\.edges\b/);
+    }
   });
 
   it("keeps Sigma community overlay styles passive instead of visible circular controls", async () => {
