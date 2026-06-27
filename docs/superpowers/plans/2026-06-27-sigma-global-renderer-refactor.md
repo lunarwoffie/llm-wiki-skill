@@ -14,6 +14,64 @@
 
 This plan implements only #77. It does not implement #79 or #80, and it does not fix #70, #74, #75, #71, or #72. The expected behavior after every task is unchanged graph behavior with a smaller, clearer Sigma global renderer entrypoint.
 
+## NOT In Scope
+
+- #79 Sigma global route boundary documentation and long-term test taxonomy. This branch may leave notes for it, but should not expand into a documentation re-architecture.
+- #80 facade / gesture / controller / renderer redesign. This plan keeps the current public route and lifecycle entrypoint.
+- #70 label overflow behavior. Label placement and truncation can use the new model boundary later, but no user-facing label behavior changes here.
+- #74 / #71 multi-select and shift-click semantics. Hit projection gets a cleaner home, but selection semantics remain unchanged.
+- #75 camera animation performance tuning. This plan preserves current motion behavior and only moves the code.
+- New renderer dependencies or renderer selection changes. Sigma/Graphology remain the production global route.
+
+## What Already Exists
+
+- `sigma-zoom.ts` already owns pure zoom math. `sigma-wheel-zoom.ts` must call it and must not duplicate ratio constants.
+- `sigma-global-drag.ts` already owns drag sessions and document-level pointer/mouse listeners. After this refactor it should keep drag-session mechanics only; hit-target translation and overlay label selection should move out.
+- `sigma-coordinates.ts` already owns Sigma/fallback projection helpers. It should import Sigma-like types from `sigma-global-types.ts`, not from the renderer.
+- `community-cloud-geometry.ts` already owns cloud hull/bounds geometry and reuse signatures. `sigma-overlay-dom.ts` should call it through the existing renderer-owned `communityCloudFor` callback and must not duplicate hull math.
+- `sigma-overlay-svg.ts` already owns low-level SVG/DOM element factories. `sigma-overlay-dom.ts` should orchestrate lifecycle, not recreate SVG helpers.
+- `renderer-boundary.test.ts` already guards raw event ownership. Task 6 must update this test when pointerdown moves from the renderer into `sigma-overlay-dom.ts`.
+- `tests/graph-sigma-global-production.regression-1.sh` already provides production-path Sigma browser regression with FPS, p95 frame, memory, route, and artifact validation. Task 7 must use it before any manual smoke claim.
+
+## Ownership Diagram
+
+```text
+createSigmaGlobalRenderer
+  |
+  |-- lifecycle: runtime, Sigma instance, update/destroy, fatal errors
+  |-- live state: adapterData, graph, pins, active drag, generation guard
+  |
+  +--> sigma-graphology-model
+  |      adapter data + theme + edge style -> Graphology graph / patch
+  |
+  +--> sigma-hit-projector
+  |      Sigma payload/rendered object/screen point -> GraphGestureTarget
+  |
+  +--> sigma-global-camera
+  |      explicit community id + Sigma camera -> target state / movement
+  |
+  +--> sigma-wheel-zoom
+  |      mouse captor wheel -> zoom point + ratio -> renderer callback
+  |
+  +--> sigma-overlay-dom
+         overlay maps + labels + hit targets + drag DOM listeners
+```
+
+Rule: helper modules may import each other only in the direction above. They must not import `sigma-global-renderer.ts`.
+
+## Review Corrections
+
+These corrections are binding for the implementation tasks below.
+
+- The main renderer, not `sigma-global-camera.ts`, decides which community is selected. Camera helpers receive an explicit `communityId`.
+- `SigmaGlobalRenderedObject` and `gestureTargetFromSigmaRenderedObject` move to `sigma-hit-projector.ts` so hit projection does not depend on drag.
+- `sigmaOverlayNodes`, `SIGMA_GLOBAL_NODE_HIT_TARGET_LIMIT`, `SIGMA_GLOBAL_COMMUNITY_LABEL_LIMIT`, and `sigmaCommunityLabels` move with `sigma-overlay-dom.ts`, not with the Graphology model.
+- `sigma-overlay-dom.ts` owns document-level overlay drag listener cleanup through an explicit `clearActiveDragListeners()` method. Renderer commit/cancel/update/destroy paths call it before ending a drag.
+- `sigma-wheel-zoom.ts` receives `isDestroyed` and must no-op after destroy even if a fake or third-party captor fails to unregister the listener.
+- Tiny numeric helpers such as `finiteNumber`, `clamp`, and `roundNumber` may be copied as private helpers inside extracted modules. Do not remove the renderer-local `finiteNumber` while resize and drag code still uses it.
+- The plan must add direct module tests. Existing `sigma-global-renderer.test.ts` stays as integration coverage, but it is not the only proof for extracted modules.
+- Final verification must include the existing production Sigma browser regression script, not only manual `npm run dev` smoke.
+
 ## File Structure
 
 ### Create
@@ -42,6 +100,21 @@ This plan implements only #77. It does not implement #79 or #80, and it does not
 - `packages/graph-engine/test/sigma-refactor-boundaries.test.ts`
   Internal boundary test for helper existence, no runtime import cycles back to `sigma-global-renderer`, and no package-barrel export drift.
 
+- `packages/graph-engine/test/sigma-graphology-model.test.ts`
+  Direct model tests for graph build, patch eligibility, patch application, and raw data boundary.
+
+- `packages/graph-engine/test/sigma-hit-projector.test.ts`
+  Direct hit tests for Sigma node payloads, rendered objects, screen-point payloads, and blank fallback.
+
+- `packages/graph-engine/test/sigma-global-camera.test.ts`
+  Direct camera tests for invalid state, reduced motion, missing animation, projection fallback, and no-wash community centers.
+
+- `packages/graph-engine/test/sigma-wheel-zoom.test.ts`
+  Direct wheel controller tests for listener bind/off, invalid payloads, fallback center, zoom-control exclusion, and post-destroy no-op.
+
+- `packages/graph-engine/test/sigma-overlay-dom.test.ts`
+  Direct overlay controller tests for node click, pointer drag, mouse fallback drag, cancel, cleanup, prune, and reposition without DOM creation.
+
 ### Modify
 
 - `packages/graph-engine/src/render/sigma-global-renderer.ts`
@@ -56,8 +129,17 @@ This plan implements only #77. It does not implement #79 or #80, and it does not
 - `packages/graph-engine/src/render/index.ts`
   Should not export the new helper modules.
 
+- `packages/graph-engine/src/render/sigma-global-drag.ts`
+  Keep drag-session and document-listener mechanics. Move non-drag hit translation and label selection out.
+
 - `packages/graph-engine/test/sigma-global-renderer.test.ts`
   Keep integration/lifecycle tests. Direct model/camera/wheel behavior remains covered here unless a task explicitly creates a dedicated test file.
+
+- `packages/graph-engine/test/sigma-coordinates.test.ts`
+  Import Sigma-like types from `sigma-global-types.ts`.
+
+- `packages/graph-engine/test/renderer-boundary.test.ts`
+  Update raw Sigma pointer exception ownership after overlay DOM extraction.
 
 ## Task 0: Branch And Baseline
 
@@ -137,11 +219,16 @@ const helperFiles = [
   "sigma-events.ts"
 ];
 
+const existingTypeOnlyFiles = [
+  "sigma-coordinates.ts",
+  "community-cloud-geometry.ts"
+];
+
 describe("Sigma global renderer refactor boundaries", () => {
-  it("keeps shared helper modules from importing the renderer runtime", async () => {
-    for (const file of helperFiles) {
+  it("keeps shared helper modules from importing the renderer", async () => {
+    for (const file of [...helperFiles, ...existingTypeOnlyFiles]) {
       const source = await readFile(new URL(`../src/render/${file}`, import.meta.url), "utf8");
-      assert.doesNotMatch(source, /from\s+["']\.\/sigma-global-renderer["']/);
+      assert.doesNotMatch(source, /from\s+["']\.\/sigma-global-renderer(?:\.[jt]s)?["']/);
     }
   });
 
@@ -149,8 +236,13 @@ describe("Sigma global renderer refactor boundaries", () => {
     const source = await readFile(new URL("../src/render/index.ts", import.meta.url), "utf8");
     for (const file of helperFiles) {
       const moduleName = file.replace(/\.ts$/, "");
-      assert.doesNotMatch(source, new RegExp(`["']\\\\./${moduleName}["']`));
+      assert.doesNotMatch(source, new RegExp(`from\\s+["']\\\\./${moduleName}(?:\\\\.js)?["']`));
     }
+  });
+
+  it("keeps the shared type file type-only", async () => {
+    const source = await readFile(new URL("../src/render/sigma-global-types.ts", import.meta.url), "utf8");
+    assert.doesNotMatch(source, /^\s*export\s+(?!type\b|interface\b)/m);
   });
 });
 ```
@@ -338,6 +430,7 @@ Run:
 
 ```bash
 node --import tsx --test packages/graph-engine/test/sigma-refactor-boundaries.test.ts
+node --import tsx --test packages/graph-engine/test/sigma-coordinates.test.ts
 node --import tsx --test packages/graph-engine/test/sigma-global-renderer.test.ts
 npm run typecheck -w @llm-wiki/graph-engine
 ```
@@ -354,6 +447,7 @@ git add packages/graph-engine/src/render/sigma-global-types.ts \
   packages/graph-engine/src/render/sigma-global-renderer.ts \
   packages/graph-engine/src/render/sigma-coordinates.ts \
   packages/graph-engine/src/render/community-cloud-geometry.ts \
+  packages/graph-engine/test/sigma-coordinates.test.ts \
   packages/graph-engine/test/sigma-refactor-boundaries.test.ts
 git commit -m "refactor(graph): extract sigma global shared types and events"
 ```
@@ -362,7 +456,9 @@ git commit -m "refactor(graph): extract sigma global shared types and events"
 
 **Files:**
 - Create: `packages/graph-engine/src/render/sigma-graphology-model.ts`
+- Create: `packages/graph-engine/test/sigma-graphology-model.test.ts`
 - Modify: `packages/graph-engine/src/render/sigma-global-renderer.ts`
+- Modify: `packages/graph-engine/test/sigma-global-renderer.test.ts`
 - Modify: `packages/graph-engine/test/sigma-refactor-boundaries.test.ts`
 
 - [ ] **Step 1: Extend boundary test**
@@ -412,7 +508,6 @@ rgbaColor
 sigmaGlobalCommunityAttributes
 sigmaGlobalAggregationAttributes
 sigmaGlobalNodeSize
-sigmaOverlayNodes
 sigmaGlobalNodeColor
 finiteNumber
 clamp
@@ -435,11 +530,7 @@ import { getThemeTokens } from "../themes";
 import type { SigmaGlobalGraphologyGraph, SigmaGlobalGraphologyRuntime } from "./sigma-global-types";
 ```
 
-Export `SIGMA_GLOBAL_NODE_HIT_TARGET_LIMIT` because `sigma-overlay-dom.ts` consumes it in Task 6:
-
-```ts
-export const SIGMA_GLOBAL_NODE_HIT_TARGET_LIMIT = 160;
-```
+Keep `sigmaOverlayNodes`, `SIGMA_GLOBAL_NODE_HIT_TARGET_LIMIT`, `SIGMA_GLOBAL_COMMUNITY_LABEL_LIMIT`, and `sigmaCommunityLabels` out of this module. They are overlay policy and move in Task 6.
 
 - [ ] **Step 4: Update renderer imports and re-exports**
 
@@ -451,7 +542,6 @@ import {
   canPatchSigmaGlobalGraphAttributes,
   patchSigmaGlobalGraphAttributes,
   sigmaGlobalNodeSize,
-  sigmaOverlayNodes,
   sigmaSelectedCommunityIds,
   sigmaSpotlightCommunityId,
   sigmaSpotlightCommunityIds,
@@ -471,25 +561,47 @@ export {
 export type { SigmaGlobalEdgeStyle } from "./sigma-graphology-model";
 ```
 
-- [ ] **Step 5: Run targeted tests**
+- [ ] **Step 5: Add direct model tests**
+
+Create `packages/graph-engine/test/sigma-graphology-model.test.ts` by moving direct Graphology model assertions out of `sigma-global-renderer.test.ts` where practical:
+
+- build graph entirely from `GraphRendererAdapterData`
+- selected community focus edge styling
+- node spotlight dimming / force-visible behavior
+- semantic emphasis and focus-highlight edge styling
+- patch eligibility true for same node/edge structure
+- patch eligibility false for theme changes, node id changes, edge id/source/target changes
+- patch application refreshes graph attributes without replacing the graph
+
+Also update the raw-data boundary assertion so it inspects `sigma-graphology-model.ts` and the renderer:
+
+```text
+sigma-graphology-model.ts must type buildSigmaGlobalGraphologyGraph(adapterData: GraphRendererAdapterData, ...)
+sigma-graphology-model.ts and sigma-global-renderer.ts must not import or mention raw GraphData/buildGraphRendererAdapterData/data.nodes/data.edges
+```
+
+- [ ] **Step 6: Run targeted tests**
 
 Run:
 
 ```bash
 node --import tsx --test packages/graph-engine/test/sigma-refactor-boundaries.test.ts
+node --import tsx --test packages/graph-engine/test/sigma-graphology-model.test.ts
 node --import tsx --test packages/graph-engine/test/sigma-global-renderer.test.ts
 npm run typecheck -w @llm-wiki/graph-engine
 ```
 
 Expected: all pass.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 Run:
 
 ```bash
 git add packages/graph-engine/src/render/sigma-graphology-model.ts \
   packages/graph-engine/src/render/sigma-global-renderer.ts \
+  packages/graph-engine/test/sigma-graphology-model.test.ts \
+  packages/graph-engine/test/sigma-global-renderer.test.ts \
   packages/graph-engine/test/sigma-refactor-boundaries.test.ts
 git commit -m "refactor(graph): extract sigma graphology render model"
 ```
@@ -498,7 +610,10 @@ git commit -m "refactor(graph): extract sigma graphology render model"
 
 **Files:**
 - Create: `packages/graph-engine/src/render/sigma-hit-projector.ts`
+- Create: `packages/graph-engine/test/sigma-hit-projector.test.ts`
 - Modify: `packages/graph-engine/src/render/sigma-global-renderer.ts`
+- Modify: `packages/graph-engine/src/render/sigma-global-drag.ts`
+- Modify: `packages/graph-engine/test/sigma-global-renderer.test.ts`
 - Modify: `packages/graph-engine/test/sigma-refactor-boundaries.test.ts`
 
 - [ ] **Step 1: Extend boundary test**
@@ -536,6 +651,8 @@ createSigmaGlobalHitProjector
 sigmaNodeIdFromPayload
 sigmaScreenPointFromPayload
 spatialInputFromAdapterData
+SigmaGlobalRenderedObject
+gestureTargetFromSigmaRenderedObject
 ```
 
 Use these imports:
@@ -546,11 +663,9 @@ import type { GraphRendererAdapterData } from "./adapter";
 import { screenPointToWorldPoint, type GraphScreenPoint } from "./geometry";
 import { graphSpatialHitToGestureTarget, type GraphGestureTarget } from "./gestures";
 import type { RendererViewport, RendererViewportSize } from "./viewport";
-import {
-  gestureTargetFromSigmaRenderedObject,
-  type SigmaGlobalRenderedObject
-} from "./sigma-global-drag";
 ```
+
+Remove `SigmaGlobalRenderedObject` and `gestureTargetFromSigmaRenderedObject` from `sigma-global-drag.ts`; that file should keep drag-session and document-listener mechanics only.
 
 - [ ] **Step 4: Update renderer imports and re-exports**
 
@@ -573,29 +688,45 @@ export { createSigmaGlobalHitProjector } from "./sigma-hit-projector";
 export type {
   SigmaGlobalHitInput,
   SigmaGlobalHitProjector,
-  SigmaGlobalHitProjectorInput
+  SigmaGlobalHitProjectorInput,
+  SigmaGlobalRenderedObject
 } from "./sigma-hit-projector";
 ```
 
-- [ ] **Step 5: Run targeted tests**
+- [ ] **Step 5: Add direct hit projector tests**
+
+Create `packages/graph-engine/test/sigma-hit-projector.test.ts` covering:
+
+- known Sigma node id wins before overlapping community region
+- unknown Sigma node id falls back to rendered object or spatial screen point
+- rendered node, edge, community wash, and aggregation container objects translate to `GraphGestureTarget`
+- invalid rendered object ids return `graph-blank` through fallback behavior
+- top-level `x/y` payload and nested `event.x/event.y` payload both parse
+- missing screen point returns `graph-blank`
+
+- [ ] **Step 6: Run targeted tests**
 
 Run:
 
 ```bash
 node --import tsx --test packages/graph-engine/test/sigma-refactor-boundaries.test.ts
+node --import tsx --test packages/graph-engine/test/sigma-hit-projector.test.ts
 node --import tsx --test packages/graph-engine/test/sigma-global-renderer.test.ts
 npm run typecheck -w @llm-wiki/graph-engine
 ```
 
 Expected: all pass.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 Run:
 
 ```bash
 git add packages/graph-engine/src/render/sigma-hit-projector.ts \
+  packages/graph-engine/src/render/sigma-global-drag.ts \
   packages/graph-engine/src/render/sigma-global-renderer.ts \
+  packages/graph-engine/test/sigma-hit-projector.test.ts \
+  packages/graph-engine/test/sigma-global-renderer.test.ts \
   packages/graph-engine/test/sigma-refactor-boundaries.test.ts
 git commit -m "refactor(graph): extract sigma hit projector"
 ```
@@ -604,6 +735,7 @@ git commit -m "refactor(graph): extract sigma hit projector"
 
 **Files:**
 - Create: `packages/graph-engine/src/render/sigma-global-camera.ts`
+- Create: `packages/graph-engine/test/sigma-global-camera.test.ts`
 - Modify: `packages/graph-engine/src/render/sigma-global-renderer.ts`
 - Modify: `packages/graph-engine/test/sigma-refactor-boundaries.test.ts`
 
@@ -646,25 +778,33 @@ sigmaGraphPointToCameraPoint
 sigmaCameraDistanceForGraphDistance
 sigmaCommunitySpotlightCenter
 prefersReducedMotion
-finiteNumber
-clamp
-roundNumber
 ```
+
+Move or copy private numeric helpers inside `sigma-global-camera.ts` as needed, but keep a local `finiteNumber` in `sigma-global-renderer.ts` while resize and drag code still uses it.
 
 Use these imports:
 
 ```ts
 import type { GraphRendererAdapterData } from "./adapter";
-import {
-  sigmaSpotlightCommunityId
-} from "./sigma-graphology-model";
 import type {
   SigmaGlobalCameraState,
   SigmaGlobalSigmaLike
 } from "./sigma-global-types";
 ```
 
-Export all moved camera functions that `sigma-global-renderer.ts` uses.
+Do not import `sigmaSpotlightCommunityId` into `sigma-global-camera.ts`. The main renderer computes the selected/spotlight community id and passes it into camera helpers.
+
+Export all moved camera functions that `sigma-global-renderer.ts` uses. `maybeAnimateSigmaCommunitySpotlightCamera` should take this shape:
+
+```ts
+export function maybeAnimateSigmaCommunitySpotlightCamera(
+  sigma: SigmaGlobalSigmaLike,
+  root: HTMLElement,
+  adapterData: GraphRendererAdapterData,
+  communityId: string | null,
+  previousCommunityId: string | null
+): string | null
+```
 
 - [ ] **Step 4: Update renderer imports**
 
@@ -683,25 +823,52 @@ import {
 
 Remove the moved function definitions from `sigma-global-renderer.ts`.
 
-- [ ] **Step 5: Run targeted tests**
+When calling `maybeAnimateSigmaCommunitySpotlightCamera`, compute the id in the renderer:
+
+```ts
+cameraSpotlightCommunityId = maybeAnimateSigmaCommunitySpotlightCamera(
+  sigma,
+  sigmaRoot,
+  adapterData,
+  sigmaSpotlightCommunityId(adapterData),
+  previousCameraSpotlightCommunityId
+);
+```
+
+- [ ] **Step 5: Add direct camera tests**
+
+Create `packages/graph-engine/test/sigma-global-camera.test.ts` covering:
+
+- `readCameraState` normalizes missing/non-finite values
+- `restoreCameraState` no-ops on null state
+- reduced motion uses `setState` instead of `animate`
+- missing `animate` falls back to `setState`
+- graph-to-camera projection falls back to raw graph point when Sigma projection is missing or non-finite
+- community center uses wash center when available
+- community center averages node points when no wash exists
+- camera helper does not decide selected community by reading adapter selection internally
+
+- [ ] **Step 6: Run targeted tests**
 
 Run:
 
 ```bash
 node --import tsx --test packages/graph-engine/test/sigma-refactor-boundaries.test.ts
+node --import tsx --test packages/graph-engine/test/sigma-global-camera.test.ts
 node --import tsx --test packages/graph-engine/test/sigma-global-renderer.test.ts
 npm run typecheck -w @llm-wiki/graph-engine
 ```
 
 Expected: all pass, including existing tests for community spotlight camera animation, reduced motion, already-framed community, and reset view.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 Run:
 
 ```bash
 git add packages/graph-engine/src/render/sigma-global-camera.ts \
   packages/graph-engine/src/render/sigma-global-renderer.ts \
+  packages/graph-engine/test/sigma-global-camera.test.ts \
   packages/graph-engine/test/sigma-refactor-boundaries.test.ts
 git commit -m "refactor(graph): extract sigma global camera logic"
 ```
@@ -710,7 +877,9 @@ git commit -m "refactor(graph): extract sigma global camera logic"
 
 **Files:**
 - Create: `packages/graph-engine/src/render/sigma-wheel-zoom.ts`
+- Create: `packages/graph-engine/test/sigma-wheel-zoom.test.ts`
 - Modify: `packages/graph-engine/src/render/sigma-global-renderer.ts`
+- Modify: `packages/graph-engine/test/sigma-global-renderer.test.ts`
 - Modify: `packages/graph-engine/test/sigma-refactor-boundaries.test.ts`
 
 - [ ] **Step 1: Extend boundary test**
@@ -767,20 +936,27 @@ export interface SigmaWheelZoomController {
 export interface SigmaWheelZoomControllerInput {
   sigma: SigmaGlobalSigmaLike;
   root: HTMLElement;
+  isDestroyed: () => boolean;
   currentRatio: () => number;
   onZoomAtPoint: (point: GraphScreenPoint, nextRatio: number) => void;
+  onFatalError?: (error: unknown) => void;
 }
 
 export function bindSigmaWheelZoomController(input: SigmaWheelZoomControllerInput): SigmaWheelZoomController {
   const captor = input.sigma.getMouseCaptor?.();
   if (!captor?.on) return { destroy: () => undefined };
   const listener = (payload?: unknown): void => {
-    const wheel = sigmaWheelInputFromPayload(payload, sigmaViewportCenter(input.root));
-    if (!wheel) return;
-    preventSigmaDefault(payload);
-    if (sigmaWheelTargetIsZoomControl(payload)) return;
-    const nextRatio = sigmaWheelZoomRatio(input.currentRatio(), wheel.delta);
-    input.onZoomAtPoint(wheel.point, nextRatio);
+    if (input.isDestroyed()) return;
+    try {
+      const wheel = sigmaWheelInputFromPayload(payload, sigmaViewportCenter(input.root));
+      if (!wheel) return;
+      preventSigmaDefault(payload);
+      if (sigmaWheelTargetIsZoomControl(payload)) return;
+      const nextRatio = sigmaWheelZoomRatio(input.currentRatio(), wheel.delta);
+      input.onZoomAtPoint(wheel.point, nextRatio);
+    } catch (error) {
+      input.onFatalError?.(error);
+    }
   };
   captor.on("wheel", listener);
   return {
@@ -860,8 +1036,10 @@ let sigmaWheelZoomController: { destroy(): void } | null = null;
 sigmaWheelZoomController = bindSigmaWheelZoomController({
   sigma,
   root: sigmaRoot,
+  isDestroyed: () => destroyed,
   currentRatio: () => readCameraState(sigma)?.ratio ?? 1,
-  onZoomAtPoint: (point, nextRatio) => zoomSigmaCameraAtViewportPoint(point, nextRatio, false)
+  onZoomAtPoint: (point, nextRatio) => zoomSigmaCameraAtViewportPoint(point, nextRatio, false),
+  onFatalError: options.onFatalError
 });
 ```
 
@@ -883,12 +1061,28 @@ import {
 
 5. Remove local `SigmaGlobalWheelPayload`, `bindSigmaWheelZoom`, `unbindSigmaWheelZoom`, `handleSigmaWheelZoom`, `sigmaWheelInputFromPayload`, `sigmaWheelTargetIsZoomControl`, and `sigmaViewportCenter`.
 
-- [ ] **Step 5: Run targeted tests**
+- [ ] **Step 5: Add direct wheel tests**
+
+Create `packages/graph-engine/test/sigma-wheel-zoom.test.ts` covering:
+
+- controller binds one wheel listener and `destroy()` unregisters the same listener
+- `isDestroyed()` makes late wheel events no-op even if the captor still invokes the listener
+- invalid payloads do not call `onZoomAtPoint`
+- `original.deltaY` wins over fallback `delta`
+- fallback `delta` is converted to pixel-like wheel input
+- missing pointer coordinates use viewport center
+- zoom-control targets are prevented but do not zoom
+- thrown zoom callback errors are passed to `onFatalError`
+
+Update `sigma-global-renderer.test.ts` or its fake captor so renderer-level `destroy()` proves wheel listeners are removed and post-destroy wheel events do not change camera state.
+
+- [ ] **Step 6: Run targeted tests**
 
 Run:
 
 ```bash
 node --import tsx --test packages/graph-engine/test/sigma-refactor-boundaries.test.ts
+node --import tsx --test packages/graph-engine/test/sigma-wheel-zoom.test.ts
 node --import tsx --test packages/graph-engine/test/sigma-global-renderer.test.ts
 node --import tsx --test packages/graph-engine/test/sigma-zoom.test.ts
 npm run typecheck -w @llm-wiki/graph-engine
@@ -896,13 +1090,15 @@ npm run typecheck -w @llm-wiki/graph-engine
 
 Expected: all pass, including existing wheel zoom tests.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 Run:
 
 ```bash
 git add packages/graph-engine/src/render/sigma-wheel-zoom.ts \
   packages/graph-engine/src/render/sigma-global-renderer.ts \
+  packages/graph-engine/test/sigma-wheel-zoom.test.ts \
+  packages/graph-engine/test/sigma-global-renderer.test.ts \
   packages/graph-engine/test/sigma-refactor-boundaries.test.ts
 git commit -m "refactor(graph): extract sigma wheel zoom controller"
 ```
@@ -911,7 +1107,11 @@ git commit -m "refactor(graph): extract sigma wheel zoom controller"
 
 **Files:**
 - Create: `packages/graph-engine/src/render/sigma-overlay-dom.ts`
+- Create: `packages/graph-engine/test/sigma-overlay-dom.test.ts`
 - Modify: `packages/graph-engine/src/render/sigma-global-renderer.ts`
+- Modify: `packages/graph-engine/src/render/sigma-global-drag.ts`
+- Modify: `packages/graph-engine/test/sigma-global-renderer.test.ts`
+- Modify: `packages/graph-engine/test/renderer-boundary.test.ts`
 - Modify: `packages/graph-engine/test/sigma-refactor-boundaries.test.ts`
 
 - [ ] **Step 1: Extend boundary test**
@@ -947,14 +1147,14 @@ Create `packages/graph-engine/src/render/sigma-overlay-dom.ts` with this exporte
 ```ts
 import type { GraphRendererAdapterData } from "./adapter";
 import type { GraphScreenPoint } from "./geometry";
-import type { PinPosition } from "../types";
 import type { SigmaCommunityCloud } from "./community-cloud-geometry";
-import type { SigmaGlobalRenderedObject } from "./sigma-global-drag";
+import type { SigmaGlobalRenderedObject } from "./sigma-hit-projector";
 import type { SigmaGlobalRendererCreateOptions, SigmaGlobalSigmaLike } from "./sigma-global-types";
 
 export interface SigmaOverlayDomController {
   rebuild(): void;
   reposition(): void;
+  clearActiveDragListeners(): void;
   destroy(): void;
 }
 
@@ -971,6 +1171,7 @@ export interface SigmaOverlayDomControllerInput {
   moveNodeDrag: (point: GraphScreenPoint, payload?: unknown) => void;
   commitNodeDrag: (point: GraphScreenPoint | null, payload?: unknown) => void;
   cancelNodeDrag: () => void;
+  screenPointFromEvent: (event: MouseEvent | PointerEvent) => GraphScreenPoint;
   consumeSuppressedNodeClick: (nodeId: string | null) => boolean;
   activeNodeDragId: () => string | null;
 }
@@ -991,6 +1192,8 @@ bindOverlayPointerDragListeners
 bindOverlayMouseDragListeners
 isActiveOverlayDrag
 clearOverlayPointerDragListeners
+sigmaOverlayNodes
+sigmaCommunityLabels
 ```
 
 Keep the same behavior:
@@ -1000,6 +1203,11 @@ Keep the same behavior:
 - `reposition()` must not create DOM elements.
 - click handlers call `input.onHit(...)`.
 - drag handlers call the passed drag callbacks.
+- `clearActiveDragListeners()` must be idempotent and must run on drag commit, drag cancel, update cancellation, and destroy.
+- Define `SIGMA_GLOBAL_NODE_HIT_TARGET_LIMIT = 160` and `SIGMA_GLOBAL_COMMUNITY_LABEL_LIMIT = 8` inside `sigma-overlay-dom.ts`.
+- Import `sigmaGlobalNodeSize` and `sigmaGlobalNodeSpotlightState` from `sigma-graphology-model.ts`; do not import overlay policy back into the model.
+
+Update `packages/graph-engine/src/render/sigma-global-drag.ts` so it no longer exports `sigmaCommunityLabels`.
 
 - [ ] **Step 4: Update renderer to use overlay controller**
 
@@ -1027,6 +1235,7 @@ overlayDomController = createSigmaOverlayDomController({
   moveNodeDrag,
   commitNodeDrag,
   cancelNodeDrag,
+  screenPointFromEvent: (event) => overlayPointerScreenPoint(event, sigmaRoot),
   consumeSuppressedNodeClick,
   activeNodeDragId: () => activeNodeDrag?.nodeId ?? null
 });
@@ -1053,7 +1262,15 @@ overlayDomController?.destroy();
 overlayDomController = null;
 ```
 
-5. Import:
+5. In renderer drag lifecycle, replace local `clearOverlayPointerDragListeners()` calls with:
+
+```ts
+overlayDomController?.clearActiveDragListeners();
+```
+
+This call must remain in commit, cancel, update cancellation, and destroy paths before the active drag is dropped.
+
+6. Import:
 
 ```ts
 import {
@@ -1062,27 +1279,58 @@ import {
 } from "./sigma-overlay-dom";
 ```
 
-6. Remove the moved local functions and maps.
+7. Remove the moved local functions and maps.
 
-- [ ] **Step 5: Run targeted tests**
+- [ ] **Step 5: Update boundary tests for overlay ownership**
+
+Update `packages/graph-engine/test/renderer-boundary.test.ts`:
+
+- allow `render/sigma-overlay-dom.ts` as the Sigma overlay DOM pointerdown owner
+- keep document-level `pointermove` / `pointerup` / `pointercancel` ownership in `sigma-global-drag.ts`
+- assert `sigma-global-renderer.ts` no longer contains `.sigma-global-node-hit-target` creation or `addEventListener("pointerdown")`
+- assert `sigma-overlay-dom.ts` contains `.sigma-global-node-hit-target` and `addEventListener("pointerdown")`
+- assert `sigma-overlay-dom.ts` does not directly call host callbacks or own graph selection semantics
+
+- [ ] **Step 6: Add direct overlay tests**
+
+Create `packages/graph-engine/test/sigma-overlay-dom.test.ts` covering:
+
+- node hit-target `click` calls `onHit({ kind: "node", id })`
+- community cloud shape click calls `onHit({ kind: "community-wash", id })`
+- pointer drag path dispatches `pointerdown` on `.sigma-global-node-hit-target`, document `pointermove`, document `pointerup`, and clears document listeners
+- pointer cancel clears document listeners and calls cancel
+- mouse fallback path works when `PointerEvent` is unavailable
+- `destroy()` clears element maps and active drag listeners
+- `rebuild()` prunes stale community/node/label elements and refreshes data attributes
+- `reposition()` updates boxes/geometry without `replaceChildren`, DOM creation, or listener rebinding
+- label cap remains 8 and selected labels are prioritized
+- node hit-target cap remains 160 and selected/search/pinned anchors are kept
+
+- [ ] **Step 7: Run targeted tests**
 
 Run:
 
 ```bash
 node --import tsx --test packages/graph-engine/test/sigma-refactor-boundaries.test.ts
+node --import tsx --test packages/graph-engine/test/renderer-boundary.test.ts
+node --import tsx --test packages/graph-engine/test/sigma-overlay-dom.test.ts
 node --import tsx --test packages/graph-engine/test/sigma-global-renderer.test.ts
 npm run typecheck -w @llm-wiki/graph-engine
 ```
 
 Expected: all pass, including tests that prove overlay elements are reused on camera updates and data updates.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 8: Commit**
 
 Run:
 
 ```bash
 git add packages/graph-engine/src/render/sigma-overlay-dom.ts \
+  packages/graph-engine/src/render/sigma-global-drag.ts \
   packages/graph-engine/src/render/sigma-global-renderer.ts \
+  packages/graph-engine/test/sigma-overlay-dom.test.ts \
+  packages/graph-engine/test/sigma-global-renderer.test.ts \
+  packages/graph-engine/test/renderer-boundary.test.ts \
   packages/graph-engine/test/sigma-refactor-boundaries.test.ts
 git commit -m "refactor(graph): extract sigma overlay dom controller"
 ```
@@ -1135,7 +1383,35 @@ npm run typecheck -w @llm-wiki/graph-engine
 
 Expected: both pass.
 
-- [ ] **Step 5: Run workbench smoke**
+- [ ] **Step 5: Run production Sigma browser regression**
+
+Run the existing production-path browser gate:
+
+```bash
+GRAPH_SIGMA_PRODUCTION_ARTIFACT_DIR="/tmp/llm-wiki-sigma-global-refactor-$(date +%Y%m%d-%H%M%S)" \
+GRAPH_SIGMA_PRODUCTION_SHAPES="real-snapshot-proxy,nodes-1000-sparse,nodes-1000-dense" \
+bash tests/graph-sigma-global-production.regression-1.sh
+```
+
+Expected:
+
+```text
+PASS: production-path artifact fields
+PASS: Sigma global production performance trial
+```
+
+The generated `sigma-global-production-results.json` must pass validation with:
+
+- failed records: `0`
+- production path: `true`
+- global records return `sigma-global-ready`
+- wheel FPS at or above the script threshold
+- wheel frame p95 at or below the script threshold
+- repeated-cycle memory growth within the script threshold
+
+If Playwright or Chrome is unavailable, record the exact blocker. Do not replace this with manual smoke unless the blocker is environment-only and all graph-engine tests/typecheck already passed.
+
+- [ ] **Step 6: Run workbench smoke**
 
 Run:
 
@@ -1156,26 +1432,154 @@ Then open the workbench and verify these paths manually:
 
 Expected: all paths behave like current main. If browser verification is blocked by port, Chrome, or local data, record the exact blocker in the final response and do not claim browser verification passed.
 
-- [ ] **Step 6: Comment on #77**
+- [ ] **Step 7: Comment on #77**
 
 Run:
 
 ```bash
-gh issue comment 77 --repo sdyckjq-lab/llm-wiki-skill --body "Implemented the Sigma global renderer split from the design spec. Extracted shared Sigma types/events, Graphology render model, hit projector, camera logic, wheel zoom controller, and overlay DOM controller. Verified graph-engine tests/typecheck and browser smoke where available. PR will close this issue after review."
+gh issue comment 77 --repo sdyckjq-lab/llm-wiki-skill --body "Implemented the Sigma global renderer split from the design spec. Extracted shared Sigma types/events, Graphology render model, hit projector, camera logic, wheel zoom controller, and overlay DOM controller. Verified graph-engine tests/typecheck plus the Sigma production browser regression where available. PR will close this issue after review."
 ```
 
 Expected: issue comment is created.
 
-- [ ] **Step 7: Commit final cleanup**
+- [ ] **Step 8: Commit final cleanup**
 
-If Step 1-6 changed files, run:
+If Step 1-7 changed files, run:
 
 ```bash
 git add packages/graph-engine/src/render packages/graph-engine/test
 git commit -m "test(graph): verify sigma renderer refactor boundaries"
 ```
 
-If Step 1-6 did not change files, do not create an empty commit.
+If Step 1-7 did not change files, do not create an empty commit.
+
+## Test Coverage Map
+
+```text
+CODE PATHS                                            COVERAGE REQUIRED
+[+] Shared types/events
+  |-- type-only runtime boundary                       [NEW] sigma-refactor-boundaries.test.ts
+  |-- prevent Sigma default payload shapes             [NEW] sigma-events coverage via wheel/hit tests
+
+[+] Graphology model
+  |-- adapterData -> nodes/edges/attrs                 [EXISTING -> MOVE] sigma-graphology-model.test.ts
+  |-- selected-community node dimming                  [EXISTING -> MOVE] sigma-graphology-model.test.ts
+  |-- edge relation/focus styling                      [EXISTING -> MOVE] sigma-graphology-model.test.ts
+  |-- patchable same structure                         [NEW] sigma-graphology-model.test.ts
+  |-- theme/shape change rebuild path                  [EXISTING + NEW] renderer + model tests
+
+[+] Hit projector
+  |-- known node id                                    [EXISTING -> MOVE] sigma-hit-projector.test.ts
+  |-- rendered node/edge/community/aggregation object  [NEW] sigma-hit-projector.test.ts
+  |-- screen point spatial fallback                    [EXISTING -> MOVE] sigma-hit-projector.test.ts
+  |-- blank / invalid payload                          [EXISTING + NEW] sigma-hit-projector.test.ts
+
+[+] Camera
+  |-- read/restore camera state                        [NEW] sigma-global-camera.test.ts
+  |-- selected community target from explicit id       [EXISTING + NEW] renderer + camera tests
+  |-- reduced motion / missing animate fallback        [EXISTING -> MOVE] sigma-global-camera.test.ts
+  |-- no-wash community center fallback                [NEW] sigma-global-camera.test.ts
+
+[+] Wheel zoom
+  |-- captor bind/off                                  [NEW] sigma-wheel-zoom.test.ts
+  |-- delta parsing and viewport center fallback       [EXISTING + NEW] zoom + wheel tests
+  |-- zoom-control exclusion                           [EXISTING + NEW] wheel tests
+  |-- late event after destroy                         [NEW] wheel + renderer tests
+  |-- real browser wheel/button path                   [REQUIRED] graph-sigma-global-production regression
+
+[+] Overlay DOM
+  |-- rebuild creates/reuses/prunes elements            [EXISTING + NEW] sigma-overlay-dom.test.ts
+  |-- reposition does not create/replace/rebind         [EXISTING + NEW] sigma-overlay-dom.test.ts
+  |-- node hit-target click                            [NEW] sigma-overlay-dom.test.ts
+  |-- pointer drag, cancel, mouse fallback             [NEW] sigma-overlay-dom.test.ts
+  |-- listener cleanup                                 [NEW] sigma-overlay-dom.test.ts
+  |-- 8 label cap / 160 hit-target cap                 [EXISTING + NEW] renderer + overlay tests
+
+USER FLOWS
+[+] Open global graph                                  [REQUIRED] production browser regression
+[+] Wheel/trackpad zoom                                [REQUIRED] production browser regression
+[+] Left-bottom zoom buttons                           [REQUIRED] production browser regression + manual smoke
+[+] Click community, stay global, drawer sync          [REQUIRED] production browser regression + manual smoke
+[+] Return global                                      [REQUIRED] production browser regression + manual smoke
+[+] Drag node and persist pin                          [REQUIRED] production browser regression + manual smoke
+```
+
+Coverage target: every moved branch is covered by a direct module test, an existing integration test, or the production browser regression. No moved module should rely only on `sigma-global-renderer.test.ts`.
+
+## Failure Modes
+
+| New codepath | Realistic failure | Required coverage / handling |
+|---|---|---|
+| Shared type extraction | helper imports renderer at runtime and creates a cycle | `sigma-refactor-boundaries.test.ts` scans helper imports and package barrel exports |
+| Graphology model extraction | raw `GraphData` leaks into renderer model path | model boundary test reads `sigma-graphology-model.ts` and renderer source |
+| Graph patching | patch path misses updated community/aggregation attributes | direct model patch test plus renderer lifecycle integration test |
+| Hit projector extraction | rendered object translation stays hidden in drag module | hit projector direct tests and drag module cleanup |
+| Camera extraction | camera module reads selection state and duplicates selection ownership | camera direct test plus explicit renderer-passed community id |
+| Camera motion | reduced-motion users still get animation | camera reduced-motion test |
+| Wheel extraction | stale captor listener zooms after destroy | direct wheel test and renderer destroy test |
+| Wheel / animation | real Sigma animation overwrites wheel state | production browser regression plus manual smoke if local browser available |
+| Overlay extraction | document drag listeners leak after commit/cancel/destroy | overlay direct tests count listener cleanup paths |
+| Overlay reposition | camera updates rebuild DOM and rebind listeners every frame | existing and direct overlay tests assert no create/replace/rebind |
+| Browser production path | unit tests pass but real Sigma canvas/route regresses | `tests/graph-sigma-global-production.regression-1.sh` is a hard final gate |
+
+No failure mode above is allowed to be silent with no test and no cleanup path.
+
+## Worktree Parallelization Strategy
+
+This refactor touches one primary module and many shared tests, so the safest execution is mostly sequential. Limited parallel review is useful; parallel implementation is not.
+
+| Step | Modules touched | Depends on |
+|---|---|---|
+| Task 1 shared types/events | `packages/graph-engine/src/render`, `packages/graph-engine/test` | Task 0 |
+| Task 2 graphology model | `packages/graph-engine/src/render`, `packages/graph-engine/test` | Task 1 |
+| Task 3 hit projector | `packages/graph-engine/src/render`, `packages/graph-engine/test` | Task 1, Task 2 for shared types |
+| Task 4 camera | `packages/graph-engine/src/render`, `packages/graph-engine/test` | Task 2 for spotlight helper import |
+| Task 5 wheel | `packages/graph-engine/src/render`, `packages/graph-engine/test` | Task 1 |
+| Task 6 overlay DOM | `packages/graph-engine/src/render`, `packages/graph-engine/test` | Tasks 2, 3, 4, 5 |
+| Task 7 final verification | repo-wide tests/browser | Tasks 1-6 |
+
+Parallel lanes:
+
+- Lane A: Task 1 -> Task 2 -> Task 3 -> Task 4 -> Task 5 -> Task 6 -> Task 7.
+- Lane B: read-only review / QA scripts can run in parallel after Task 5, but should not edit files.
+
+Execution order: implement sequentially in one branch. Use subagents only for read-only review or for isolated test drafting after a task has landed.
+
+Conflict flags: all implementation tasks touch `sigma-global-renderer.ts` and shared fake runtime tests. Parallel code edits would create avoidable merge conflicts.
+
+## Implementation Tasks
+
+Synthesized from this review's findings. Each task derives from a specific finding above.
+
+- [ ] **T1 (P1, human: ~30min / CC: ~8min)** — Camera boundary — Pass explicit community id into camera helpers
+  - Surfaced by: architecture review — camera module must not decide selected community.
+  - Files: `packages/graph-engine/src/render/sigma-global-camera.ts`, `packages/graph-engine/src/render/sigma-global-renderer.ts`, `packages/graph-engine/test/sigma-global-camera.test.ts`
+  - Verify: `node --import tsx --test packages/graph-engine/test/sigma-global-camera.test.ts packages/graph-engine/test/sigma-global-renderer.test.ts`
+
+- [ ] **T2 (P1, human: ~45min / CC: ~12min)** — Overlay cleanup — Add explicit active drag listener cleanup contract
+  - Surfaced by: architecture/performance review — extracted overlay controller otherwise loses commit/cancel cleanup ownership.
+  - Files: `packages/graph-engine/src/render/sigma-overlay-dom.ts`, `packages/graph-engine/src/render/sigma-global-renderer.ts`, `packages/graph-engine/test/sigma-overlay-dom.test.ts`
+  - Verify: `node --import tsx --test packages/graph-engine/test/sigma-overlay-dom.test.ts packages/graph-engine/test/sigma-global-renderer.test.ts`
+
+- [ ] **T3 (P1, human: ~30min / CC: ~8min)** — Boundary tests — Update renderer boundary test for overlay DOM pointer ownership
+  - Surfaced by: architecture review — current `renderer-boundary.test.ts` expects pointerdown in the old file.
+  - Files: `packages/graph-engine/test/renderer-boundary.test.ts`, `packages/graph-engine/src/render/sigma-overlay-dom.ts`
+  - Verify: `node --import tsx --test packages/graph-engine/test/renderer-boundary.test.ts`
+
+- [ ] **T4 (P1, human: ~30min / CC: ~8min)** — Wheel cleanup — Add post-destroy no-op and listener unregister tests
+  - Surfaced by: test/performance review — wheel controller must not act after destroy even if captor cleanup fails.
+  - Files: `packages/graph-engine/src/render/sigma-wheel-zoom.ts`, `packages/graph-engine/test/sigma-wheel-zoom.test.ts`, `packages/graph-engine/test/sigma-global-renderer.test.ts`
+  - Verify: `node --import tsx --test packages/graph-engine/test/sigma-wheel-zoom.test.ts packages/graph-engine/test/sigma-global-renderer.test.ts`
+
+- [ ] **T5 (P2, human: ~45min / CC: ~12min)** — Direct module tests — Split high-value behavior checks out of the integration file
+  - Surfaced by: test review — moved branches need direct tests, not only old integration coverage.
+  - Files: `packages/graph-engine/test/sigma-graphology-model.test.ts`, `packages/graph-engine/test/sigma-hit-projector.test.ts`, `packages/graph-engine/test/sigma-global-camera.test.ts`, `packages/graph-engine/test/sigma-wheel-zoom.test.ts`, `packages/graph-engine/test/sigma-overlay-dom.test.ts`
+  - Verify: `node --import tsx --test packages/graph-engine/test/sigma-*.test.ts`
+
+- [ ] **T6 (P2, human: ~20min / CC: ~5min)** — Production browser gate — Run existing Sigma production regression as final acceptance
+  - Surfaced by: performance review and prior learning `sigma_plan_must_name_production_perf_gate`.
+  - Files: no source changes expected; record artifact path in final issue comment.
+  - Verify: `bash tests/graph-sigma-global-production.regression-1.sh`
 
 ## Final Self-Review Checklist
 
@@ -1186,3 +1590,38 @@ If Step 1-6 did not change files, do not create an empty commit.
 - [ ] Existing graph-engine behavior tests pass.
 - [ ] Browser smoke result is recorded honestly.
 - [ ] #77 has an implementation comment.
+
+## GSTACK REVIEW REPORT
+
+Runs:
+
+| Reviewer | Status | Result |
+|---|---|---|
+| Main engineering review | complete | Plan needed hardening before implementation |
+| Architecture / feasibility subagent | complete | Found camera boundary, overlay cleanup, boundary-test, hit-projector, overlay-policy, and wheel stale-event issues |
+| Performance / reliability subagent | complete | Found overlay cleanup, wheel post-destroy, production browser gate, label cap, and animation/wheel proof gaps |
+| Testing subagent | complete | Found wheel cleanup, overlay DOM interaction, browser repeatability, raw-data boundary, boundary-test strength, and direct module-test gaps |
+
+Findings:
+
+| Severity | Finding | Resolution in this plan |
+|---|---|---|
+| P1 | Camera module would decide selected community itself | Renderer now computes community id and passes it into camera helpers |
+| P1 | Overlay drag listener cleanup lacked an explicit owner | `sigma-overlay-dom.ts` now has `clearActiveDragListeners()` and required tests |
+| P1 | Existing renderer boundary test would fail after overlay extraction | Task 6 now updates `renderer-boundary.test.ts` |
+| P1 | Wheel controller could act after destroy | `isDestroyed` guard and post-destroy tests added |
+| P1 | Manual browser smoke was not repeatable enough | Existing Sigma production browser regression is now a hard final gate |
+| P2 | Hit projector remained coupled to drag | rendered-object translation now moves to `sigma-hit-projector.ts` |
+| P2 | Overlay policy was misplaced in Graphology model | overlay node/label caps and selection move with `sigma-overlay-dom.ts` |
+| P2 | Direct tests were missing for extracted modules | five direct module test files added to the plan |
+| P2 | Raw-data boundary assertion would become false confidence | Task 2 now inspects `sigma-graphology-model.ts` directly |
+
+Prior learnings applied:
+
+- `sigma_plan_must_name_production_perf_gate` (confidence 9/10): final acceptance now runs `tests/graph-sigma-global-production.regression-1.sh`.
+- `sigma_camera_setstate_does_not_cancel_animation` (confidence 9/10): wheel/camera behavior remains covered by production browser regression and explicit wheel no-op tests.
+- `graph_refactor_interaction_chain_before_facade` (confidence 9/10): plan preserves the real Sigma interaction path and does not jump to facade redesign.
+
+VERDICT: proceed with implementation after this reviewed plan commit. Complexity is medium-high but justified for #77 because the goal is durable renderer boundaries before more global Sigma features land.
+
+NO UNRESOLVED DECISIONS
