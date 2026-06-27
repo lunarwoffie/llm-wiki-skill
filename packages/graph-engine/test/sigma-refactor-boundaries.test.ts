@@ -6,7 +6,8 @@ const helperFiles = [
   "sigma-global-types.ts",
   "sigma-events.ts",
   "sigma-graphology-model.ts",
-  "sigma-hit-projector.ts"
+  "sigma-hit-projector.ts",
+  "sigma-global-camera.ts"
 ];
 
 const existingTypeOnlyFiles = [

@@ -74,6 +74,13 @@ import {
   type SigmaGlobalHitInput,
   type SigmaGlobalHitProjector
 } from "./sigma-hit-projector";
+import {
+  maybeAnimateSigmaCommunitySpotlightCamera,
+  prefersReducedMotion,
+  readCameraState,
+  restoreCameraState,
+  sigmaGlobalCameraState
+} from "./sigma-global-camera";
 
 export type {
   SigmaGlobalCameraState,
@@ -244,6 +251,7 @@ export function createSigmaGlobalRenderer(options: SigmaGlobalRendererCreateOpti
             sigma,
             sigmaRoot,
             adapterData,
+            sigmaSpotlightCommunityId(adapterData),
             previousCameraSpotlightCommunityId
           );
         } catch (error) {
@@ -837,17 +845,6 @@ function sigmaLabelColor(theme: ThemeId): { color: string } {
   return { color: theme === "mo-ye" ? "#f8fafc" : "#6b6256" };
 }
 
-function readCameraState(sigma: SigmaGlobalSigmaLike): SigmaGlobalCameraState | null {
-  const state = sigma.getCamera?.().getState?.();
-  if (!state) return null;
-  return {
-    x: finiteNumber(state.x, 0),
-    y: finiteNumber(state.y, 0),
-    angle: finiteNumber(state.angle, 0),
-    ratio: finiteNumber(state.ratio, 1)
-  };
-}
-
 function sigmaWheelInputFromPayload(payload: unknown, fallbackPoint: GraphScreenPoint): {
   point: GraphScreenPoint;
   delta: SigmaWheelDeltaLike;
@@ -899,136 +896,6 @@ function sigmaViewportCenter(root: HTMLElement): GraphScreenPoint {
     x: width / 2,
     y: height / 2
   };
-}
-
-function restoreCameraState(sigma: SigmaGlobalSigmaLike, state: SigmaGlobalCameraState | null): void {
-  if (!state) return;
-  sigma.getCamera?.().setState?.(state);
-}
-
-function maybeAnimateSigmaCommunitySpotlightCamera(
-  sigma: SigmaGlobalSigmaLike,
-  root: HTMLElement,
-  adapterData: GraphRendererAdapterData,
-  previousCommunityId: string | null
-): string | null {
-  const communityId = sigmaSpotlightCommunityId(adapterData);
-  if (!communityId) return null;
-  if (communityId === previousCommunityId) return communityId;
-  const target = sigmaCommunitySpotlightCameraState(sigma, adapterData, communityId);
-  if (!target) return communityId;
-  moveSigmaCamera(sigma, target, prefersReducedMotion(root.ownerDocument.defaultView));
-  return communityId;
-}
-
-function moveSigmaCamera(
-  sigma: SigmaGlobalSigmaLike,
-  target: Partial<SigmaGlobalCameraState>,
-  reducedMotion: boolean
-): void {
-  const camera = sigma.getCamera?.();
-  if (!camera) return;
-  if (reducedMotion || !camera.animate) {
-    camera.setState?.(target);
-    return;
-  }
-  void camera.animate(target, { duration: 380, easing: "quadraticInOut" });
-}
-
-function sigmaCommunitySpotlightCameraState(
-  sigma: SigmaGlobalSigmaLike,
-  adapterData: GraphRendererAdapterData,
-  communityId: string
-): Partial<SigmaGlobalCameraState> | null {
-  const current = readCameraState(sigma) ?? { x: 0, y: 0, angle: 0, ratio: 1 };
-  const center = sigmaCommunitySpotlightCenter(adapterData, communityId);
-  if (!center) return null;
-  const bounds = adapterData.renderable.worldBounds;
-  const worldWidth = Math.max(0, finiteNumber(bounds.maxX, center.x) - finiteNumber(bounds.minX, center.x));
-  const drawerOffset = worldWidth * 0.08;
-  const graphTargetPoint = { x: center.x + drawerOffset, y: center.y };
-  const targetPoint = sigmaGraphPointToCameraPoint(sigma, graphTargetPoint);
-  const targetX = roundNumber(targetPoint.x, 3);
-  const targetY = roundNumber(targetPoint.y, 3);
-  const settledThreshold = sigmaCameraDistanceForGraphDistance(sigma, graphTargetPoint, Math.max(worldWidth * 0.015, 4));
-  const positionSettled = Math.abs(current.x - targetX) <= settledThreshold
-    && Math.abs(current.y - targetY) <= settledThreshold;
-  const target = {
-    x: targetX,
-    y: targetY,
-    angle: current.angle,
-    ratio: positionSettled || current.ratio <= 0.9
-      ? current.ratio
-      : roundNumber(clamp(current.ratio * 0.92, 0.72, current.ratio), 3)
-  };
-  const settled = positionSettled
-    && Math.abs(current.ratio - target.ratio) <= 0.025;
-  return settled ? null : target;
-}
-
-function sigmaGlobalCameraState(
-  sigma: SigmaGlobalSigmaLike,
-  adapterData: GraphRendererAdapterData
-): Partial<SigmaGlobalCameraState> {
-  const bounds = adapterData.renderable.worldBounds;
-  const center = sigmaGraphPointToCameraPoint(sigma, {
-    x: (finiteNumber(bounds.minX, 0) + finiteNumber(bounds.maxX, 0)) / 2,
-    y: (finiteNumber(bounds.minY, 0) + finiteNumber(bounds.maxY, 0)) / 2
-  });
-  return {
-    x: roundNumber(center.x, 3),
-    y: roundNumber(center.y, 3),
-    angle: 0,
-    ratio: 1
-  };
-}
-
-function sigmaGraphPointToCameraPoint(
-  sigma: SigmaGlobalSigmaLike,
-  point: { x: number; y: number }
-): { x: number; y: number } {
-  const viewportPoint = sigma.graphToViewport?.(point);
-  const cameraPoint = viewportPoint ? sigma.viewportToFramedGraph?.(viewportPoint) : null;
-  if (cameraPoint && Number.isFinite(cameraPoint.x) && Number.isFinite(cameraPoint.y)) {
-    return cameraPoint;
-  }
-  return point;
-}
-
-function sigmaCameraDistanceForGraphDistance(
-  sigma: SigmaGlobalSigmaLike,
-  point: { x: number; y: number },
-  graphDistance: number
-): number {
-  if (graphDistance <= 0) return 0;
-  const base = sigmaGraphPointToCameraPoint(sigma, point);
-  const shifted = sigmaGraphPointToCameraPoint(sigma, { x: point.x + graphDistance, y: point.y });
-  const distance = Math.abs(shifted.x - base.x);
-  return Number.isFinite(distance) && distance > 0 ? distance : graphDistance;
-}
-
-function sigmaCommunitySpotlightCenter(
-  adapterData: GraphRendererAdapterData,
-  communityId: string
-): { x: number; y: number } | null {
-  const renderableCommunity = adapterData.renderable.communities.find((community) => community.id === communityId);
-  if (renderableCommunity?.wash) {
-    return {
-      x: finiteNumber(renderableCommunity.wash.cx, 0),
-      y: finiteNumber(renderableCommunity.wash.cy, 0)
-    };
-  }
-  const nodes = adapterData.nodes.filter((node) => node.communityId === communityId);
-  if (nodes.length === 0) return null;
-  const sum = nodes.reduce((acc, node) => ({
-    x: acc.x + finiteNumber(node.point.x, 0),
-    y: acc.y + finiteNumber(node.point.y, 0)
-  }), { x: 0, y: 0 });
-  return { x: sum.x / nodes.length, y: sum.y / nodes.length };
-}
-
-function prefersReducedMotion(view: Window | null | undefined): boolean {
-  return Boolean(view?.matchMedia?.("(prefers-reduced-motion: reduce)").matches);
 }
 
 function sigmaOverlayNodes(adapterData: GraphRendererAdapterData): GraphRendererAdapterNode[] {
