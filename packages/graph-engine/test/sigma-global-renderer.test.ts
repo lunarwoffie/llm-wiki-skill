@@ -338,12 +338,16 @@ describe("Sigma global renderer production boundary", () => {
   });
 
   it("keeps the production Sigma boundary on GraphRendererAdapterData instead of raw GraphData", async () => {
-    const source = await readFile(new URL("../src/render/sigma-global-renderer.ts", import.meta.url), "utf8");
-    assert.match(source, /buildSigmaGlobalGraphologyGraph\(\s*adapterData: GraphRendererAdapterData/);
-    assert.doesNotMatch(source, /GraphData/);
-    assert.doesNotMatch(source, /buildGraphRendererAdapterData/);
-    assert.doesNotMatch(source, /\bdata\.nodes\b/);
-    assert.doesNotMatch(source, /\bdata\.edges\b/);
+    const modelSource = await readFile(new URL("../src/render/sigma-graphology-model.ts", import.meta.url), "utf8");
+    const rendererSource = await readFile(new URL("../src/render/sigma-global-renderer.ts", import.meta.url), "utf8");
+
+    assert.match(modelSource, /buildSigmaGlobalGraphologyGraph\(\s*adapterData: GraphRendererAdapterData/);
+    for (const source of [modelSource, rendererSource]) {
+      assert.doesNotMatch(source, /GraphData/);
+      assert.doesNotMatch(source, /buildGraphRendererAdapterData/);
+      assert.doesNotMatch(source, /\bdata\.nodes\b/);
+      assert.doesNotMatch(source, /\bdata\.edges\b/);
+    }
   });
 
   it("keeps Sigma community overlay styles passive instead of visible circular controls", async () => {
@@ -604,6 +608,57 @@ describe("Sigma global renderer production boundary", () => {
     assert.equal(sigma.setGraphCalls.length, 0);
     assert.equal(movedRegion, initialRegion);
     assert.ok(movedLeft > initialLeft, `expected cloud to follow updated node, got ${initialLeft} -> ${movedLeft}`);
+
+    renderer.destroy();
+  });
+
+  it("rebuilds the Sigma graph when node and edge counts change", () => {
+    const runtime = fakeRuntime();
+    const initialData = adapterDataFixture();
+    const renderer = createSigmaGlobalRenderer({
+      container: fakeContainer(),
+      adapterData: initialData,
+      theme: "shan-shui",
+      runtime
+    });
+    const sigma = runtime.instances[0];
+    const originalGraph = renderer.graph;
+
+    renderer.update({ adapterData: adapterDataWithAddedNodeAndEdge(initialData) });
+
+    assert.notEqual(renderer.graph, originalGraph);
+    assert.equal(sigma.setGraphCalls.length, 1);
+    assert.equal(renderer.graph.order, 3);
+    assert.equal(renderer.graph.size, 2);
+    assert.equal(sigma.graph, renderer.graph);
+
+    renderer.destroy();
+  });
+
+  it("patches edge style changes in place without swapping the Sigma graph", () => {
+    const runtime = fakeRuntime();
+    const adapterData = adapterDataFixture();
+    const renderer = createSigmaGlobalRenderer({
+      container: fakeContainer(),
+      adapterData,
+      theme: "shan-shui",
+      runtime
+    });
+    const sigma = runtime.instances[0];
+    const originalGraph = renderer.graph;
+    const originalEdge = { ...renderer.graph.getEdgeAttributes("adapter-edge") };
+
+    renderer.update({
+      adapterData,
+      edgeStyle: { semanticEmphasis: true, focusHighlight: false }
+    });
+
+    const updatedEdge = renderer.graph.getEdgeAttributes("adapter-edge");
+    assert.equal(renderer.graph, originalGraph);
+    assert.equal(sigma.setGraphCalls.length, 0);
+    assert.notDeepEqual(updatedEdge, originalEdge);
+    assert.ok(edgeStyleAlpha(updatedEdge.color) < edgeStyleAlpha(originalEdge.color));
+    assert.ok(updatedEdge.size < originalEdge.size);
 
     renderer.destroy();
   });
@@ -1722,6 +1777,86 @@ function adapterDataFixture(options: {
         stableCoreNodeIds: ["render-alpha"],
         stableSkeletonEdgeIds: ["adapter-edge"],
         temporaryBoostNodeIds: []
+      }
+    }
+  };
+}
+
+function adapterDataWithAddedNodeAndEdge(data: GraphRendererAdapterData = adapterDataFixture()): GraphRendererAdapterData {
+  const seedNode = data.nodes[0];
+  const seedEdge = data.edges[0];
+  if (!seedNode || !seedEdge) throw new Error("adapterDataWithAddedNodeAndEdge requires the default adapter fixture shape");
+  const addedNode: GraphRendererAdapterData["nodes"][number] = {
+    ...seedNode,
+    id: "render-gamma",
+    object: { kind: "node", nodeId: "render-gamma" },
+    label: "Adapter Gamma",
+    sourcePath: "adapter/gamma.md",
+    point: { x: 222, y: 111 },
+    selected: false,
+    searchHit: false,
+    pinHint: {
+      nodeId: "render-gamma",
+      wikiPath: "adapter/gamma.md",
+      pinned: false,
+      position: null
+    },
+    aggregationIds: [],
+    drawerTarget: {
+      summaryKind: "node-summary",
+      object: { kind: "node", nodeId: "render-gamma" }
+    },
+    render: {
+      ...seedNode.render,
+      displayMode: "point",
+      labelVisible: false,
+      priority: 50
+    }
+  };
+  const addedEdge: GraphRendererAdapterData["edges"][number] = {
+    ...seedEdge,
+    id: "adapter-edge-added",
+    sourceNodeId: "render-beta",
+    targetNodeId: "render-gamma"
+  };
+
+  return {
+    ...data,
+    counts: {
+      ...data.counts,
+      nodes: data.counts.nodes + 1,
+      edges: data.counts.edges + 1,
+      renderedNodes: data.counts.renderedNodes + 1,
+      renderedEdges: data.counts.renderedEdges + 1
+    },
+    nodes: [...data.nodes, addedNode],
+    edges: [...data.edges, addedEdge],
+    communities: data.communities.map((community) => community.id === "adapter-community"
+      ? {
+          ...community,
+          nodeIds: [...community.nodeIds, addedNode.id],
+          nodeCount: community.nodeCount + 1
+        }
+      : community),
+    renderable: {
+      ...data.renderable,
+      budgets: {
+        ...data.renderable.budgets,
+        limits: {
+          ...data.renderable.budgets.limits,
+          maxNodes: data.renderable.budgets.limits.maxNodes + 1,
+          maxEdges: data.renderable.budgets.limits.maxEdges + 1
+        },
+        usage: {
+          ...data.renderable.budgets.usage,
+          nodes: data.renderable.budgets.usage.nodes + 1,
+          edges: data.renderable.budgets.usage.edges + 1
+        }
+      },
+      communityQuality: {
+        ...data.renderable.communityQuality,
+        stableCoreNodeIds: [...data.renderable.communityQuality.stableCoreNodeIds, addedNode.id],
+        stableSkeletonEdgeIds: [...data.renderable.communityQuality.stableSkeletonEdgeIds, addedEdge.id]
       }
     }
   };

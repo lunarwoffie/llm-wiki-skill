@@ -1,13 +1,6 @@
 import type { PinPosition } from "../types";
 import type { GraphRendererAdapterData, GraphRendererAdapterNode } from "./adapter";
 import type { GraphScreenPoint } from "./geometry";
-import type { GraphGestureTarget } from "./gestures";
-
-export type SigmaGlobalRenderedObject =
-  | { kind: "node"; id: string }
-  | { kind: "edge"; id: string }
-  | { kind: "community-wash"; id: string }
-  | { kind: "aggregation-container"; id: string; communityId?: string | null };
 
 export const SIGMA_GLOBAL_NODE_DRAG_START_THRESHOLD = 2;
 
@@ -204,43 +197,4 @@ function sigmaAdapterNodeWithPoint(
       position: pinned ? (pinPosition ?? { x: point.x, y: point.y, coordinateSpace: "world" }) : null
     }
   };
-}
-
-export function sigmaCommunityLabels(adapterData: GraphRendererAdapterData, limit: number): GraphRendererAdapterData["renderable"]["communities"] {
-  const selectedCommunityIds = new Set(adapterData.communities.filter((community) => community.selected).map((community) => community.id));
-  return adapterData.renderable.communities
-    .filter((community) => community.wash)
-    .map((community, index) => ({
-      community,
-      index,
-      selected: selectedCommunityIds.has(community.id)
-    }))
-    .sort((left, right) => {
-      if (left.selected !== right.selected) return left.selected ? -1 : 1;
-      if (left.community.nodeCount !== right.community.nodeCount) return right.community.nodeCount - left.community.nodeCount;
-      return left.index - right.index;
-    })
-    .slice(0, limit)
-    .map((candidate) => candidate.community);
-}
-
-export function gestureTargetFromSigmaRenderedObject(
-  object: SigmaGlobalRenderedObject,
-  adapterData: GraphRendererAdapterData
-): GraphGestureTarget | null {
-  switch (object.kind) {
-    case "node":
-      return adapterData.nodes.some((node) => node.id === object.id) ? { kind: "node", id: object.id } : null;
-    case "edge":
-      return adapterData.edges.some((edge) => edge.id === object.id) ? { kind: "edge", id: object.id } : null;
-    case "community-wash":
-      return adapterData.communities.some((community) => community.id === object.id) ? { kind: "community-wash", id: object.id } : null;
-    case "aggregation-container": {
-      const aggregation = adapterData.aggregations.find((item) => item.id === object.id);
-      if (!aggregation) return null;
-      return { kind: "aggregation-container", id: object.id, communityId: object.communityId ?? aggregation.communityId };
-    }
-    default:
-      return null;
-  }
 }

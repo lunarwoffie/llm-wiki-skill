@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 
 import { GRAPH_WORLD_BOUNDS } from "../src/render/geometry";
 import { sigmaScreenPointToWorldPoint, sigmaWorldPointToScreenPoint } from "../src/render/sigma-coordinates";
-import type { SigmaGlobalSigmaLike } from "../src/render/sigma-global-renderer";
+import type { SigmaGlobalSigmaLike } from "../src/render/sigma-global-types";
 
 type ProjectionOptions = Parameters<typeof sigmaWorldPointToScreenPoint>[2];
 

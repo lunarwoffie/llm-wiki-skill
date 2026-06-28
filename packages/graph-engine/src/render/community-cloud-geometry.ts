@@ -1,7 +1,7 @@
 import type { GraphRendererAdapterData } from "./adapter";
 import type { GraphScreenPoint } from "./geometry";
 import { sigmaWorldPointToScreenPoint } from "./sigma-coordinates";
-import type { SigmaGlobalRendererCreateOptions, SigmaGlobalSigmaLike } from "./sigma-global-renderer";
+import type { SigmaGlobalRendererCreateOptions, SigmaGlobalSigmaLike } from "./sigma-global-types";
 
 export interface SigmaCommunityCloud {
   box: { left: number; top: number; width: number; height: number };
